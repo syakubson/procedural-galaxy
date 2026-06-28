@@ -10,6 +10,7 @@ import { starVertexShader, starFragmentShader, flareCoronaFragmentShader } from 
 import { Planet } from './planet.js';
 import { BlackHole } from './blackHole.js';
 import { Endurance } from './endurance.js';
+import { DeathStar } from './deathStar.js';
 import { ROLES, buildShip, getFaction } from './ships.js';
 import { Comet } from './comet.js';
 
@@ -99,6 +100,10 @@ export class SystemView {
 
     if (data.kind === 'blackhole') {
       this._loadBlackHole(data);
+      return;
+    }
+    if (data.kind === 'deathstar') {
+      this._loadDeathStar(data);
       return;
     }
 
@@ -224,6 +229,44 @@ export class SystemView {
       reach = Math.max(reach, this._endOrbit + 4);
     }
     this._frame(reach, data.blackHole.radius * 1.5);
+  }
+
+  _loadDeathStar(data) {
+    // The Death Star (#12) is the only lit object in the system view — give it a
+    // key + ambient light. Ships are unlit MeshBasic and ignore these lights.
+    this._dsLight = new THREE.DirectionalLight(0xffffff, 2.4);
+    this._dsLight.position.set(4, 5, 6);
+    this._dsAmbient = new THREE.AmbientLight(0x4a4e58, 1.1);
+    this.scene.add(this._dsLight, this._dsAmbient);
+
+    const R = data.deathStar.radius;
+    const ds = new DeathStar(R);
+    ds.addTo(this.scene);
+    this.deathStar = ds;
+
+    // imperial escort fleet roaming around the station (Star-Destroyer wedges)
+    this._faction = data.faction || 'imperial';
+    this._starKeepout = R + 2;
+    this._roamReach = R * 3.4;
+    this.ships = [];
+    const flag = ROLES.find((r) => r.cat === 'flagship');
+    const fighters = ROLES.filter((r) => r.cat === 'fighter');
+    const roster = [flag, fighters[0], fighters[1 % fighters.length], flag, fighters[0]];
+    roster.forEach((type, i) => {
+      if (!type) return;
+      const g = buildShip(type, this._faction); // imperial Star Destroyers
+      const a = (i / roster.length) * TAU;
+      const rr = R * (1.7 + 0.35 * i);
+      g.position.set(Math.cos(a) * rr, (i - 2) * R * 0.22, Math.sin(a) * rr);
+      g.scale.setScalar(type.scale);
+      this.scene.add(g);
+      const ship = { mesh: g, type, baseScale: type.scale, grow: 1, roam: true, speed: type.speed, waypoint: this._roamPoint() };
+      g.userData.pickKind = 'ship';
+      g.userData.pickRef = ship;
+      this.ships.push(ship);
+    });
+
+    this._frame(R * 3.2, R * 1.3);
   }
 
   _frame(maxOrbit, minR) {
@@ -376,6 +419,7 @@ export class SystemView {
     for (const m of this._starMats) m.uniforms.uTime.value = time;
     if (this._binary) this.starGroup.rotation.y += dt * 0.15; // the pair revolves
     if (this.blackHole) this.blackHole.update(time);
+    if (this.deathStar) this.deathStar.update(dt);
     if (this.endurance) {
       this.endurance.update(dt);
       this._endAngle += dt * 0.12;
@@ -415,7 +459,9 @@ export class SystemView {
   }
 
   _updateShips(dt) {
-    if (!this.ships || !this.ships.length || !this.planets.length) return;
+    // roam-only fleets (e.g. the Death Star escort) have no planets to commute
+    // between, so guard on ships alone — the commute branch handles its own.
+    if (!this.ships || !this.ships.length) return;
     for (const ship of this.ships) {
       if (ship.roam) {
         this._updateRoam(ship, dt);
@@ -530,6 +576,19 @@ export class SystemView {
       this.scene.remove(this.endurance.group);
       this.endurance.dispose();
       this.endurance = null;
+    }
+    if (this.deathStar) {
+      this.scene.remove(this.deathStar.group);
+      this.deathStar.dispose();
+      this.deathStar = null;
+    }
+    if (this._dsLight) {
+      this.scene.remove(this._dsLight);
+      this._dsLight = null;
+    }
+    if (this._dsAmbient) {
+      this.scene.remove(this._dsAmbient);
+      this._dsAmbient = null;
     }
   }
 }

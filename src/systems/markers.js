@@ -15,6 +15,7 @@ import {
   generateSolarSystem,
   generateDeadSpace,
   generateFilmWorlds,
+  generateDeathStar,
   FLEET_FACTIONS,
 } from './systemData.js';
 
@@ -145,6 +146,10 @@ export class Systems {
     generateFilmWorlds().forEach((data, k) => {
       this._addSpecialSystem(eggPos(filmSpots[k][0], filmSpots[k][1]), data, SPECIAL, 4.8);
     });
+
+    // the "Death Star" event (#12), pinned on its own arm — an event object, so
+    // it pulses amber like the Interstellar/Gargantua encounter.
+    this._addSpecial(eggPos(5, 0.42), generateDeathStar(), '#ffcf6e', 6);
   }
 
   // The galactic-centre black hole: a fully-opaque BLACK disk that punches a

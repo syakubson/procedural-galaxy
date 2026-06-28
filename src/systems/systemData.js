@@ -434,6 +434,32 @@ export function generateInterstellar() {
   };
 }
 
+/** A special "Death Star" event (#12): an imperial battle station the size of a
+ *  moon, patrolled by a fleet of Star-Destroyer wedges. Lightly anonymised. */
+export function generateDeathStar() {
+  return {
+    seed: 'death-star',
+    kind: 'deathstar',
+    event: true, // a special "event" encounter — highlighted on the map + in the UI
+    name: 'Боевая станция «Длань»',
+    status: 'blackhole', // reuse the dark "special object" status styling
+    statusLabel: 'Боевая станция · Империя',
+    description:
+      'Бронированная боевая станция размером с малую луну. По её броне тянется глубокий экваториальный ров, а на верхней полусфере зияет вогнутая чаша главного орудия — оно способно расколоть планету одним залпом.',
+    star: { label: 'Боевая станция', desc: 'диаметром с малую луну', color: '#9094a0', radius: 8, activity: 0 },
+    ageGyr: 0.0, // newly built
+    history:
+      'Её собирали десятилетиями в обстановке полной секретности. Вокруг станции патрулирует имперский флот клиновидных разрушителей, готовый стереть в пыль любую угрозу.',
+    resources: [],
+    useFor: 'абсолютное оружие и символ имперской власти',
+    fact: 'Один выстрел её главного орудия высвобождает энергию небольшой звезды.',
+    planets: [],
+    ships: 0,
+    faction: 'imperial',
+    deathStar: { radius: 8 },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Special hand-crafted "easter egg" systems (#13/#19/#20). They reuse the
 // normal star+planets system view; we just hand-build the data from a compact
