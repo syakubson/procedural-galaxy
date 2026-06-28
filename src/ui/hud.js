@@ -96,6 +96,7 @@ export class InfoPanel {
       <h1 class="sp-name"></h1>
       <div class="sp-star"></div>
       <p class="sp-desc"></p>
+      <button class="sp-expand" type="button">▾ Подробнее</button>
 
       <div class="sp-section">
         <div class="sp-sec-title">Об этой системе</div>
@@ -124,6 +125,14 @@ export class InfoPanel {
     this.el = el;
     this._backBtn = el.querySelector('.sp-back');
     this._backBtn.addEventListener('click', () => this._back());
+    // #3: the system overview opens COLLAPSED (compact card) — this toggles the
+    // full detail (history / resources / civ / planets / fact) on demand.
+    this._expandBtn = el.querySelector('.sp-expand');
+    this._expandBtn.addEventListener('click', () => {
+      const collapsed = this.el.classList.toggle('collapsed');
+      this._expandBtn.textContent = collapsed ? '▾ Подробнее' : '▴ Свернуть';
+      this.el.scrollTop = 0;
+    });
     this._r = {
       status: el.querySelector('.sp-status'),
       resTitle: el.querySelector('.sp-res-title'),
@@ -209,6 +218,11 @@ export class InfoPanel {
       r.planets.appendChild(li);
     }
 
+    // open compact: just the name/status/star + a 2-line teaser, full lore on tap
+    this._expandBtn.style.display = '';
+    this._expandBtn.textContent = '▾ Подробнее';
+    this.el.classList.add('collapsed');
+
     // scroll back to top for the new system
     this.el.scrollTop = 0;
     this.el.classList.add('visible');
@@ -218,6 +232,8 @@ export class InfoPanel {
   showPlanet(p) {
     const r = this._r;
     this._mode = 'planet';
+    this.el.classList.remove('collapsed'); // detail views are always full
+    this._expandBtn.style.display = 'none';
     this._backBtn.textContent = '← Назад к системе';
     if (r.resTitle) r.resTitle.textContent = 'Что на планете';
     const color = p.inhabited || p.colony ? STATUS_COLOR.inhabited : p.ruined ? STATUS_COLOR.ruins : STATUS_COLOR.wild;
@@ -254,6 +270,8 @@ export class InfoPanel {
   showShip(role, faction) {
     const r = this._r;
     this._mode = 'ship';
+    this.el.classList.remove('collapsed'); // detail views are always full
+    this._expandBtn.style.display = 'none';
     this._backBtn.textContent = '← Назад к системе';
     const color = '#bcd0ff';
     r.status.textContent = `Корабль · ${role.size}`;
