@@ -614,6 +614,88 @@ body {
   }
 }
 
+/* --- Cinematic planet caption (system view, on focus) -------------------- */
+#planet-caption {
+  position: fixed;
+  left: 42px;
+  bottom: 96px;
+  max-width: min(48vw, 600px);
+  z-index: 14;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+#planet-caption.visible {
+  opacity: 1;
+  transform: none;
+}
+.pc-kicker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  margin-bottom: 8px;
+}
+.pc-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 11px currentColor;
+}
+.pc-name {
+  margin: 0 0 13px;
+  font-size: 50px;
+  font-weight: 700;
+  line-height: 1.03;
+  letter-spacing: 0.5px;
+  color: #fff;
+  text-wrap: balance;
+}
+.pc-desc {
+  margin: 0 0 15px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #d6d9f5;
+  text-wrap: pretty;
+}
+.pc-feats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 17px;
+}
+.pc-actions {
+  display: flex;
+  gap: 10px;
+}
+.pc-actions button {
+  pointer-events: auto;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(150, 160, 230, 0.28);
+  background: rgba(10, 11, 24, 0.55);
+  backdrop-filter: blur(8px);
+  color: #cdd2ff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+.pc-actions button:hover {
+  background: rgba(30, 32, 60, 0.7);
+  border-color: rgba(150, 160, 230, 0.5);
+}
+.pc-actions button:active {
+  transform: scale(0.96);
+}
+.pc-details {
+  border-color: rgba(125, 200, 255, 0.4) !important;
+  color: #eaf2ff !important;
+}
+
 /* --- Diegetic in-world planet labels (system view) ----------------------- */
 #planet-labels {
   position: fixed;

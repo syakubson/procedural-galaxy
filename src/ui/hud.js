@@ -290,6 +290,59 @@ export class InfoPanel {
   }
 }
 
+// A cinematic lower-left caption shown when a planet is focused (#2 of the UI
+// redesign) — kicker + big name + one-line lore + feature chips, instead of the
+// heavy side panel. "Подробнее" still opens the full InfoPanel.showPlanet card.
+export class PlanetCaption {
+  constructor({ onBack, onDetails }) {
+    this.onBack = onBack;
+    this.onDetails = onDetails;
+    const el = document.createElement('div');
+    el.id = 'planet-caption';
+    el.innerHTML = `
+      <div class="pc-kicker"><span class="pc-dot"></span><span class="pc-kicker-txt"></span></div>
+      <h2 class="pc-name"></h2>
+      <p class="pc-desc"></p>
+      <div class="pc-feats"></div>
+      <div class="pc-actions">
+        <button class="pc-back" type="button">← К системе</button>
+        <button class="pc-details" type="button">Подробнее</button>
+      </div>`;
+    document.body.appendChild(el);
+    this.el = el;
+    el.querySelector('.pc-back').addEventListener('click', () => this.onBack && this.onBack());
+    el.querySelector('.pc-details').addEventListener('click', () => this.onDetails && this.onDetails());
+    this._dot = el.querySelector('.pc-dot');
+    this._kicker = el.querySelector('.pc-kicker-txt');
+    this._name = el.querySelector('.pc-name');
+    this._desc = el.querySelector('.pc-desc');
+    this._feats = el.querySelector('.pc-feats');
+  }
+
+  show(p, name) {
+    const inhabited = p.inhabited || p.colony;
+    const kicker = p.inhabited
+      ? 'Обитаемый мир'
+      : p.colony
+        ? 'Колония'
+        : p.ruined
+          ? 'Мёртвый мир'
+          : TYPE_LABEL[p.type] || 'Мир';
+    const color = inhabited ? STATUS_COLOR.inhabited : p.ruined ? STATUS_COLOR.ruins : STATUS_COLOR.wild;
+    this._kicker.textContent = kicker.toUpperCase();
+    this._kicker.parentElement.style.color = color;
+    this._dot.style.background = color;
+    this._name.textContent = name;
+    this._desc.textContent = planetDesc(p);
+    this._feats.innerHTML = planetFeatures(p).join('');
+    this.el.classList.add('visible');
+  }
+
+  hide() {
+    this.el.classList.remove('visible');
+  }
+}
+
 export class Tooltip {
   constructor() {
     const el = document.createElement('div');

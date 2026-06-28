@@ -13,7 +13,7 @@ import { PostFX } from './postfx.js';
 import { buildGUI } from './gui.js';
 import { Systems } from './systems/markers.js';
 import { SystemView } from './systems/systemView.js';
-import { InfoPanel, Tooltip, Overlay, Legend } from './ui/hud.js';
+import { InfoPanel, Tooltip, Overlay, Legend, PlanetCaption } from './ui/hud.js';
 import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
 
@@ -201,6 +201,19 @@ class GalaxyApp {
     this.legend = new Legend();
     this.legend.setVisible(this.config.showMarkers);
     this.planetLabels = new PlanetLabels();
+    this.planetCaption = new PlanetCaption({
+      // ← К системе: drop the focus and return to the system overview
+      onBack: () => {
+        this.systemView.unfocus();
+        this.planetCaption.hide();
+        if (this.systemView.data) this.infoPanel.show(this.systemView.data);
+      },
+      // Подробнее: open the full detailed planet card
+      onDetails: () => {
+        this.planetCaption.hide();
+        if (this._focusedPlanetData) this.infoPanel.showPlanet(this._focusedPlanetData);
+      },
+    });
     this.music = new AmbientMusic();
     this.raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
@@ -282,6 +295,12 @@ class GalaxyApp {
     this.raycaster.setFromCamera(this._pointer, this.systemView.camera);
     const hit = this.systemView.pickObject(this.raycaster);
     if (hit && hit.kind === 'planet') {
+      // already focused on this planet → no "click to approach" prompt
+      if (this.systemView._focus && this.systemView._focus.planet === hit.ref) {
+        this.tooltip.hide();
+        this.canvas.style.cursor = 'default';
+        return;
+      }
       const d = hit.ref.data;
       const title = d.label || d.biomeLabel || SYS_TYPE_RU[d.type] || 'Планета';
       this.tooltip.showSimple(title, 'нажмите, чтобы приблизиться →', e.x, e.y);
@@ -317,9 +336,17 @@ class GalaxyApp {
       const hit = this.systemView.pickObject(this.raycaster);
       if (!hit) return;
       if (hit.kind === 'planet') {
+        // #2: focus + a cinematic caption (not the heavy panel). Designation is
+        // the system name + b/c/d… by orbit index, or the hand-named label.
         this.systemView.focusPlanet(hit.ref);
-        this.infoPanel.showPlanet(hit.ref.data);
+        const idx = this.systemView.planets.indexOf(hit.ref);
+        const d = hit.ref.data;
+        const name = d.label || `${this.systemView.data.name} ${String.fromCharCode(98 + idx)}`;
+        this._focusedPlanetData = d;
+        this.infoPanel.hide();
+        this.planetCaption.show(d, name);
       } else if (hit.kind === 'ship') {
+        this.planetCaption.hide();
         this.infoPanel.showShip(hit.ref.type, this.systemView._factionStyle);
       }
     }
@@ -382,6 +409,7 @@ class GalaxyApp {
     if (this.mode !== 'system') return;
     this.mode = 'transition';
     this.infoPanel.hide();
+    this.planetCaption.hide();
     this.planetLabels.setVisible(false);
 
     // #3: first zoom the system camera back OUT (reverse of the entry flight),
@@ -517,8 +545,9 @@ class GalaxyApp {
       this.systemView.update(dt, this._time);
       if (this.mode === 'system') {
         this._processHoverSystem();
-        // diegetic planet labels — hidden during the entry zoom to avoid jitter
-        const showLabels = !this.systemView._zoom;
+        // diegetic planet labels — hidden during the entry zoom and while a
+        // single planet is focused (the cinematic caption names it instead)
+        const showLabels = !this.systemView._zoom && !this.systemView._focus;
         this.planetLabels.setVisible(showLabels);
         if (showLabels) {
           this.planetLabels.update(this.systemView.camera, window.innerWidth, window.innerHeight);
