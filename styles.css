@@ -136,6 +136,41 @@ body {
   z-index: 15;
   backdrop-filter: blur(10px);
 }
+/* the settings panel is hidden by default (behind the ⚙ button) and, when
+   opened, sits just below the gear so the gear stays clickable to close it. */
+.lil-gui.root {
+  top: 70px;
+  right: 18px;
+  max-height: calc(100vh - 92px);
+}
+
+/* --- settings (⚙) toggle — top-right, opens/closes the generator panel --- */
+#settings-toggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 16;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(150, 160, 230, 0.22);
+  background: rgba(10, 11, 24, 0.55);
+  backdrop-filter: blur(8px);
+  color: #cdd2ff;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+#settings-toggle:hover {
+  background: rgba(30, 32, 60, 0.7);
+  transform: scale(1.06);
+}
+#settings-toggle.on {
+  border-color: rgba(125, 200, 255, 0.55);
+  color: #fff;
+  transform: rotate(40deg);
+}
 
 /* --- ambient music toggle --- */
 #music-toggle {

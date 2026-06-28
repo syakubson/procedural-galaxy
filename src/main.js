@@ -58,12 +58,29 @@ class GalaxyApp {
     this.clock = new THREE.Clock();
 
     this._bindEvents();
-    buildGUI(this);
+    this.gui = buildGUI(this);
+    this.gui.hide(); // minimal galaxy view — the generator panel opens via the ⚙ button
+    this._initSettingsToggle();
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
 
     this._warmUpSystemShaders(); // pre-compile system shaders so the first dive is instant
+  }
+
+  /** Wire the ⚙ button that opens/closes the generator panel (hidden by default
+   *  so the galaxy reads as a universe to explore, not an engineer's console). */
+  _initSettingsToggle() {
+    const btn = document.getElementById('settings-toggle');
+    this._settingsBtn = btn;
+    this._settingsOpen = false;
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      this._settingsOpen = !this._settingsOpen;
+      if (this._settingsOpen) this.gui.show();
+      else this.gui.hide();
+      btn.classList.toggle('on', this._settingsOpen);
+    });
   }
 
   /** Pre-compile the system-view shaders ONCE, in the background, while the user
@@ -329,6 +346,11 @@ class GalaxyApp {
     this.tooltip.hide();
     this.legend.setVisible(false);
     this.canvas.style.cursor = 'default';
+    // settings belong to the galaxy view only — hide the ⚙ + close the panel
+    if (this._settingsBtn) this._settingsBtn.style.display = 'none';
+    this.gui.hide();
+    this._settingsOpen = false;
+    if (this._settingsBtn) this._settingsBtn.classList.remove('on');
 
     // #9: fly the galaxy camera toward the marker, while the system is BUILT AND
     // COMPILED IN THE BACKGROUND during the approach — so by the time the flight
@@ -383,6 +405,7 @@ class GalaxyApp {
     this.controls.autoRotate = this.config.cameraAutoRotate;
     this._lastInteract = this._time;
     this.legend.setVisible(this.config.showMarkers);
+    if (this._settingsBtn) this._settingsBtn.style.display = ''; // ⚙ back in the galaxy view
     this.mode = 'galaxy'; // flip after reveal so a stray click can't double-fire
   }
 
