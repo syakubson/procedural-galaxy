@@ -414,6 +414,7 @@ export function generateInterstellar() {
     seed: 'interstellar',
     kind: 'blackhole',
     variant: 'gargantua',
+    event: true, // a special "event" encounter — highlighted on the map + in the UI
     name: 'Гаргантюа',
     status: 'blackhole',
     statusLabel: 'Чёрная дыра · «Интерстеллар»',

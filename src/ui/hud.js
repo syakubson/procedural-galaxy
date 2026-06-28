@@ -148,8 +148,8 @@ export class InfoPanel {
     this._mode = 'system';
     this._backBtn.textContent = '← Назад к галактике';
     if (r.resTitle) r.resTitle.textContent = 'Ресурсы';
-    const color = data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status];
-    r.status.textContent = data.statusLabel;
+    const color = data.event ? '#ffcf6e' : data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status];
+    r.status.textContent = (data.event ? '✦ СОБЫТИЕ · ' : '') + data.statusLabel;
     r.status.style.color = color;
     r.status.style.borderColor = color;
     r.name.textContent = data.name;
@@ -319,8 +319,10 @@ export class Tooltip {
     const teaser = visited
       ? '<span class="tt-teaser tt-seen">✓ исследована · открыть снова</span>'
       : '<span class="tt-teaser">нажмите, чтобы исследовать →</span>';
+    const eventBadge = data.event ? '<span style="color:#ffcf6e;font-weight:600">✦ СОБЫТИЕ</span>' : '';
     this.el.innerHTML =
       `<b>${data.name}</b>` +
+      eventBadge +
       `<span style="color:${STATUS_COLOR[data.status]}">${data.statusLabel}</span>` +
       `<span class="tt-info">${info}</span>` +
       teaser;

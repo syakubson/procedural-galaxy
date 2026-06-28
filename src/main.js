@@ -35,6 +35,8 @@ class GalaxyApp {
 
     this._time = 0; // accumulated animation time (seconds)
     this._lastInteract = 0; // time of last camera interaction (auto-rotate idle, #23)
+    this._galaxyDolly = null; // galaxy-side camera flight into/out of a system (#9)
+    this._preDolly = null; // saved galaxy view to restore on exit (#9)
     this._running = true;
     this._fpsEma = 60;
     this._lowPerfFrames = 0;
@@ -299,7 +301,13 @@ class GalaxyApp {
     this.legend.setVisible(false);
     this.canvas.style.cursor = 'default';
 
-    await this.overlay.fadeTo(0.72, 300); // brief dip, not a full black cut
+    // #9: fly the galaxy camera toward the marker FIRST, then dip + swap, so the
+    // warp reads as one continuous zoom into the system (reversed on exit).
+    this._preDolly = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
+    const toPos = this.camera.position.clone().lerp(entry.worldPos, 0.72);
+    await this._galaxyDollyTo(toPos, entry.worldPos.clone(), 0.45);
+
+    await this.overlay.fadeTo(0.72, 240); // brief dip, not a full black cut
     this.systemView.load(entry.data);
     this.systemView.setSize(window.innerWidth, window.innerHeight);
     this.postfx.setView(this.systemView.scene, this.systemView.camera);
@@ -321,13 +329,49 @@ class GalaxyApp {
     this.systemView.exit();
     this.postfx.setView(this.scene, this.camera);
     this.systemView.clear();
-    await this.overlay.fadeTo(0, 600);
+    // #9: reveal the galaxy while the camera pulls back out to where it was —
+    // the reverse of the entry flight.
+    const reveal = this.overlay.fadeTo(0, 600);
+    if (this._preDolly) {
+      await this._galaxyDollyTo(this._preDolly.pos, this._preDolly.target, 0.6);
+      this._preDolly = null;
+    }
+    await reveal;
     this.controls.enabled = true;
     // rotate again on return to the galaxy, and restart the 30s idle timer (#23)
     this.controls.autoRotate = this.config.cameraAutoRotate;
     this._lastInteract = this._time;
     this.legend.setVisible(this.config.showMarkers);
     this.mode = 'galaxy'; // flip after reveal so a stray click can't double-fire
+  }
+
+  /** Animate the galaxy camera + target to (toPos,toTarget); resolves when done (#9). */
+  _galaxyDollyTo(toPos, toTarget, dur) {
+    return new Promise((resolve) => {
+      this._galaxyDolly = {
+        t: 0,
+        dur,
+        fromPos: this.camera.position.clone(),
+        fromTarget: this.controls.target.clone(),
+        toPos: toPos.clone(),
+        toTarget: toTarget.clone(),
+        resolve,
+      };
+    });
+  }
+
+  _stepGalaxyDolly(dt) {
+    const d = this._galaxyDolly;
+    d.t = Math.min(d.t + dt / d.dur, 1);
+    const e = d.t * d.t * (3 - 2 * d.t); // smoothstep ease
+    this.camera.position.lerpVectors(d.fromPos, d.toPos, e);
+    this.controls.target.lerpVectors(d.fromTarget, d.toTarget, e);
+    this.camera.lookAt(this.controls.target);
+    if (d.t >= 1) {
+      const r = d.resolve;
+      this._galaxyDolly = null;
+      if (r) r();
+    }
   }
 
   // ---- mutations driven by the GUI -----------------------------------------
@@ -391,15 +435,19 @@ class GalaxyApp {
       this.background.update(this._time);
       this.systems.update(this._time, this.camera);
       if (this.mode === 'galaxy') this._processHover();
-      // resume auto-rotation after 30s of no camera interaction (#23)
-      if (
-        this.config.cameraAutoRotate &&
-        !this.controls.autoRotate &&
-        this._time - this._lastInteract > 30
-      ) {
-        this.controls.autoRotate = true;
+      if (this._galaxyDolly) {
+        this._stepGalaxyDolly(dt); // #9: warp flight in/out — bypass controls
+      } else {
+        // resume auto-rotation after 30s of no camera interaction (#23)
+        if (
+          this.config.cameraAutoRotate &&
+          !this.controls.autoRotate &&
+          this._time - this._lastInteract > 30
+        ) {
+          this.controls.autoRotate = true;
+        }
+        this.controls.update();
       }
-      this.controls.update();
     }
     if (this.mode === 'system' || this.mode === 'transition') {
       this.systemView.update(dt, this._time);

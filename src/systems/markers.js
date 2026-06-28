@@ -285,7 +285,9 @@ export class Systems {
       // disk. Unexplored ones pulse a little; explored ones dim only slightly so
       // they're still distinguishable.
       const seen = s.visited;
-      const pulse = 1 + (seen ? 0.05 : 0.12) * Math.sin(time * 2.0 + s.index * 0.7);
+      // "event" objects pulse harder to read as a special encounter on the map
+      const amp = s.data && s.data.event ? 0.24 : seen ? 0.05 : 0.12;
+      const pulse = 1 + amp * Math.sin(time * 2.0 + s.index * 0.7);
       const base = s.special ? s.baseScale : seen ? 3.7 : 4.4;
       s.sprite.scale.setScalar(base * pulse);
       s.sprite.material.opacity = seen ? 0.82 : 1.0;
