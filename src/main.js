@@ -305,23 +305,29 @@ class GalaxyApp {
     this.legend.setVisible(false);
     this.canvas.style.cursor = 'default';
 
-    // #9: fly the galaxy camera toward the marker FIRST, then dip + swap, so the
-    // warp reads as one continuous zoom into the system (reversed on exit).
+    // #9: fly the galaxy camera toward the marker, while the system is BUILT AND
+    // COMPILED IN THE BACKGROUND during the approach — so by the time the flight
+    // lands everything is ready and the swap is a quick dip, not a long one that
+    // has to hide the load. Reversed on exit.
     this._preDolly = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     const toPos = this.camera.position.clone().lerp(entry.worldPos, 0.72);
-    await this._galaxyDollyTo(toPos, entry.worldPos.clone(), 0.6);
 
-    await this.overlay.fadeTo(0.72, 240); // brief dip, not a full black cut
+    // build the system now (cheap), and compile its shaders in PARALLEL with the
+    // flight (non-blocking via KHR_parallel_shader_compile) — no mid-warp hitch.
     this.systemView.load(entry.data);
     this.planetLabels.setSystem(this.systemView.planets, entry.data);
     this.systemView.setSize(window.innerWidth, window.innerHeight);
+    const compiled = this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
+
+    await this._galaxyDollyTo(toPos, entry.worldPos.clone(), 0.6);
+    await compiled; // ensure shaders are ready before we reveal (usually already done)
+
+    await this.overlay.fadeTo(0.72, 120); // short dip — nothing heavy left to do
     this.postfx.setView(this.systemView.scene, this.systemView.camera);
-    // compile the new shaders during the dip, not during the reveal
-    this.renderer.compile(this.systemView.scene, this.systemView.camera);
     this.systemView.beginEnterZoom(1.35); // system appears pulled-back and dollies in (cinematic)
     this.systemView.enter();
     this.infoPanel.show(entry.data);
-    await this.overlay.fadeTo(0, 500); // reveal while the zoom continues to the overview
+    await this.overlay.fadeTo(0, 460); // reveal while the zoom continues to the overview
     this.mode = 'system'; // flip only now, so Esc can't race the reveal
   }
 
