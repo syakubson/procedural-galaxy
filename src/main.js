@@ -110,6 +110,8 @@ class GalaxyApp {
     controls.enablePan = false; // keep the centre locked
     controls.rotateSpeed = 0.6;
     controls.zoomSpeed = 0.9;
+    controls.zoomToCursor = true; // #2: wheel zooms toward the cursor, not just the centre
+    controls.maxTargetRadius = r * 0.5; // …but keep the focus near the centre so you never get lost
     controls.minDistance = r * 0.12; // dive into the core
     controls.maxDistance = r * 7;
     controls.maxPolarAngle = Math.PI * 0.92; // don't flip fully under the disk
@@ -307,7 +309,7 @@ class GalaxyApp {
     // warp reads as one continuous zoom into the system (reversed on exit).
     this._preDolly = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     const toPos = this.camera.position.clone().lerp(entry.worldPos, 0.72);
-    await this._galaxyDollyTo(toPos, entry.worldPos.clone(), 0.45);
+    await this._galaxyDollyTo(toPos, entry.worldPos.clone(), 0.6);
 
     await this.overlay.fadeTo(0.72, 240); // brief dip, not a full black cut
     this.systemView.load(entry.data);
@@ -316,10 +318,10 @@ class GalaxyApp {
     this.postfx.setView(this.systemView.scene, this.systemView.camera);
     // compile the new shaders during the dip, not during the reveal
     this.renderer.compile(this.systemView.scene, this.systemView.camera);
-    this.systemView.beginEnterZoom(1.1); // system appears pulled-back and dollies in
+    this.systemView.beginEnterZoom(1.35); // system appears pulled-back and dollies in (cinematic)
     this.systemView.enter();
     this.infoPanel.show(entry.data);
-    await this.overlay.fadeTo(0, 440); // reveal while the zoom continues to the overview
+    await this.overlay.fadeTo(0, 500); // reveal while the zoom continues to the overview
     this.mode = 'system'; // flip only now, so Esc can't race the reveal
   }
 
@@ -329,16 +331,19 @@ class GalaxyApp {
     this.infoPanel.hide();
     this.planetLabels.setVisible(false);
 
-    await this.overlay.fadeTo(1, 460);
+    // #3: first zoom the system camera back OUT (reverse of the entry flight),
+    // then a brief PARTIAL dip — not a hard black cut — so the exit reads as one
+    // continuous pull-back rather than a jump.
+    this.systemView.beginExitZoom(0.55);
+    await this.overlay.fadeTo(0.82, 300);
     this.systemView.exit();
     this.postfx.setView(this.scene, this.camera);
     this.systemView.clear();
     this.planetLabels.clear();
-    // #9: reveal the galaxy while the camera pulls back out to where it was —
-    // the reverse of the entry flight.
-    const reveal = this.overlay.fadeTo(0, 600);
+    // reveal the galaxy while the camera pulls back out to where it was.
+    const reveal = this.overlay.fadeTo(0, 620);
     if (this._preDolly) {
-      await this._galaxyDollyTo(this._preDolly.pos, this._preDolly.target, 0.6);
+      await this._galaxyDollyTo(this._preDolly.pos, this._preDolly.target, 0.7);
       this._preDolly = null;
     }
     await reveal;
@@ -368,7 +373,7 @@ class GalaxyApp {
   _stepGalaxyDolly(dt) {
     const d = this._galaxyDolly;
     d.t = Math.min(d.t + dt / d.dur, 1);
-    const e = d.t * d.t * (3 - 2 * d.t); // smoothstep ease
+    const e = d.t * d.t * d.t * (d.t * (d.t * 6 - 15) + 10); // smootherstep — gentler accel/decel
     this.camera.position.lerpVectors(d.fromPos, d.toPos, e);
     this.controls.target.lerpVectors(d.fromTarget, d.toTarget, e);
     this.camera.lookAt(this.controls.target);

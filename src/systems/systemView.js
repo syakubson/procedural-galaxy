@@ -313,7 +313,7 @@ export class SystemView {
       planet,
       entering: true,
       t: 0,
-      dur: 0.8,
+      dur: 0.95, // a touch slower → more cinematic approach
       dist: planet.data.radius * 5 + 2,
       fromPos: this.camera.position.clone(),
       fromTarget: this.controls.target.clone(),
@@ -413,6 +413,17 @@ export class SystemView {
     this.camera.position.copy(from);
     this.camera.lookAt(ov.target);
     this._zoom = { t: 0, dur, from, to: ov.pos.clone() };
+  }
+
+  /** #3: reverse of beginEnterZoom — dolly the system camera outward (away from
+   *  whatever it's looking at) so leaving the system reads as a pull-back flight.
+   *  Fire-and-forget: the next exit() nulls _zoom, so it never needs awaiting. */
+  beginExitZoom(dur = 0.55) {
+    const tgt = this.controls.target;
+    const from = this.camera.position.clone();
+    const to = from.clone().sub(tgt).multiplyScalar(2.3).add(tgt);
+    this._focus = null; // override any planet-follow so the pull-back wins
+    this._zoom = { t: 0, dur, from, to };
   }
 
   update(dt, time) {
