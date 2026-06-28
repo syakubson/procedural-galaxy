@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <meta name="theme-color" content="#03030b" />
+    <title>Galaxy — процедурная вселенная</title>
+    <link rel="stylesheet" href="./styles.css" />
+
+    <!-- Resolve bare module specifiers to the vendored Three.js + lil-gui. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three.module.js",
+          "three/addons/": "./vendor/addons/",
+          "lil-gui": "./vendor/lil-gui.esm.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <div id="loader" aria-hidden="true">
+      <div class="loader__core"></div>
+      <span>Генерация вселенной…</span>
+    </div>
+
+    <div id="hint">
+      <span><b>Колесо мыши</b> — приблизиться к центру</span>
+      <span class="hint__dot">·</span>
+      <span><b>Зажать ЛКМ</b> — повернуть галактику</span>
+      <span class="hint__dot">·</span>
+      <span><b>Панель справа</b> — настройки</span>
+    </div>
+
+    <a id="gallery-link" href="./gallery.html" title="Все корабли и станции">🛰 Флот и станции</a>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

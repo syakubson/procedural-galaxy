@@ -1,0 +1,447 @@
+// Application orchestrator: renderer, camera + controls, the galaxy layers,
+// post-processing and the render loop. Designed to stay light on the CPU —
+// per frame it only advances one time value and lets the GPU do the rest.
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createDefaultConfig, applyQuality } from './config.js';
+import { getPalette } from './palettes.js';
+import { Galaxy } from './galaxy.js';
+import { Suns } from './suns.js';
+import { Background } from './background.js';
+import { PostFX } from './postfx.js';
+import { buildGUI } from './gui.js';
+import { Systems } from './systems/markers.js';
+import { SystemView } from './systems/systemView.js';
+import { InfoPanel, Tooltip, Overlay, Legend } from './ui/hud.js';
+import { AmbientMusic } from './audio/ambient.js';
+
+// Russian planet-type labels for the in-system hover card (#6).
+const SYS_TYPE_RU = {
+  lava: 'Лавовая',
+  rocky: 'Каменистая',
+  desert: 'Пустынная',
+  terran: 'Земного типа',
+  ocean: 'Океаническая',
+  ice: 'Ледяная',
+  gas: 'Газовый гигант',
+};
+
+class GalaxyApp {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.config = createDefaultConfig('medium');
+    this.stats = { fps: 0 };
+
+    this._time = 0; // accumulated animation time (seconds)
+    this._lastInteract = 0; // time of last camera interaction (auto-rotate idle, #23)
+    this._running = true;
+    this._fpsEma = 60;
+    this._lowPerfFrames = 0;
+    this._autoDowngraded = false;
+
+    this.mode = 'galaxy'; // 'galaxy' | 'system' | 'transition'
+
+    this._initRenderer();
+    this._initScene();
+    this._initControls();
+    this._buildWorld();
+    this.postfx = new PostFX(this.renderer, this.scene, this.camera, this.config.antialias ? 4 : 0);
+    this._buildSystems();
+    this.systemView = new SystemView(this.renderer);
+    this._initHud();
+    this._syncPixelRatio();
+
+    this.clock = new THREE.Clock();
+
+    this._bindEvents();
+    buildGUI(this);
+
+    this._loop = this._loop.bind(this);
+    this.renderer.setAnimationLoop(this._loop);
+  }
+
+  // ---- setup ----------------------------------------------------------------
+
+  _initRenderer() {
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: this.config.antialias,
+      powerPreference: 'high-performance',
+      alpha: false,
+      stencil: false,
+    });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setClearColor(new THREE.Color(getPalette(this.config.palette).background), 1);
+    // ACES tone-mapping (applied by the OutputPass) rolls off the additive HDR
+    // accumulation so the core glows warm-white instead of clipping flat.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = this.config.exposure;
+
+    // Hardware point-size ceiling — weak GPUs cap this low (often 63/64); we
+    // clamp to it so big suns don't hit the driver's silent point-size cliff.
+    const gl = this.renderer.getContext();
+    this.maxPointSize = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 1024;
+  }
+
+  _initScene() {
+    this.scene = new THREE.Scene();
+    const r = this.config.radius;
+    this.camera = new THREE.PerspectiveCamera(
+      58,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      r * 20, // headroom over the radius*9 background shell at full zoom-out
+    );
+    // cinematic low-oblique view: close enough to fill the frame, tilted enough
+    // to project the disk as a clear ellipse (a 3D plane, not a flat sprite).
+    this.camera.position.set(0, r * 0.62, r * 1.2);
+  }
+
+  _initControls() {
+    const r = this.config.radius;
+    const controls = new OrbitControls(this.camera, this.renderer.domElement);
+    controls.target.set(0, 0, 0); // always orbit / zoom toward the galactic centre
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.enablePan = false; // keep the centre locked
+    controls.rotateSpeed = 0.6;
+    controls.zoomSpeed = 0.9;
+    controls.minDistance = r * 0.12; // dive into the core
+    controls.maxDistance = r * 7;
+    controls.maxPolarAngle = Math.PI * 0.92; // don't flip fully under the disk
+    controls.autoRotate = this.config.cameraAutoRotate;
+    controls.autoRotateSpeed = 0.3;
+    // #23: stop the idle auto-rotation the moment the user grabs the camera
+    // (drag / zoom); it resumes only after 30s of no interaction (see _loop).
+    controls.addEventListener('start', () => {
+      controls.autoRotate = false;
+      this._lastInteract = this._time;
+    });
+    this.controls = controls;
+  }
+
+  _buildWorld() {
+    this.galaxy = new Galaxy(this.config);
+    this.suns = new Suns(this.config);
+    this.background = new Background(this.config);
+    // clamp shader point sizes to the device's hardware ceiling
+    const cap = Math.min(this.maxPointSize, 1024);
+    this.galaxy.material.uniforms.uMaxPointSize.value = cap;
+    this.suns.material.uniforms.uMaxPointSize.value = cap;
+    this.scene.add(this.background.group);
+    this.scene.add(this.galaxy.points);
+    this.scene.add(this.suns.points);
+  }
+
+  _buildSystems() {
+    this.systems = new Systems(this.config);
+    this.systems.setVisible(this.config.showMarkers);
+    this.scene.add(this.systems.group);
+  }
+
+  _initHud() {
+    this.overlay = new Overlay();
+    this.tooltip = new Tooltip();
+    this.infoPanel = new InfoPanel({
+      onBack: () => this.exitSystem(),
+      // from a planet/ship card → back to the system overview (#6/#7)
+      onBackToSystem: () => {
+        this.systemView.unfocus();
+        if (this.systemView.data) this.infoPanel.show(this.systemView.data);
+      },
+    });
+    this.legend = new Legend();
+    this.legend.setVisible(this.config.showMarkers);
+    this.music = new AmbientMusic();
+    this.raycaster = new THREE.Raycaster();
+    this._pointer = new THREE.Vector2();
+    this._downAt = { x: 0, y: 0 };
+    this._updateProgress();
+  }
+
+  _syncPixelRatio() {
+    const pr = Math.min(window.devicePixelRatio || 1, this.config.maxPixelRatio);
+    this.renderer.setPixelRatio(pr);
+    this.postfx.setPixelRatio(pr);
+    this.postfx.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  // ---- events ---------------------------------------------------------------
+
+  _bindEvents() {
+    let resizeRaf = 0;
+    window.addEventListener('resize', () => {
+      cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => this._onResize());
+    });
+    document.addEventListener('visibilitychange', () => {
+      // Pause the loop when the tab is hidden — saves battery/CPU.
+      this._running = !document.hidden;
+      if (this._running) this.clock.getDelta(); // drop the accumulated gap
+    });
+
+    // --- system interaction (galaxy mode) ---
+    this.canvas.addEventListener('pointermove', (e) => this._onPointerMove(e));
+    this.canvas.addEventListener('pointerdown', (e) => {
+      this._downAt = { x: e.clientX, y: e.clientY };
+    });
+    this.canvas.addEventListener('pointerup', (e) => {
+      const moved = Math.hypot(e.clientX - this._downAt.x, e.clientY - this._downAt.y);
+      if (moved < 6) this._onClick(e); // distinguish a click from an orbit-drag
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.mode === 'system') this.exitSystem();
+    });
+  }
+
+  _updatePointer(e) {
+    this._pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+    this._pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    this.raycaster.setFromCamera(this._pointer, this.camera);
+  }
+
+  _onPointerMove(e) {
+    // Record only; the actual raycast runs at most once per frame in the loop.
+    this._hover = { x: e.clientX, y: e.clientY };
+  }
+
+  /** Throttled hover pick — one raycast per rendered frame, in galaxy mode. */
+  _processHover() {
+    if (!this._hover) return;
+    const e = this._hover;
+    this._hover = null;
+    this._pointer.x = (e.x / window.innerWidth) * 2 - 1;
+    this._pointer.y = -(e.y / window.innerHeight) * 2 + 1;
+    this.raycaster.setFromCamera(this._pointer, this.camera);
+    const hit = this.systems.pick(this.raycaster);
+    if (hit) {
+      this.tooltip.show(hit.data, e.x, e.y, hit.visited);
+      this.canvas.style.cursor = 'pointer';
+    } else {
+      this.tooltip.hide();
+      this.canvas.style.cursor = 'grab';
+    }
+  }
+
+  /** Throttled hover pick in the system view — planets + ships (#6/#7). */
+  _processHoverSystem() {
+    if (!this._hover) return;
+    const e = this._hover;
+    this._hover = null;
+    this._pointer.x = (e.x / window.innerWidth) * 2 - 1;
+    this._pointer.y = -(e.y / window.innerHeight) * 2 + 1;
+    this.raycaster.setFromCamera(this._pointer, this.systemView.camera);
+    const hit = this.systemView.pickObject(this.raycaster);
+    if (hit && hit.kind === 'planet') {
+      const d = hit.ref.data;
+      const title = d.label || d.biomeLabel || SYS_TYPE_RU[d.type] || 'Планета';
+      this.tooltip.showSimple(title, 'нажмите, чтобы приблизиться →', e.x, e.y);
+      this.canvas.style.cursor = 'pointer';
+    } else if (hit && hit.kind === 'ship') {
+      this.tooltip.showSimple(hit.ref.type.name, 'нажмите для информации →', e.x, e.y);
+      this.canvas.style.cursor = 'pointer';
+    } else {
+      this.tooltip.hide();
+      this.canvas.style.cursor = 'grab';
+    }
+  }
+
+  _updateProgress() {
+    // count only real systems (the legend doesn't list the special black holes)
+    const list = this.systems.list.filter((s) => !s.special);
+    const n = list.filter((s) => s.visited).length;
+    this.legend.setProgress(n, list.length);
+  }
+
+  _onClick(e) {
+    if (this.mode === 'galaxy') {
+      this._updatePointer(e);
+      const hit = this.systems.pick(this.raycaster);
+      if (hit) this.enterSystem(hit);
+      return;
+    }
+    if (this.mode === 'system') {
+      // pick a planet (→ zoom + planet card, #6) or a ship (→ ship card, #7)
+      this._pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      this._pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      this.raycaster.setFromCamera(this._pointer, this.systemView.camera);
+      const hit = this.systemView.pickObject(this.raycaster);
+      if (!hit) return;
+      if (hit.kind === 'planet') {
+        this.systemView.focusPlanet(hit.ref);
+        this.infoPanel.showPlanet(hit.ref.data);
+      } else if (hit.kind === 'ship') {
+        this.infoPanel.showShip(hit.ref.type, this.systemView._factionStyle);
+      }
+    }
+  }
+
+  _onResize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h);
+    this.postfx.setSize(w, h);
+    this.systemView.setSize(w, h);
+  }
+
+  // ---- system enter / exit (cinematic warp) ---------------------------------
+
+  async enterSystem(entry) {
+    if (this.mode !== 'galaxy') return;
+    this.mode = 'transition';
+    entry.visited = true; // discovery progress + dims the marker
+    this._updateProgress();
+    this.controls.enabled = false; // lock galaxy input immediately
+    this.tooltip.hide();
+    this.legend.setVisible(false);
+    this.canvas.style.cursor = 'default';
+
+    await this.overlay.fadeTo(0.72, 300); // brief dip, not a full black cut
+    this.systemView.load(entry.data);
+    this.systemView.setSize(window.innerWidth, window.innerHeight);
+    this.postfx.setView(this.systemView.scene, this.systemView.camera);
+    // compile the new shaders during the dip, not during the reveal
+    this.renderer.compile(this.systemView.scene, this.systemView.camera);
+    this.systemView.beginEnterZoom(1.1); // system appears pulled-back and dollies in
+    this.systemView.enter();
+    this.infoPanel.show(entry.data);
+    await this.overlay.fadeTo(0, 440); // reveal while the zoom continues to the overview
+    this.mode = 'system'; // flip only now, so Esc can't race the reveal
+  }
+
+  async exitSystem() {
+    if (this.mode !== 'system') return;
+    this.mode = 'transition';
+    this.infoPanel.hide();
+
+    await this.overlay.fadeTo(1, 460);
+    this.systemView.exit();
+    this.postfx.setView(this.scene, this.camera);
+    this.systemView.clear();
+    await this.overlay.fadeTo(0, 600);
+    this.controls.enabled = true;
+    // rotate again on return to the galaxy, and restart the 30s idle timer (#23)
+    this.controls.autoRotate = this.config.cameraAutoRotate;
+    this._lastInteract = this._time;
+    this.legend.setVisible(this.config.showMarkers);
+    this.mode = 'galaxy'; // flip after reveal so a stray click can't double-fire
+  }
+
+  // ---- mutations driven by the GUI -----------------------------------------
+
+  /** Structural change: regenerate all geometry from the current config. */
+  rebuild() {
+    this.scene.remove(this.galaxy.points);
+    this.scene.remove(this.suns.points);
+    this.scene.remove(this.background.group);
+    this.galaxy.dispose();
+    this.suns.dispose();
+    this.background.dispose();
+    this._buildWorld();
+    this.rebuildSystems();
+    this.controls.autoRotate = this.config.cameraAutoRotate;
+  }
+
+  /** Regenerate the explorable systems (seed / count / fraction change). */
+  rebuildSystems() {
+    this.scene.remove(this.systems.group);
+    this.systems.dispose();
+    this._buildSystems();
+    this._updateProgress();
+  }
+
+  /** Live change: push uniforms / renderer state without rebuilding geometry. */
+  applyLive() {
+    this.galaxy.applyLiveUniforms();
+    this.suns.applyLiveUniforms();
+    this.background.applyLiveUniforms();
+    this.controls.autoRotate = this.config.cameraAutoRotate;
+    this.renderer.setClearColor(new THREE.Color(getPalette(this.config.palette).background), 1);
+    this.renderer.toneMappingExposure = this.config.exposure;
+    this.systems.setVisible(this.config.showMarkers);
+    this.legend.setVisible(this.config.showMarkers && this.mode !== 'system');
+  }
+
+  setQuality(quality) {
+    applyQuality(this.config, quality);
+    this.postfx.setSamples(this.config.antialias ? 4 : 0);
+    this._syncPixelRatio();
+    this._autoDowngraded = false;
+    this.rebuild();
+    this.applyLive();
+  }
+
+  // ---- render loop ----------------------------------------------------------
+
+  _loop() {
+    const rawDelta = this.clock.getDelta();
+    if (!this._running) return;
+
+    // clamp to avoid a time jump after a stall / hidden tab
+    const dt = Math.min(rawDelta, 0.05);
+    this._time += dt;
+
+    if (this.mode === 'galaxy' || this.mode === 'transition') {
+      const pr = this.renderer.getPixelRatio();
+      this.galaxy.update(this._time, pr);
+      this.suns.update(this._time, pr);
+      this.background.update(this._time);
+      this.systems.update(this._time, this.camera);
+      if (this.mode === 'galaxy') this._processHover();
+      // resume auto-rotation after 30s of no camera interaction (#23)
+      if (
+        this.config.cameraAutoRotate &&
+        !this.controls.autoRotate &&
+        this._time - this._lastInteract > 30
+      ) {
+        this.controls.autoRotate = true;
+      }
+      this.controls.update();
+    }
+    if (this.mode === 'system' || this.mode === 'transition') {
+      this.systemView.update(dt, this._time);
+      if (this.mode === 'system') this._processHoverSystem();
+    }
+
+    this.postfx.render();
+    this._trackPerf(rawDelta);
+  }
+
+  _trackPerf(delta) {
+    if (delta > 0) {
+      const fps = 1 / delta;
+      this._fpsEma = this._fpsEma * 0.9 + fps * 0.1;
+      this.stats.fps = Math.round(this._fpsEma);
+    }
+    // One-shot graceful auto-downgrade if the machine clearly can't keep up.
+    if (!this._autoDowngraded && this._fpsEma < 38) {
+      if (++this._lowPerfFrames > 40) {
+        this._autoDowngrade();
+      }
+    } else {
+      this._lowPerfFrames = 0;
+    }
+  }
+
+  _autoDowngrade() {
+    this._autoDowngraded = true;
+    this.config.maxPixelRatio = 1.0;
+    this._syncPixelRatio();
+    // eslint-disable-next-line no-console
+    console.info('[galaxy] low FPS detected — pixel ratio capped to 1.0 for smoother motion.');
+  }
+}
+
+const canvas = document.getElementById('scene');
+// Expose for debugging / console tweaking.
+window.galaxyApp = new GalaxyApp(canvas);
+
+// The scene builds synchronously, so the loader can fade out immediately.
+const loader = document.getElementById('loader');
+if (loader) {
+  loader.classList.add('hide');
+  setTimeout(() => loader.remove(), 700);
+}

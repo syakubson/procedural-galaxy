@@ -1,0 +1,7 @@
+{
+  "name": "galaxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Procedural animated galaxy with explorable star systems (Three.js, no build)."
+}

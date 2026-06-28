@@ -1,0 +1,580 @@
+/* Full-bleed canvas + a couple of unobtrusive overlays. */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #03030b;
+  color: #e8e9ff;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#scene {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* let OrbitControls own touch gestures */
+  cursor: grab;
+}
+
+#scene:active {
+  cursor: grabbing;
+}
+
+/* --- loader (removed by main.js once the scene is built) --- */
+#loader {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: #03030b;
+  z-index: 20;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #9aa0d8;
+  transition: opacity 0.6s ease;
+}
+
+#loader.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loader__core {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3d4 0%, #8a6bff 45%, transparent 70%);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+/* --- bottom hint, auto-fades --- */
+#hint {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(10, 10, 26, 0.45);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(150, 150, 230, 0.16);
+  font-size: 12.5px;
+  color: #c5c8f0;
+  white-space: nowrap;
+  z-index: 10;
+  animation: hintFade 1s ease 7s forwards;
+  pointer-events: none;
+  max-width: 92vw;
+  overflow: hidden;
+}
+
+#hint b {
+  color: #fff;
+  font-weight: 600;
+}
+
+.hint__dot {
+  opacity: 0.4;
+}
+
+@keyframes hintFade {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (max-width: 640px) {
+  #hint {
+    font-size: 11px;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  .hint__dot {
+    display: none;
+  }
+  #hint span:nth-child(5) {
+    display: none;
+  }
+}
+
+/* lil-gui tuning so it sits nicely on top */
+.lil-gui {
+  --background-color: rgba(12, 12, 28, 0.72);
+  --widget-color: rgba(40, 40, 70, 0.7);
+  --title-background-color: rgba(20, 20, 44, 0.85);
+  z-index: 15;
+  backdrop-filter: blur(10px);
+}
+
+/* --- ambient music toggle --- */
+#music-toggle {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 16;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(150, 160, 230, 0.22);
+  background: rgba(10, 11, 24, 0.55);
+  backdrop-filter: blur(8px);
+  color: #cdd2ff;
+  font-size: 17px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+#music-toggle:hover {
+  background: rgba(30, 32, 60, 0.7);
+  transform: scale(1.06);
+}
+#music-toggle.on {
+  border-color: rgba(125, 255, 176, 0.5);
+  color: #fff;
+}
+
+/* next-track button — sits just left of the toggle */
+#music-next {
+  position: fixed;
+  right: 70px;
+  bottom: 20px;
+  z-index: 16;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(150, 160, 230, 0.22);
+  background: rgba(10, 11, 24, 0.55);
+  backdrop-filter: blur(8px);
+  color: #cdd2ff;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+#music-next:hover {
+  background: rgba(30, 32, 60, 0.7);
+  transform: scale(1.06);
+}
+
+/* current-track name — fades in briefly when the track changes */
+#music-track {
+  position: fixed;
+  right: 20px;
+  bottom: 70px;
+  z-index: 16;
+  padding: 5px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(150, 160, 230, 0.22);
+  background: rgba(10, 11, 24, 0.6);
+  backdrop-filter: blur(8px);
+  color: #cdd2ff;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+#music-track.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- gallery link (ships & stations showcase) --- */
+#gallery-link {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 16;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(150, 160, 230, 0.22);
+  background: rgba(10, 11, 24, 0.55);
+  backdrop-filter: blur(8px);
+  color: #cdd2ff;
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+#gallery-link:hover {
+  background: rgba(30, 32, 60, 0.7);
+  border-color: rgba(125, 200, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* --- warp transition overlay --- */
+#warp-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+
+/* --- hover tooltip on explorable systems --- */
+#system-tooltip {
+  position: fixed;
+  z-index: 16;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 11px;
+  border-radius: 9px;
+  background: rgba(10, 12, 26, 0.82);
+  border: 1px solid rgba(150, 160, 230, 0.22);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  color: #eef0ff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+#system-tooltip.visible {
+  opacity: 1;
+}
+#system-tooltip b {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+#system-tooltip span {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* --- system colour legend (galaxy mode) --- */
+#system-legend {
+  position: fixed;
+  left: 22px;
+  top: 22px;
+  z-index: 14;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(10, 11, 24, 0.5);
+  border: 1px solid rgba(150, 160, 230, 0.14);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  color: #c8ccf0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
+}
+#system-legend.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+#system-legend .lg-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #7e85c0;
+  margin-bottom: 7px;
+}
+#system-legend .lg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.7;
+}
+#system-legend .lg-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 7px currentColor;
+}
+
+/* --- system lore panel --- */
+#system-panel {
+  position: fixed;
+  left: 26px;
+  bottom: 26px;
+  width: min(360px, calc(100vw - 52px));
+  max-height: calc(100vh - 52px);
+  overflow-y: auto;
+  z-index: 16;
+  padding: 20px 22px 22px;
+  border-radius: 18px;
+  background: rgba(10, 11, 24, 0.72);
+  border: 1px solid rgba(150, 160, 230, 0.18);
+  backdrop-filter: blur(14px);
+  color: #e8eaff;
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+#system-panel.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.sp-back {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(150, 160, 230, 0.25);
+  color: #cdd2ff;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.sp-back:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(180, 190, 255, 0.5);
+}
+.sp-status {
+  display: inline-block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 3px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.sp-name {
+  font-size: 27px;
+  font-weight: 650;
+  line-height: 1.1;
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
+}
+.sp-star {
+  font-size: 12.5px;
+  color: #9aa0d8;
+  margin-bottom: 14px;
+}
+.sp-desc {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #d4d7f4;
+  margin-bottom: 18px;
+}
+.sp-planets-title {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #7e85c0;
+  margin-bottom: 8px;
+}
+.sp-planets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sp-planets li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+}
+.sp-planets .dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
+}
+.sp-planets .pt {
+  flex: 1;
+}
+.sp-planets .tags {
+  display: flex;
+  gap: 5px;
+}
+.sp-planets .tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c2c6ee;
+  white-space: nowrap;
+}
+.sp-planets .tag-live {
+  background: rgba(125, 255, 176, 0.16);
+  color: #7dffb0;
+}
+.sp-planets .tag-ruin {
+  background: rgba(255, 176, 102, 0.16);
+  color: #ffb066;
+}
+
+/* --- panel sections (history / resources / civilisation) --- */
+.sp-section {
+  border-top: 1px solid rgba(150, 160, 230, 0.12);
+  padding-top: 14px;
+  margin-top: 16px;
+}
+.sp-sec-title {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #7e85c0;
+  margin-bottom: 10px;
+}
+.sp-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: #aeb2e0;
+  margin-bottom: 10px;
+}
+.sp-meta b {
+  color: #d4d7f4;
+  font-weight: 600;
+}
+.sp-history {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c5c8ea;
+  margin-bottom: 12px;
+}
+.sp-res-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6f76ac;
+  margin-bottom: 6px;
+}
+.sp-res {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.chip {
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: rgba(120, 150, 255, 0.1);
+  border: 1px solid rgba(150, 160, 230, 0.16);
+  color: #c2c9f0;
+}
+.sp-race-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+.race-name {
+  font-size: 17px;
+  font-weight: 650;
+  color: #eef0ff;
+}
+.sp-race-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #cfd2f0;
+}
+
+/* --- mini planet icons --- */
+.pi {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.pi-ball {
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.4);
+}
+.pi-ring {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: 50%;
+  height: 7px;
+  transform: translateY(-50%) rotate(-18deg);
+  border-radius: 50%;
+  border: 1.4px solid rgba(222, 210, 178, 0.75);
+}
+
+/* --- tooltip teaser + discovery counter --- */
+.tt-teaser {
+  font-size: 10px;
+  color: #9aa0d8;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.tt-teaser.tt-seen {
+  color: #7dffb0;
+}
+.tt-info {
+  font-size: 10.5px;
+  color: #c2c6ee;
+}
+
+/* "did you know" fact box */
+.sp-fact {
+  margin-top: 16px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  background: rgba(120, 150, 255, 0.08);
+  border: 1px solid rgba(150, 160, 230, 0.16);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #cfd3f2;
+}
+.lg-prog {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(150, 160, 230, 0.12);
+  font-size: 11px;
+  color: #9aa0d8;
+}
+.lg-prog b {
+  color: #eef0ff;
+}
+
+@media (max-width: 640px) {
+  #system-panel {
+    left: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
+    max-height: 56vh;
+    padding: 16px;
+  }
+  .sp-name {
+    font-size: 23px;
+  }
+}

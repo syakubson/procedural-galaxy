@@ -1,0 +1,9 @@
+Texture credits
+===============
+
+galaxy_skybox.jpg — procedurally generated nebula starfield (galaxy / universe view)
+skybox_space.jpg  — procedurally generated nebula starfield (in-system view, randomly
+                    rotated per system)
+
+Both are produced by scripts/gen_nebula_skybox.py from two different seeds.
+No external assets, no third-party license.
