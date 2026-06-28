@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createRng } from '../rng.js';
-import { starVertexShader, starFragmentShader, flareCoronaFragmentShader } from '../shaders/starSurfaceShader.js';
+import { starVertexShader, starFragmentShader } from '../shaders/starSurfaceShader.js';
 import { Planet } from './planet.js';
 import { BlackHole } from './blackHole.js';
 import { Endurance } from './endurance.js';
@@ -193,27 +193,11 @@ export class SystemView {
     mesh.position.x = offsetX;
     this.starGroup.add(mesh);
 
-    // tight, IRREGULAR flare corona — replaces the big round halo sprite (#4)
-    const coronaMat = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-        uColor: { value: new THREE.Color(sd.color) },
-        uBrightness: { value: 2.1 },
-        uActivity: { value: 0.6 + activity * 0.6 },
-      },
-      vertexShader: starVertexShader,
-      fragmentShader: flareCoronaFragmentShader,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const coronaGeo = new THREE.SphereGeometry(R * 1.14, 40, 40); // tight clean halo hugging the surface (#14)
-    const corona = new THREE.Mesh(coronaGeo, coronaMat);
-    corona.position.x = offsetX;
-    this.starGroup.add(corona);
-
-    this._starMats.push(mat, coronaMat);
-    this._starGeos.push(geo, coronaGeo);
+    // NB: the separate corona sphere (at R*1.14) was removed — its fresnel glow
+    // peaked at the sphere's silhouette and read as an ugly translucent RING
+    // sitting off the star's edge. The star is now just its own clean disk.
+    this._starMats.push(mat);
+    this._starGeos.push(geo);
   }
 
   _loadBlackHole(data) {
