@@ -64,6 +64,7 @@ export class PlanetLabels {
    *  in system mode (skipped during the entry zoom to avoid jitter). */
   update(camera, w, h) {
     if (!this.visible || !this.items.length) return;
+    const vis = [];
     for (const it of this.items) {
       if (!it.body) {
         it.el.style.display = 'none';
@@ -75,10 +76,32 @@ export class PlanetLabels {
         it.el.style.display = 'none'; // behind the camera
         continue;
       }
-      const x = (this._v.x * 0.5 + 0.5) * w;
-      const y = (-this._v.y * 0.5 + 0.5) * h;
+      it.sx = (this._v.x * 0.5 + 0.5) * w;
+      it.sy = (-this._v.y * 0.5 + 0.5) * h;
       it.el.style.display = '';
-      it.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      vis.push(it);
+    }
+    // de-overlap: nudge labels that land too close apart in Y (a few relaxation
+    // passes). Cheap — no DOM measuring, just constants for the pill footprint.
+    const MIN_DX = 158;
+    const MIN_DY = 36;
+    vis.sort((a, b) => a.sy - b.sy);
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 0; i < vis.length; i++) {
+        for (let j = i + 1; j < vis.length; j++) {
+          const a = vis[i];
+          const b = vis[j];
+          const dy = b.sy - a.sy;
+          if (Math.abs(a.sx - b.sx) < MIN_DX && dy < MIN_DY) {
+            const push = (MIN_DY - dy) / 2 + 0.5;
+            a.sy -= push;
+            b.sy += push;
+          }
+        }
+      }
+    }
+    for (const it of vis) {
+      it.el.style.transform = `translate(${Math.round(it.sx)}px, ${Math.round(it.sy)}px)`;
     }
   }
 }
