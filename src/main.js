@@ -62,6 +62,31 @@ class GalaxyApp {
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
+
+    this._warmUpSystemShaders(); // pre-compile system shaders so the first dive is instant
+  }
+
+  /** Pre-compile the system-view shaders ONCE, in the background, while the user
+   *  is still on the galaxy — so the first dive into a system doesn't pay the
+   *  shader-compile cost mid-warp. three caches programs, so later dives reuse
+   *  them. Best-effort and race-safe: skips if the user has already dived, and
+   *  never clears a system they entered while we were compiling. */
+  _warmUpSystemShaders() {
+    setTimeout(async () => {
+      if (this._warmed || this.mode !== 'galaxy') return;
+      const sample = this.systems.list.find(
+        (s) => s.data && s.data.kind === 'star' && (s.data.planets || []).length >= 2,
+      );
+      if (!sample) return;
+      try {
+        this.systemView.load(sample.data);
+        await this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
+        if (this.mode === 'galaxy') this.systemView.clear(); // don't nuke a system dived into meanwhile
+        this._warmed = true;
+      } catch {
+        // a failed warmup just means the first real dive compiles normally
+      }
+    }, 1500);
   }
 
   // ---- setup ----------------------------------------------------------------
