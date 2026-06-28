@@ -182,7 +182,7 @@ export class SystemView {
       uniforms: {
         uTime: { value: 0 },
         uColor: { value: new THREE.Color(sd.color) },
-        uBrightness: { value: 2.3 },
+        uBrightness: { value: 0.85 }, // lower → the body shows colour instead of clipping to white
         uActivity: { value: activity },
       },
       vertexShader: starVertexShader,
@@ -193,10 +193,28 @@ export class SystemView {
     mesh.position.x = offsetX;
     this.starGroup.add(mesh);
 
-    // NB: the separate corona sphere (at R*1.14) was removed — its fresnel glow
-    // peaked at the sphere's silhouette and read as an ugly translucent RING
-    // sitting off the star's edge. The star is now just its own clean disk.
-    this._starMats.push(mat);
+    // Soft outer glow (Spore-style): a smooth radial gradient billboard that fades
+    // into space — brightest at the surface, dissolving outward with NO hard edge
+    // or ring (unlike the old fresnel corona sphere). depthTest keeps it AROUND
+    // the disc, so the granulated surface stays visible.
+    const glowColor = new THREE.Color(sd.color);
+    const ghsl = { h: 0, s: 0, l: 0 };
+    glowColor.getHSL(ghsl);
+    // deeper + more saturated than the star body → a rich golden corona, not pale grey
+    glowColor.setHSL(ghsl.h, Math.min(1, ghsl.s * 1.9), ghsl.l * 0.82);
+    const glowMat = new THREE.SpriteMaterial({
+      map: starGlowTexture(),
+      color: glowColor,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const glow = new THREE.Sprite(glowMat);
+    glow.scale.setScalar(R * 3.2);
+    glow.position.x = offsetX;
+    this.starGroup.add(glow);
+
+    this._starMats.push(mat, glowMat);
     this._starGeos.push(geo);
   }
 
@@ -411,7 +429,7 @@ export class SystemView {
   }
 
   update(dt, time) {
-    for (const m of this._starMats) m.uniforms.uTime.value = time;
+    for (const m of this._starMats) if (m.uniforms) m.uniforms.uTime.value = time; // skip the glow sprite
     if (this._binary) this.starGroup.rotation.y += dt * 0.15; // the pair revolves
     if (this.blackHole) this.blackHole.update(time);
     if (this.deathStar) this.deathStar.update(dt);
@@ -586,6 +604,28 @@ export class SystemView {
       this._dsAmbient = null;
     }
   }
+}
+
+// Soft radial star-glow texture (cached, shared): white core fading smoothly to
+// transparent — a gaussian-ish falloff with NO hard edge, so the additive sprite
+// reads as a soft corona, never a ring. Tinted per-star via the sprite material.
+let _starGlowTex = null;
+function starGlowTexture() {
+  if (_starGlowTex) return _starGlowTex;
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0.0, 'rgba(255,255,255,0.95)');
+  g.addColorStop(0.26, 'rgba(255,255,255,0.6)');
+  g.addColorStop(0.52, 'rgba(255,255,255,0.26)');
+  g.addColorStop(0.76, 'rgba(255,255,255,0.08)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  _starGlowTex = new THREE.CanvasTexture(c);
+  return _starGlowTex;
 }
 
 // Stable small hash for seeding planet noise offsets.

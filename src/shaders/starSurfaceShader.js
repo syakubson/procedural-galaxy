@@ -50,7 +50,7 @@ export const starFragmentShader = /* glsl */ `
     float g2 = fbm(vDir * 12.0 - vec3(uTime * 0.04));
     float gran = 0.78 + 0.5 * g + 0.22 * g2;
     vec3 col = uColor * gran;
-    col += vec3(1.0) * pow(g, 3.0) * 0.4;                 // bright faculae toward white
+    col += vec3(1.0) * pow(g, 3.0) * 0.16;               // bright faculae toward white
 
     // sunspots — darker cooler patches where a slow noise field dips
     float spotField = fbm(vDir * 2.6 + vec3(11.0) + vec3(uTime * 0.01));
@@ -62,7 +62,7 @@ export const starFragmentShader = /* glsl */ `
     float center = max(dot(normalize(vNormalW), normalize(vViewW)), 0.0);
     float limb = pow(center, 0.45);
     col *= 0.45 + 0.7 * limb;
-    col = mix(col * vec3(1.0, 0.82, 0.62), col, limb);    // reddened limb
+    col = mix(col * vec3(1.0, 0.72, 0.46), col, limb);    // reddened limb (warmer edge)
 
     // bright flare tongues on the surface, hottest toward the limb (#3) — makes
     // the disc itself look active/uneven, consistent with the flare corona
@@ -72,6 +72,15 @@ export const starFragmentShader = /* glsl */ `
     float flare = pow(max(fl * 0.65 + fl2 * 0.55, 0.0), 3.0);
     col += uColor * flare * (0.5 + 2.0 * rim) * (0.5 + uActivity);
     col += vec3(1.0, 0.86, 0.5) * flare * rim * uActivity;   // hot white-orange licks
+
+    // boost saturation BEFORE the hot core, so ACES doesn't wash the golden body
+    // to white (bright colours desaturate under ACES) — keep the star clearly tinted
+    float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+    col = mix(vec3(luma), col, 1.45);
+
+    // white-hot heart: only the very centre of the disc blows toward white, so the
+    // body keeps its colour + granulation (Spore-like) instead of clipping flat
+    col += vec3(1.0, 0.96, 0.88) * pow(center, 6.0) * 0.45;
 
     col *= uBrightness;
     gl_FragColor = vec4(col, 1.0);
