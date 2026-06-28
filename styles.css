@@ -578,3 +578,55 @@ body {
     font-size: 23px;
   }
 }
+
+/* --- Diegetic in-world planet labels (system view) ----------------------- */
+#planet-labels {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.plabel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+.plabel__pin {
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(232, 233, 255, 0.92);
+  box-shadow: 0 0 7px rgba(150, 180, 255, 0.85);
+}
+.plabel__txt {
+  position: absolute;
+  left: 11px;
+  bottom: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: 9px;
+  background: rgba(8, 9, 20, 0.5);
+  border: 1px solid rgba(150, 160, 230, 0.2);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0.92;
+}
+.plabel__txt b {
+  font-size: 13px;
+  font-weight: 600;
+  color: #eef0ff;
+  letter-spacing: 0.2px;
+}
+.plabel__txt i {
+  font-size: 10.5px;
+  font-style: normal;
+  color: #9aa0d8;
+  letter-spacing: 0.3px;
+}

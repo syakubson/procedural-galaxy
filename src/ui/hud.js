@@ -31,7 +31,7 @@ function planetIcon(p) {
   return `<span class="pi">${ring}<span class="pi-ball" style="background:${grad}"></span></span>`;
 }
 
-function planetLabel(p) {
+export function planetLabel(p) {
   if (p.label) return p.label; // hand-named special-system planets (#13/#19/#20)
   if (p.biomeLabel && (p.inhabited || p.ruined)) return p.biomeLabel;
   return TYPE_LABEL[p.type] || p.type;

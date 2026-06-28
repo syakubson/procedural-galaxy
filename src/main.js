@@ -14,6 +14,7 @@ import { buildGUI } from './gui.js';
 import { Systems } from './systems/markers.js';
 import { SystemView } from './systems/systemView.js';
 import { InfoPanel, Tooltip, Overlay, Legend } from './ui/hud.js';
+import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
 
 // Russian planet-type labels for the in-system hover card (#6).
@@ -155,6 +156,7 @@ class GalaxyApp {
     });
     this.legend = new Legend();
     this.legend.setVisible(this.config.showMarkers);
+    this.planetLabels = new PlanetLabels();
     this.music = new AmbientMusic();
     this.raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
@@ -309,6 +311,7 @@ class GalaxyApp {
 
     await this.overlay.fadeTo(0.72, 240); // brief dip, not a full black cut
     this.systemView.load(entry.data);
+    this.planetLabels.setSystem(this.systemView.planets, entry.data);
     this.systemView.setSize(window.innerWidth, window.innerHeight);
     this.postfx.setView(this.systemView.scene, this.systemView.camera);
     // compile the new shaders during the dip, not during the reveal
@@ -324,11 +327,13 @@ class GalaxyApp {
     if (this.mode !== 'system') return;
     this.mode = 'transition';
     this.infoPanel.hide();
+    this.planetLabels.setVisible(false);
 
     await this.overlay.fadeTo(1, 460);
     this.systemView.exit();
     this.postfx.setView(this.scene, this.camera);
     this.systemView.clear();
+    this.planetLabels.clear();
     // #9: reveal the galaxy while the camera pulls back out to where it was —
     // the reverse of the entry flight.
     const reveal = this.overlay.fadeTo(0, 600);
@@ -451,7 +456,15 @@ class GalaxyApp {
     }
     if (this.mode === 'system' || this.mode === 'transition') {
       this.systemView.update(dt, this._time);
-      if (this.mode === 'system') this._processHoverSystem();
+      if (this.mode === 'system') {
+        this._processHoverSystem();
+        // diegetic planet labels — hidden during the entry zoom to avoid jitter
+        const showLabels = !this.systemView._zoom;
+        this.planetLabels.setVisible(showLabels);
+        if (showLabels) {
+          this.planetLabels.update(this.systemView.camera, window.innerWidth, window.innerHeight);
+        }
+      }
     }
 
     this.postfx.render();
