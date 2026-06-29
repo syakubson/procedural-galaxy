@@ -420,14 +420,17 @@ export class SystemView {
   }
 
   /** Generalised focus (#6): dolly-in + follow ANY moving object — a planet, a
-   *  ship (flagship) or an orbital structure. `radius` sizes the approach. */
-  focusObject(obj, radius) {
+   *  ship (flagship) or an orbital structure. `radius` sizes the camera approach;
+   *  `reticleRadius` (defaults to `radius`) sizes the on-screen ranging bracket —
+   *  decoupled so an elongated ship can be approached wide but bracketed tight (#19). */
+  focusObject(obj, radius, reticleRadius = radius) {
     obj.getWorldPosition(_fp);
     this.controls.minDistance = Math.max(0.3, radius * 1.4);
     this.controls.maxDistance = radius * 40 + 12;
     this._focus = {
       obj,
-      radius, // used by the ranging reticle to bracket the object on screen
+      radius, // approach distance basis
+      reticleRadius, // used by the ranging reticle to bracket the object on screen
       entering: true,
       t: 0,
       dur: 0.95, // a touch slower → more cinematic approach

@@ -132,7 +132,7 @@ class GalaxyApp {
     const sy = (-cp.y * 0.5 + 0.5) * h;
     // project a point one radius to the camera-right → on-screen radius in px
     const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
-    const edge = c.clone().addScaledVector(right, f.radius || 1).project(cam);
+    const edge = c.clone().addScaledVector(right, f.reticleRadius || f.radius || 1).project(cam);
     const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
     const size = Math.max(44, pxR * 2 + 28);
     r.style.left = `${sx}px`;
@@ -406,7 +406,8 @@ class GalaxyApp {
       this._focusPlanet(ref);
     } else if (kind === 'ship') {
       // #6: ships zoom in + follow, just like planets, plus the ship card.
-      this.systemView.focusObject(ref.mesh, Math.max(0.5, ref.baseScale * 1.6));
+      // a flagship is long & thin, so bracket it tighter than the wide approach (#19).
+      this.systemView.focusObject(ref.mesh, Math.max(0.5, ref.baseScale * 1.6), Math.max(0.35, ref.baseScale * 0.85));
       this.infoPanel.showShip(ref.type, this.systemView._factionStyle, ref);
       this.planetLabels.setVisible(false);
     } else if (kind === 'structure') {
@@ -418,7 +419,8 @@ class GalaxyApp {
     } else if (kind === 'ishimura') {
       // #5: the planet-cracker — zoom in + its own card
       const ish = this.systemView.ishimura;
-      this.systemView.focusObject(ish.group, 3);
+      // the Ishimura is a long hull — approach wide (3), bracket tight (1.5) (#19).
+      this.systemView.focusObject(ish.group, 3, 1.5);
       this.infoPanel.showStructure(
         {
           kindLabel: 'Корабль · добыча',

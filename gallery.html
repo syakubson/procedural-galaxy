@@ -196,18 +196,22 @@
         const ctx = cv.getContext('2d');
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        let fs = 30;
-        ctx.font = `600 ${fs}px system-ui, sans-serif`;
-        while (ctx.measureText(text).width > cv.width - 24 && fs > 16) {
+        // cartographer baked labels (#12): serif name + mono caption, ivory on
+        // parchment — same palette as the main app's diegetic labels.
+        let fs = 34;
+        ctx.font = `500 ${fs}px 'EB Garamond', Georgia, serif`;
+        while (ctx.measureText(text).width > cv.width - 24 && fs > 18) {
           fs -= 2;
-          ctx.font = `600 ${fs}px system-ui, sans-serif`;
+          ctx.font = `500 ${fs}px 'EB Garamond', Georgia, serif`;
         }
-        ctx.fillStyle = '#dfe4ff';
-        ctx.fillText(text, cv.width / 2, 30);
+        ctx.fillStyle = '#ece3cd'; // --ivory
+        ctx.fillText(text, cv.width / 2, 27);
         if (sub) {
-          ctx.font = '400 20px system-ui, sans-serif';
-          ctx.fillStyle = '#8893c0';
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+          ctx.font = `400 17px 'IBM Plex Mono', ui-monospace, monospace`;
+          ctx.fillStyle = '#8a8068'; // --parchment
           ctx.fillText(sub, cv.width / 2, 58);
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
         }
         const tex = new THREE.CanvasTexture(cv);
         tex.colorSpace = THREE.SRGBColorSpace;
@@ -291,7 +295,14 @@
         return b;
       });
       buttons[0].classList.add('on');
-      build(FACTIONS[0]);
+      // bake labels only after the cartographer fonts are rasterised, else the
+      // first faction's name textures fall back to a generic sans-serif (#12).
+      Promise.all([
+        document.fonts.load("500 34px 'EB Garamond'"),
+        document.fonts.load("400 17px 'IBM Plex Mono'"),
+      ])
+        .catch(() => {})
+        .then(() => build(FACTIONS[0]));
 
       let last = performance.now();
       function loop(now) {
