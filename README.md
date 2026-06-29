@@ -13,12 +13,10 @@ tens of thousands of stars.
 
 **▶ Live demo — https://galaxy-lyart-one.vercel.app**
 
-<video src="https://github.com/syakubson/procedural-galaxy/raw/main/media/demo.mp4" controls muted loop poster="media/demo-poster.jpg" width="100%"></video>
+[![Galaxy Explorer — click to play the demo](media/demo-poster.jpg)](https://github.com/syakubson/procedural-galaxy/blob/main/media/demo.mp4)
 
-> If the video doesn't play inline, [watch `media/demo.mp4`](media/demo.mp4) or just open the
+> ▶ **Click the image** to play the screen-capture demo (`media/demo.mp4`), or just open the
 > [live demo](https://galaxy-lyart-one.vercel.app).
-
-![demo](media/demo-poster.jpg)
 
 ---
 
