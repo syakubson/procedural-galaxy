@@ -22,13 +22,17 @@ import {
 const TAU = Math.PI * 2;
 
 const STATUS_COLOR = {
-  inhabited: '#7dffb0', // green — alive
-  ruins: '#ffb066', // amber — dead
-  wild: '#5aa0ff', // saturated cyan-blue — untouched
+  inhabited: '#76e2a2', // green — alive
+  ruins: '#e2a660', // amber — dead
+  wild: '#76a6e8', // blue — untouched
 };
 
 // magenta — hand-crafted easter-egg systems (#13/#19/#20), marked distinctly
-const SPECIAL_COLOR = '#e879ff';
+const SPECIAL_COLOR = '#d089e2';
+
+// uncharted marker tint — a faint ivory hairline ring, no status colour leaked,
+// until the system is discovered (then it "inks in" to its status colour).
+const UNCHARTED_COLOR = '#d8cfb4';
 
 const _v = new THREE.Vector3();
 
@@ -51,7 +55,8 @@ export class Systems {
     // keep markers from piling on top of each other so every system is easy to
     // click (#12), and place them clear of the central black hole (#21).
     const placed = [];
-    const minSep = radius * 0.05;
+    const minSep = radius * 0.075; // larger gap so systems don't pile up on screen
+    this._visitedSet = this._loadVisited(); // charted systems persist across reloads
     let inhabIdx = 0; // round-robins factions across inhabited systems (#24)
     for (let i = 0; i < count; i++) {
       let base;
@@ -59,7 +64,7 @@ export class Systems {
       do {
         // place tight on an arm so the marker sits on visible disk brightness,
         // with an inner clear zone around the galactic centre (#21)
-        const r = rng.range(0.34, 0.82) * radius;
+        const r = rng.range(0.30, 0.86) * radius;
         const arm = rng.int(0, c.arms - 1);
         const branch = (arm / c.arms) * TAU;
         const spin = (r / radius) * c.spin;
@@ -73,7 +78,7 @@ export class Systems {
         );
         tries++;
       } while (
-        tries < 16 &&
+        tries < 40 &&
         placed.some((p) => (p.x - base.x) ** 2 + (p.z - base.z) ** 2 < minSep * minSep)
       );
       placed.push({ x: base.x, z: base.z });
@@ -86,9 +91,12 @@ export class Systems {
         inhabIdx++;
       }
 
+      const visited = this._visitedSet.has(i);
+      const statusColor = STATUS_COLOR[data.status] || UNCHARTED_COLOR;
       const mat = new THREE.SpriteMaterial({
         map: tex,
-        color: new THREE.Color(STATUS_COLOR[data.status]),
+        // colourless ivory until charted, then inked into its status colour
+        color: new THREE.Color(visited ? statusColor : UNCHARTED_COLOR),
         transparent: true,
         depthWrite: false,
         depthTest: false,
@@ -106,6 +114,8 @@ export class Systems {
         data,
         sprite,
         worldPos: new THREE.Vector3(),
+        visited,
+        statusColor,
       };
       sprite.userData.system = entry; // fast pick, no array scan
 
@@ -233,9 +243,11 @@ export class Systems {
   // the normal star-marker look in a distinct colour, flagged special so it's
   // excluded from the discovery counter (it's a bonus find).
   _addSpecialSystem(base, data, color, scale) {
+    const idx = this.list.length;
+    const visited = this._visitedSet ? this._visitedSet.has(idx) : false;
     const mat = new THREE.SpriteMaterial({
       map: getMarkerTexture(),
-      color: new THREE.Color(color),
+      color: new THREE.Color(visited ? color : UNCHARTED_COLOR),
       transparent: true,
       depthWrite: false,
       depthTest: false,
@@ -244,7 +256,7 @@ export class Systems {
     sprite.scale.setScalar(scale);
     sprite.renderOrder = 8;
     const entry = {
-      index: this.list.length,
+      index: idx,
       base: base.clone(),
       r: Math.hypot(base.x, base.z),
       data,
@@ -252,6 +264,8 @@ export class Systems {
       worldPos: new THREE.Vector3(),
       special: true,
       baseScale: scale,
+      visited,
+      statusColor: color,
     };
     sprite.userData.system = entry;
     this.group.add(sprite);
@@ -300,6 +314,32 @@ export class Systems {
     }
   }
 
+  _visitedKey() {
+    return 'galaxy.charted.' + this.config.seed;
+  }
+  _loadVisited() {
+    try {
+      const raw = localStorage.getItem(this._visitedKey());
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch (e) {
+      return new Set();
+    }
+  }
+  /** Chart a system: persist it + "ink" its marker from ivory to its status colour. */
+  markVisited(entry) {
+    entry.visited = true;
+    if (entry.sprite && entry.statusColor) {
+      entry.sprite.material.color.set(entry.statusColor);
+    }
+    if (!this._visitedSet) this._visitedSet = new Set();
+    this._visitedSet.add(entry.index);
+    try {
+      localStorage.setItem(this._visitedKey(), JSON.stringify([...this._visitedSet]));
+    } catch (e) {
+      /* storage unavailable — discovery just won't persist this session */
+    }
+  }
+
   setVisible(v) {
     this.group.visible = v;
   }
@@ -337,22 +377,19 @@ function getMarkerTexture() {
   const cx = size / 2;
   const cy = size / 2;
 
-  // SOLID, opaque core (#12): a bright filled dot with a crisp ring, so with
-  // NormalBlending + a status-colour tint it reads as a clear icon on any
-  // background (deep space OR the bright bulge) and never washes out.
-  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.34);
-  core.addColorStop(0, 'rgba(255,255,255,1)');
-  core.addColorStop(0.62, 'rgba(255,255,255,1)');
-  core.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = core;
-  ctx.fillRect(0, 0, size, size);
-
-  // crisp bright ring around the dot
-  ctx.lineWidth = size * 0.05;
+  // Cartographer marker: a thin hairline RING with a transparent centre + a tiny
+  // core tick — an "uncharted star-chart" mark. Tinted by the sprite material
+  // (ivory = uncharted, status colour = charted), so one texture serves all states.
+  ctx.lineWidth = size * 0.04;
   ctx.strokeStyle = 'rgba(255,255,255,1)';
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.42, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.4, 0, Math.PI * 2);
   ctx.stroke();
+  // faint centre tick
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.05, 0, Math.PI * 2);
+  ctx.fill();
 
   _markerTex = new THREE.CanvasTexture(canvas);
   _markerTex.colorSpace = THREE.SRGBColorSpace;

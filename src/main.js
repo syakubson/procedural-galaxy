@@ -94,7 +94,7 @@ class GalaxyApp {
     const btn = document.getElementById('view-mode');
     this._viewModeBtn = btn;
     this._viewMode = 0;
-    this._viewModeIcons = ['🏷️', '🌐', '🎬'];
+    this._viewModeIcons = ['❏', '○', '▣']; // подписи / чистая сцена / кино (monochrome glyphs)
     if (!btn) return;
     btn.addEventListener('click', () => {
       this._viewMode = (this._viewMode + 1) % 3;
@@ -436,7 +436,7 @@ class GalaxyApp {
   async enterSystem(entry) {
     if (this.mode !== 'galaxy') return;
     this.mode = 'transition';
-    entry.visited = true; // discovery progress + dims the marker
+    this.systems.markVisited(entry); // chart it: persist + ink the marker its status colour
     this._updateProgress();
     this.controls.enabled = false; // lock galaxy input immediately
     this.tooltip.hide();

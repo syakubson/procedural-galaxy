@@ -37,7 +37,7 @@ export class AmbientMusic {
     nextBtn.id = 'music-next';
     nextBtn.type = 'button';
     nextBtn.title = 'Следующий трек';
-    nextBtn.textContent = '⏭';
+    nextBtn.textContent = '»';
     nextBtn.addEventListener('click', () => this.next());
     document.body.appendChild(nextBtn);
 
@@ -45,10 +45,9 @@ export class AmbientMusic {
     btn.id = 'music-toggle';
     btn.type = 'button';
     btn.title = 'Космическая музыка';
-    btn.textContent = '🔇';
+    btn.textContent = '♪'; // monochrome note; .on tints it brass when playing
     btn.addEventListener('click', () => {
       const on = this.toggle();
-      btn.textContent = on ? '🔊' : '🔇';
       btn.classList.toggle('on', on);
     });
     document.body.appendChild(btn);
@@ -104,7 +103,6 @@ export class AmbientMusic {
     if (!this.playing) {
       this._load(nextI);
       this.toggle();
-      this._btn.textContent = '🔊';
       this._btn.classList.add('on');
       return;
     }

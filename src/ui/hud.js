@@ -4,14 +4,14 @@
 // for the warp transition. All plain DOM, styled via classes in styles.css.
 
 const STATUS_COLOR = {
-  inhabited: '#7dffb0',
-  ruins: '#ffb066',
-  wild: '#5aa0ff',
-  blackhole: '#c8b0ff',
+  inhabited: '#76e2a2',
+  ruins: '#e2a660',
+  wild: '#76a6e8',
+  blackhole: '#c9a24a',
 };
 
 // magenta — hand-crafted easter-egg systems (#13/#19/#20)
-const SPECIAL_COLOR = '#e879ff';
+const SPECIAL_COLOR = '#d089e2';
 
 const TYPE_LABEL = {
   lava: 'Лавовая',
@@ -420,6 +420,20 @@ export class Tooltip {
   }
 
   show(data, x, y, visited) {
+    // Discovery mechanic: an undiscovered system is anonymous — hovering reveals
+    // only «не исследована», never its status or contents (that's the reward for
+    // diving in). The galactic-centre black hole (noFade) is always revealed.
+    if (!visited && !data.noFade) {
+      const label = data.special ? 'Неопознанный объект' : 'Неопознанная система';
+      this.el.innerHTML =
+        `<div class="tt-name">${label}</div>` +
+        `<div class="tt-status" style="color:var(--parchment)">не исследована</div>` +
+        `<div class="tt-teaser">Нажмите, чтобы исследовать →</div>`;
+      this.el.style.left = `${x + 16}px`;
+      this.el.style.top = `${y + 14}px`;
+      this.el.classList.add('visible');
+      return;
+    }
     // a little real info on hover (#9) — laid out as aligned key→value rows
     // (a small table) rather than one long «·»-separated enumeration.
     const rows = [];
@@ -478,12 +492,12 @@ export class Legend {
     const el = document.createElement('div');
     el.id = 'system-legend';
     el.innerHTML = `
-      <div class="lg-title">Системы</div>
-      <div class="lg-row"><span class="lg-dot" style="background:${STATUS_COLOR.inhabited}"></span>обитаемые</div>
-      <div class="lg-row"><span class="lg-dot" style="background:${STATUS_COLOR.wild}"></span>дикие</div>
-      <div class="lg-row"><span class="lg-dot" style="background:${STATUS_COLOR.ruins}"></span>руины</div>
-      <div class="lg-row"><span class="lg-dot" style="background:${SPECIAL_COLOR}"></span>особые</div>
-      <div class="lg-prog">Исследовано <b>0</b> / 0</div>
+      <div class="lg-title">Звёздная опись</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.inhabited}"></span>обитаемые</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.wild}"></span>дикие</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.ruins}"></span>руины</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${SPECIAL_COLOR}"></span>особые</div>
+      <div class="lg-prog">Вписано в карту <b>0</b> / 0</div>
     `;
     document.body.appendChild(el);
     this.el = el;
@@ -491,7 +505,7 @@ export class Legend {
   }
 
   setProgress(n, total) {
-    this._prog.innerHTML = `Исследовано <b>${n}</b> / ${total}`;
+    this._prog.innerHTML = `Вписано в карту <b>${n}</b> / ${total}`;
   }
 
   setVisible(v) {
