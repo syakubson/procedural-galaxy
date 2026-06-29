@@ -233,8 +233,10 @@ export class Planet {
         let stype = 'outpost';
         let sscale = planet.radius * 0.22;
         if (wantHomeStation) {
-          stype = 'ring';
-          sscale = planet.radius * 0.3;
+          // a home world is a ring-city by default, but a young/realistic world
+          // (e.g. Earth → the ISS) can ask for a modest modular station instead (#8)
+          stype = civ.stationKind || 'ring';
+          sscale = planet.radius * (civ.stationKind ? 0.2 : 0.3);
         } else if (planet.gasStation) {
           stype = 'collector';
           sscale = planet.radius * 0.26;

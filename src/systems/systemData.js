@@ -595,9 +595,15 @@ function specPlanet(spec, rng) {
   if (spec.ishimura) planet.ishimura = true; // Dead Space planet-cracker over it (#5)
   if (spec.inhabited) {
     planet.civLevel = 'spacefaring';
-    planet.civLabel = 'Космическая цивилизация';
+    planet.civLabel = spec.civLabel || 'Космическая цивилизация';
     planet.lightBoost = 1.5;
-    planet.civObjects = { satellites: 4, station: true };
+    // a realistic young world (#8) can override the orbital tech: a modest station
+    // kind (ISS) + its own satellite count instead of the default ring-city + 4.
+    planet.civObjects = {
+      satellites: spec.satellites != null ? spec.satellites : 4,
+      station: true,
+      stationKind: spec.homeStationKind || null,
+    };
   }
   if (spec.colony) {
     planet.colony = true;
@@ -715,7 +721,7 @@ export function generateSolarSystem() {
     resources: ['вода', 'железо и никель', 'редкие металлы', 'гелий-3'],
     useFor: 'колыбель человечества',
     fact: 'Свет от Солнца идёт до Земли около 8 минут.',
-    ships: 4,
+    ships: 1,
     comets: 2,
     civLevel: 'spacefaring',
     faction: 'alliance',
@@ -728,9 +734,19 @@ export function generateSolarSystem() {
         radius: 0.65,
         moonCount: 1,
         inhabited: true,
+        // realistic level (#8): the ISS — a modest modular station, not a ring-city —
+        // plus a busy belt of small satellites; no interstellar fleet.
+        homeStationKind: 'outpost',
+        satellites: 7,
+        civLabel: 'Ранняя космическая эра',
+        ref: 'Земля — голубой мир воды и воздуха, единственный известный дом жизни и разума. Низкую орбиту опоясывают спутники и одна обитаемая станция; к соседним мирам пока летят лишь зонды да первые корабли.',
         race: {
           name: 'Человечество',
-          stageLabel: 'Космическая цивилизация',
+          stageLabel: 'Ранняя космическая эра',
+          lore: [
+            'Любопытный вид, что едва оторвался от родной планеты: пара отпечатков на Луне, горстка зондов у соседних миров — и уже неутолимая тяга к Марсу и дальше.',
+            'Их низкая орбита плотно увешана спутниками связи и наблюдения, а единственную обитаемую станцию они делят на всех по очереди.',
+          ],
           description: 'Любопытный вид, едва вышедший за пределы родной планеты, но уже мечтающий о звёздах.',
         },
       },
