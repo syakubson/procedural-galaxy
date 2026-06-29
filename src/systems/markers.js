@@ -117,14 +117,15 @@ export class Systems {
     // --- special objects ---
     // supermassive black hole, fixed at the galactic centre — a real black void
     this._addGalacticBlackHole();
-    // the "Interstellar" system, sitting on an arm
+    // the "Interstellar" system, sitting on an arm — a "special" encounter,
+    // marked magenta like the other special systems (#особые)
     const ir = 0.6 * radius;
     const ia = (1 / c.arms) * TAU + (ir / radius) * c.spin;
-    this._addSpecial(
+    this._addSpecialSystem(
       new THREE.Vector3(Math.cos(ia) * ir, 0, Math.sin(ia) * ir),
       generateInterstellar(),
-      '#ffc89c',
-      7,
+      SPECIAL_COLOR,
+      5.4,
     );
 
     // hand-crafted easter-egg systems (#13/#19/#20), pinned on the arms
@@ -147,9 +148,9 @@ export class Systems {
       this._addSpecialSystem(eggPos(filmSpots[k][0], filmSpots[k][1]), data, SPECIAL, 4.8);
     });
 
-    // the "Death Star" event (#12), pinned on its own arm — an event object, so
-    // it pulses amber like the Interstellar/Gargantua encounter.
-    this._addSpecial(eggPos(5, 0.42), generateDeathStar(), '#ffcf6e', 6);
+    // the "Death Star" system (#12), pinned on its own arm — a special encounter,
+    // marked magenta like the other special systems (#особые)
+    this._addSpecialSystem(eggPos(5, 0.42), generateDeathStar(), SPECIAL, 5.2);
   }
 
   // The galactic-centre black hole: a fully-opaque BLACK disk that punches a
@@ -258,11 +259,11 @@ export class Systems {
     this.sprites.push(sprite);
   }
 
-  /** Differential galaxy rotation, matching the suns vertex shader. */
-  _omega(r) {
-    const c = this.config;
-    const coreSoft = c.coreSize * c.radius;
-    return c.rotationSpeed * (1 + c.differential * (coreSoft / (r + coreSoft)));
+  /** Rigid galaxy rotation, matching the suns/star vertex shader — one angular
+   *  speed for all radii, so the disk turns as a whole and the arms never wind
+   *  into a coil over a long idle. */
+  _omega() {
+    return this.config.rotationSpeed;
   }
 
   update(time, camera) {

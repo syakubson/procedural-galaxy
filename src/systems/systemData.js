@@ -21,6 +21,9 @@ import {
   generateHistory,
   generateResources,
   generateRace,
+  generateExtinctRace,
+  generateFlagship,
+  generateStationName,
   generateFact,
   roboticRuinLine,
   catastropheLine,
@@ -38,14 +41,22 @@ export const FLEET_FACTIONS = ['alliance', 'imperial', 'swarm', 'syndicate', 'ca
 // Star spectral classes. `radius` is visual (kept well above any planet so the
 // star always dominates). `habit` = can host life (long-lived enough).
 const STAR_TYPES = [
-  { key: 'O', label: 'Голубой сверхгигант (O)', desc: 'горячий, яркий и недолговечный', color: '#aac0ff', radius: 7.0, weight: 1, habit: false, activity: 0.35 },
-  { key: 'B', label: 'Бело-голубая звезда (B)', desc: 'массивная и очень горячая', color: '#cdddff', radius: 5.6, weight: 2, habit: false, activity: 0.3 },
-  { key: 'A', label: 'Белая звезда (A)', desc: 'главной последовательности, бело-голубая', color: '#f2f5ff', radius: 4.6, weight: 3, habit: true, activity: 0.28 },
-  { key: 'F', label: 'Жёлто-белая звезда (F)', desc: 'чуть горячее и ярче Солнца', color: '#fff7ea', radius: 4.0, weight: 4, habit: true, activity: 0.3 },
-  { key: 'G', label: 'Жёлтый карлик (G)', desc: 'спокойная звезда, как наше Солнце', color: '#fff0cc', radius: 3.5, weight: 6, habit: true, activity: 0.45 },
-  { key: 'K', label: 'Оранжевый карлик (K)', desc: 'тёплый, стабильный и долгоживущий', color: '#ffce8e', radius: 3.0, weight: 6, habit: true, activity: 0.5 },
-  { key: 'M', label: 'Красный карлик (M)', desc: 'тусклый, но живёт почти вечно', color: '#ff9470', radius: 2.6, weight: 7, habit: true, activity: 0.6 },
+  { key: 'O', label: 'Голубой сверхгигант (O)', desc: 'горячий, яркий и недолговечный', color: '#aac0ff', radius: 7.0, weight: 1, habit: false, activity: 0.35, solarMass: 22 },
+  { key: 'B', label: 'Бело-голубая звезда (B)', desc: 'массивная и очень горячая', color: '#cdddff', radius: 5.6, weight: 2, habit: false, activity: 0.3, solarMass: 7 },
+  { key: 'A', label: 'Белая звезда (A)', desc: 'главной последовательности, бело-голубая', color: '#f2f5ff', radius: 4.6, weight: 3, habit: true, activity: 0.28, solarMass: 1.9 },
+  { key: 'F', label: 'Жёлто-белая звезда (F)', desc: 'чуть горячее и ярче Солнца', color: '#fff7ea', radius: 4.0, weight: 4, habit: true, activity: 0.3, solarMass: 1.3 },
+  { key: 'G', label: 'Жёлтый карлик (G)', desc: 'спокойная звезда, как наше Солнце', color: '#fff0cc', radius: 3.5, weight: 6, habit: true, activity: 0.45, solarMass: 1.0 },
+  { key: 'K', label: 'Оранжевый карлик (K)', desc: 'тёплый, стабильный и долгоживущий', color: '#ffce8e', radius: 3.0, weight: 6, habit: true, activity: 0.5, solarMass: 0.75 },
+  { key: 'M', label: 'Красный карлик (M)', desc: 'тусклый, но живёт почти вечно', color: '#ff9470', radius: 2.6, weight: 7, habit: true, activity: 0.6, solarMass: 0.35 },
 ];
+
+// rough main-sequence mass (in Suns) by spectral class — used for hand-built
+// special systems whose star label carries its class in parentheses.
+const CLASS_SOLAR_MASS = { O: 22, B: 7, A: 1.9, F: 1.3, G: 1.0, K: 0.75, M: 0.35 };
+function solarMassFromLabel(label) {
+  const m = /\(([OBAFGKM])\)/.exec(label || '');
+  return m ? CLASS_SOLAR_MASS[m[1]] : 1.0;
+}
 
 // Planet archetypes. `kind` selects the surface branch in the planet shader.
 const PLANET_DEFS = {
@@ -277,12 +288,23 @@ export function generateSystem(seed) {
       //   destroyed   — a catastrophe crater scars the surface
       //   obliterated — blown to pieces by an alien race: a debris field
       //   (else)      — a plain, lifeless greyed-out ruin
-      applyBiome(home, rng.pick(['earthlike', 'ocean', 'desert', 'tundra']));
+      const ruinBiome = rng.pick(['earthlike', 'ocean', 'desert', 'tundra']);
+      applyBiome(home, ruinBiome);
       home.ruined = true;
       const rRoll = rng.next();
-      if (rRoll < GEN.ruinRobotic) home.robotic = true;
-      else if (rRoll < GEN.ruinDestroyed) home.destroyed = true;
-      else if (rRoll < GEN.ruinObliterated) home.obliterated = true;
+      let ruinType = 'plain';
+      if (rRoll < GEN.ruinRobotic) {
+        home.robotic = true;
+        ruinType = 'robotic';
+      } else if (rRoll < GEN.ruinDestroyed) {
+        home.destroyed = true;
+        ruinType = 'destroyed';
+      } else if (rRoll < GEN.ruinObliterated) {
+        home.obliterated = true;
+        ruinType = 'obliterated';
+      }
+      // #7: who lived here and HOW they died (the cause matches the ruin type)
+      home.race = generateExtinctRace(rng, ruinBiome, ruinType);
 
       if (home.robotic) {
         // #8: machines still run the place — a maintained depot station + a few
@@ -347,6 +369,19 @@ export function generateSystem(seed) {
     description += ' Сквозь систему медленно идёт одинокий флагман-разведчик, высматривающий планету под новую колонию.';
   }
 
+  // #H: name the flagship this system fields (if any) + a context-aware story
+  const hasFlagship = !roboticTraffic && (fleetDwelling || scoutFlagship || ships >= 3);
+  const habitable = planetKinds.has('terran') || planetKinds.has('ocean');
+  const flagship = hasFlagship
+    ? generateFlagship(rng, { status, fleetDwelling, scoutFlagship, habitable, systemName: name })
+    : null;
+  // #H: give every orbital station its own name
+  for (const p of planets) {
+    if ((p.civObjects && p.civObjects.station) || p.colonyStation || p.gasStation) {
+      p.stationName = generateStationName(rng);
+    }
+  }
+
   return {
     seed: String(seed),
     kind: 'star',
@@ -357,6 +392,7 @@ export function generateSystem(seed) {
     star,
     binary,
     ageGyr,
+    flagship,
     history: generateHistory(rng, { status, ageGyr, star }),
     resources: res.list,
     useFor: res.use,
@@ -414,7 +450,7 @@ export function generateInterstellar() {
     seed: 'interstellar',
     kind: 'blackhole',
     variant: 'gargantua',
-    event: true, // a special "event" encounter — highlighted on the map + in the UI
+    special: true, // a special encounter — magenta «особые» marker + badge
     name: 'Гаргантюа',
     status: 'blackhole',
     statusLabel: 'Чёрная дыра · «Интерстеллар»',
@@ -434,30 +470,56 @@ export function generateInterstellar() {
   };
 }
 
-/** A special "Death Star" event (#12): an imperial battle station the size of a
- *  moon, patrolled by a fleet of Star-Destroyer wedges. Lightly anonymised. */
+/** A special "Death Star" event (#12/#10): the imperial battle station inside a
+ *  real star system, having just destroyed Alderaan — recreating the film scene,
+ *  with Yavin + its rebel moon nearby. Lightly anonymised. */
 export function generateDeathStar() {
-  return {
+  return makeSpecialSystem({
     seed: 'death-star',
-    kind: 'deathstar',
-    event: true, // a special "event" encounter — highlighted on the map + in the UI
-    name: 'Боевая станция «Длань»',
-    status: 'blackhole', // reuse the dark "special object" status styling
-    statusLabel: 'Боевая станция · Империя',
+    name: 'Сектор Альдераан',
+    status: 'ruins',
+    statusLabel: 'Звезда Смерти · уничтожение Альдераана',
+    starLabel: 'Жёлтая звезда (G)',
+    starDesc: 'равнодушно светит на обломки Альдераана',
+    starColor: '#ffe7a0',
+    starRadius: 3.4,
+    ageGyr: 6.0,
     description:
-      'Бронированная боевая станция размером с малую луну. По её броне тянется глубокий экваториальный ров, а на верхней полусфере зияет вогнутая чаша главного орудия — оно способно расколоть планету одним залпом.',
-    star: { label: 'Боевая станция', desc: 'диаметром с малую луну', color: '#9094a0', radius: 8, activity: 0 },
-    ageGyr: 0.0, // newly built
+      'Здесь Империя показала, на что способна её новая боевая станция: мирный Альдераан разлетелся обломками за один залп её главного орудия. Теперь станция уходит дальше — к джунглям луны Явин-4, где укрылись повстанцы.',
     history:
-      'Её собирали десятилетиями в обстановке полной секретности. Вокруг станции патрулирует имперский флот клиновидных разрушителей, готовый стереть в пыль любую угрозу.',
+      'Бронированная станция размером с малую луну способна расколоть планету одним выстрелом. Её собирали десятилетиями в полной тайне; вокруг патрулирует имперский флот клиновидных разрушителей.',
     resources: [],
     useFor: 'абсолютное оружие и символ имперской власти',
     fact: 'Один выстрел её главного орудия высвобождает энергию небольшой звезды.',
-    planets: [],
-    ships: 0,
+    ships: 4,
+    comets: 0,
+    civLevel: 'spacefaring',
     faction: 'imperial',
-    deathStar: { radius: 8 },
-  };
+    deathStar: { radius: 0.62 }, // moon-sized — smaller than the planets
+    planetSpecs: [
+      {
+        label: 'Альдераан',
+        biome: 'earthlike',
+        radius: 0.7,
+        obliterated: true,
+        ref: 'Альдераан — мирный безоружный мир-сад, родина принцессы Леи Органы. Звезда Смерти уничтожила его одним залпом как демонстрацию силы — и это подняло всю галактику на восстание. (Star Wars)',
+      },
+      {
+        label: 'Явин',
+        biome: 'gas',
+        radius: 3.0,
+        color: '#c4763e',
+        moonCount: 0,
+        ref: 'Явин — красный газовый гигант, вокруг которого вращается покрытая джунглями луна Явин-4 с тайной базой повстанцев. (Star Wars)',
+      },
+      {
+        label: 'Явин-4',
+        biome: 'jungle',
+        radius: 0.6,
+        ref: 'Явин-4 — четвёртая луна газового гиганта Явин, сплошь покрытая джунглями и древними пирамидами массасси. Отсюда повстанцы запустили атаку, уничтожившую первую Звезду Смерти (Битва при Явине). (Star Wars)',
+      },
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -523,8 +585,14 @@ function specPlanet(spec, rng) {
     biomeName: kw.biome,
     biomeLabel,
     label: spec.label, // shown verbatim in the planet list (e.g. "Меркурий")
+    ref: spec.ref || null, // hand-written reference blurb for the planet card (#2)
     moons,
   };
+  if (spec.obliterated) {
+    planet.ruined = true;
+    planet.obliterated = true;
+  }
+  if (spec.ishimura) planet.ishimura = true; // Dead Space planet-cracker over it (#5)
   if (spec.inhabited) {
     planet.civLevel = 'spacefaring';
     planet.civLabel = 'Космическая цивилизация';
@@ -550,7 +618,11 @@ function makeSpecialSystem(o) {
     radius: o.starRadius || 3.4,
     habit: true,
     activity: o.activity != null ? o.activity : 0.45,
+    solarMass: o.solarMass != null ? o.solarMass : solarMassFromLabel(o.starLabel),
   };
+  if (o.binary && o.binary.star2 && o.binary.star2.solarMass == null) {
+    o.binary.star2.solarMass = solarMassFromLabel(o.binary.star2.label);
+  }
 
   const FIRST_GAP = star.radius * 0.9 + 3.2;
   const MIN_GAP = 2.6;
@@ -573,6 +645,25 @@ function makeSpecialSystem(o) {
     return p;
   });
 
+  // #H: flagship + station names for the hand-built systems too
+  const ships = o.ships || 0;
+  const habitable = planets.some((p) => p.type === 'terran' || p.type === 'ocean');
+  const flagship =
+    !o.roboticTraffic && (o.fleetDwelling || ships >= 3)
+      ? generateFlagship(rng, {
+          status: o.status,
+          fleetDwelling: !!o.fleetDwelling,
+          scoutFlagship: false,
+          habitable,
+          systemName: o.name,
+        })
+      : null;
+  for (const p of planets) {
+    if ((p.civObjects && p.civObjects.station) || p.colonyStation || p.gasStation) {
+      p.stationName = generateStationName(rng);
+    }
+  }
+
   return {
     seed: o.seed,
     kind: 'star',
@@ -583,12 +674,13 @@ function makeSpecialSystem(o) {
     star,
     binary: o.binary || null,
     ageGyr: o.ageGyr,
+    flagship,
     history: o.history,
     resources: o.resources || [],
     useFor: o.useFor,
     fact: o.fact || '',
     planets,
-    ships: o.ships || 0,
+    ships,
     comets: o.comets || 0,
     civLevel: o.civLevel || null,
     roboticTraffic: !!o.roboticTraffic,
@@ -596,6 +688,8 @@ function makeSpecialSystem(o) {
     scoutFlagship: false,
     faction: o.faction || 'alliance',
     special: true,
+    event: !!o.event,
+    deathStar: o.deathStar || null, // an in-system battle station (#10)
   };
 }
 
@@ -670,7 +764,15 @@ export function generateDeadSpace() {
     ships: 0,
     comets: 1,
     planetSpecs: [
-      { label: 'Расколотый Прииск', biome: 'rocky', radius: 0.7, dead: true, destroyed: true },
+      {
+        label: 'Эгида VII',
+        biome: 'rocky',
+        radius: 0.7,
+        dead: true,
+        destroyed: true,
+        ishimura: true, // the USG Ishimura hangs over it, cracking the crust (#5)
+        ref: 'Эгида VII — седьмая планета системы Лебедя, каменистый чёрно-оранжевый мир с расплавленным ядром, истерзанный нелегальной добычей. Здесь из недр подняли древний Красный Обелиск — и колония сошла с ума, а мёртвые перестали быть мёртвыми. (Dead Space)',
+      },
       { label: 'Белое Безмолвие', biome: 'ice', radius: 0.8, moonCount: 1 },
       { label: 'Угли Тенебра', biome: 'lava', radius: 0.6, dead: true },
     ],
@@ -700,7 +802,13 @@ export function generateFilmWorlds() {
       fact: 'Два солнца на закате — и две тени за спиной.',
       ships: 2,
       planetSpecs: [
-        { label: 'Татуи', biome: 'desert', radius: 0.7, color: '#d8b46a' },
+        {
+          label: 'Татуин',
+          biome: 'desert',
+          radius: 0.7,
+          color: '#d8b46a',
+          ref: 'Татуин — пустынный мир под двумя солнцами на дальней окраине Галактики, у перекрёстка контрабандных троп. Родина Люка Скайуокера; в космопорте Мос-Айсли здесь сходятся торговцы, охотники за головами и пилоты сомнительной репутации. (Star Wars)',
+        },
         { label: 'Песчаный Скит', biome: 'rocky', radius: 0.5 },
       ],
     }),
@@ -725,15 +833,16 @@ export function generateFilmWorlds() {
       faction: 'imperial',
       planetSpecs: [
         {
-          label: 'Дюна',
+          label: 'Арракис',
           biome: 'desert',
           radius: 0.9,
           color: '#caa35f',
           inhabited: true,
+          ref: 'Арракис (Дюна) — самый опасный и самый ценный мир известной вселенной: сплошная пустыня и единственный источник специи-меланжа, без которой невозможны межзвёздные перелёты. Под дюнами спят колоссальные черви-шаи-хулуды, а коренные фримены берегут каждую каплю воды. (Dune)',
           race: {
-            name: 'Народ пустыни',
+            name: 'Фримены',
             stageLabel: 'Космическая цивилизация',
-            description: 'Закалённые жители дюн в костюмах, что по капле собирают влагу тела; глаза их синие от Пряности.',
+            description: 'Закалённые жители дюн в дистикомбах, что по капле собирают влагу тела; глаза их синие от Пряности.',
           },
         },
       ],
@@ -758,17 +867,26 @@ export function generateFilmWorlds() {
       civLevel: 'spacefaring',
       faction: 'precursor',
       planetSpecs: [
-        { label: 'Полифонт', biome: 'gas', radius: 3.0, color: '#b9a06a', hasRings: true, moonCount: 2 },
         {
-          label: 'Лазурь',
+          label: 'Полифем',
+          biome: 'gas',
+          radius: 3.0,
+          color: '#b9a06a',
+          hasRings: true,
+          moonCount: 2,
+          ref: 'Полифем — газовый гигант в системе Альфа Центавра, названный в честь циклопа из мифов. У него четырнадцать спутников, и самый знаменитый из них — обитаемая луна Пандора. (Avatar)',
+        },
+        {
+          label: 'Пандора',
           biome: 'jungle',
           radius: 0.85,
           inhabited: true,
           moonCount: 1,
+          ref: 'Пандора — обитаемая луна газового гиганта Полифема, сплошь покрытая биолюминесцентными джунглями и парящими в небе горами. Дом синекожего народа На’ви; ради редчайшего анобтаниума сюда рвутся люди, не понимая, что воюют против самой живой планеты. (Avatar)',
           race: {
-            name: 'Синий народ',
+            name: 'На’ви',
             stageLabel: 'Племенная цивилизация',
-            description: 'Рослые синекожие охотники, сплетённые нервущей связью с живой сетью своего леса.',
+            description: 'Рослые синекожие охотники, сплетённые нервущей связью с живой нейросетью своего леса.',
           },
         },
       ],
@@ -794,12 +912,13 @@ export function generateFilmWorlds() {
       faction: 'alliance',
       planetSpecs: [
         {
-          label: 'Хладь',
+          label: 'Хот',
           biome: 'tundra',
           radius: 0.8,
           inhabited: true,
+          ref: 'Хот — ледяная планета, где ночь убивает быстрее любого врага. В её пещерах укрылась повстанческая база «Эхо», пока Империя не обрушила на неё шагающие крепости AT-AT. Местные таунтауны служат верховыми животными, а в ледяных норах таится свирепый вампа. (Star Wars)',
           race: {
-            name: 'Мятежники',
+            name: 'Повстанцы базы «Эхо»',
             stageLabel: 'Космическая цивилизация',
             description: 'Упрямые повстанцы, что прячут флот в ледяных пещерах и не сдаются даже на краю гибели.',
           },
