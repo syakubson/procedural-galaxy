@@ -1013,3 +1013,50 @@ body.clean-view #fact-box {
   border-left: 0;
   border-top: 0;
 }
+
+/* --- focus side callout: the focused object's label + description, parked
+   beside the reticle (moved out of the left dossier panel) --- */
+#focus-callout {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 7;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: 280px;
+  padding: 13px 15px;
+  border: 1px solid var(--vellum);
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.86), rgba(8, 10, 22, 0.86));
+  backdrop-filter: blur(8px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 3px rgba(214, 205, 178, 0.04);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+#focus-callout.visible {
+  opacity: 1;
+}
+.fc-name {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.04;
+  color: var(--ivory);
+  text-wrap: balance;
+}
+.fc-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--parchment);
+  margin: 6px 0 10px;
+}
+.fc-desc {
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--ivory-dim);
+  text-wrap: pretty;
+}

@@ -227,6 +227,20 @@ export class InfoPanel {
     document.body.appendChild(fact);
     this.factEl = fact;
 
+    // #15: a side callout parked next to the ranging reticle — carries the
+    // focused object's name + type + description (moved out of the left panel).
+    const fc = document.createElement('div');
+    fc.id = 'focus-callout';
+    fc.innerHTML = '<div class="fc-name"></div><div class="fc-sub"></div><div class="fc-desc"></div>';
+    document.body.appendChild(fc);
+    this.focusEl = fc;
+    this._fc = {
+      name: fc.querySelector('.fc-name'),
+      sub: fc.querySelector('.fc-sub'),
+      desc: fc.querySelector('.fc-desc'),
+    };
+    this.focusActive = false;
+
     this._r = {
       status: el.querySelector('.sp-status'),
       aboutTitle: el.querySelector('.sp-about-title'),
@@ -272,6 +286,18 @@ export class InfoPanel {
     }
   }
 
+  /** Fill the side callout (focused object's name + type + description). */
+  _setFocusCallout(name, sub, desc) {
+    this._fc.name.textContent = name || '';
+    this._fc.sub.textContent = sub || '';
+    this._fc.desc.textContent = desc || '';
+    this.focusActive = !!(name || desc);
+  }
+  _clearFocusCallout() {
+    this.focusActive = false;
+    this.focusEl.classList.remove('visible');
+  }
+
   show(data) {
     const r = this._r;
     this._mode = 'system';
@@ -287,7 +313,9 @@ export class InfoPanel {
     r.star.textContent = data.binary
       ? `Двойная звезда · ${data.star.label} + ${data.binary.star2.label}`
       : `${data.star.label} — ${data.star.desc}`;
+    r.desc.style.display = '';
     r.desc.textContent = data.description;
+    this._clearFocusCallout(); // the system view has no focus callout
 
     // about: age + star mass (#8) + use + history; NO resources here (#3)
     r.meta.innerHTML =
@@ -319,8 +347,11 @@ export class InfoPanel {
     r.status.style.borderColor = color;
     r.name.textContent = name || planetLabel(p);
     r.star.textContent = TYPE_DESC[p.type] || planetLabel(p);
-    // a hand-written reference blurb (#2) wins over the generic type description
-    r.desc.textContent = p.ref || planetDesc(p);
+    // description + label move to a side callout by the reticle (#15); the left
+    // panel keeps the dossier (name, type, physical data, civilisation).
+    r.desc.textContent = '';
+    r.desc.style.display = 'none';
+    this._setFocusCallout(name || planetLabel(p), TYPE_DESC[p.type] || planetLabel(p), p.ref || planetDesc(p));
     // #2: real-feeling physical data instead of the unitless radius/orbit
     const moonN = p.moons ? p.moons.length : 0;
     r.meta.innerHTML =
@@ -357,8 +388,14 @@ export class InfoPanel {
     r.status.style.borderColor = color;
     r.name.textContent = named || role.name;
     r.star.textContent = faction && faction.name ? `Флот: ${faction.name}` : 'Корабль';
-    // the flagship's own story leads; otherwise the class description
-    r.desc.textContent = ship && ship.lore ? ship.lore.join(' ') : role.desc;
+    // story + label move to the side callout by the reticle (#15)
+    r.desc.textContent = '';
+    r.desc.style.display = 'none';
+    this._setFocusCallout(
+      named || role.name,
+      faction && faction.name ? `Флот: ${faction.name}` : 'Корабль',
+      ship && ship.lore ? ship.lore.join(' ') : role.desc,
+    );
     r.meta.innerHTML =
       `<span><b>Класс:</b> ${role.name}</span>` +
       `<span><b>Длина:</b> ${role.lengthM} м</span>` +
@@ -386,7 +423,9 @@ export class InfoPanel {
     r.status.style.borderColor = color;
     r.name.textContent = info.name;
     r.star.textContent = faction && faction.name ? `Постройка флота: ${faction.name}` : 'Орбитальная постройка';
-    r.desc.textContent = info.desc;
+    r.desc.textContent = '';
+    r.desc.style.display = 'none';
+    this._setFocusCallout(info.name, info.kindLabel, info.desc);
     r.meta.innerHTML = (info.meta || []).map(([k, v]) => `<span><b>${k}:</b> ${v}</span>`).join('');
     r.history.textContent = '';
     r.resBlock.style.display = 'none';
@@ -408,6 +447,7 @@ export class InfoPanel {
     this.el.classList.remove('visible');
     this.backEl.classList.remove('visible');
     this.factEl.classList.remove('visible');
+    this._clearFocusCallout();
   }
 }
 

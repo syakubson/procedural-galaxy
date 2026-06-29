@@ -113,12 +113,14 @@ export class PlanetLabels {
    *  of the camera are labelled (so a close-up shows the focused planet + its
    *  station, not every world). At overview (cutoff 0) the cramped structure
    *  labels are hidden — planets + the flagship carry the scene. */
-  update(camera, w, h, nearCutoff = 0) {
+  update(camera, w, h, nearCutoff = 0, focusedBody = null) {
     if (!this.visible || !this.items.length) return;
     const overview = nearCutoff <= 0;
     const vis = [];
     for (const it of this.items) {
-      if (!it.body) {
+      // the focused object carries its info in the side callout, so hide its
+      // own in-world label to keep the reticle clean (#15)
+      if (!it.body || it.body === focusedBody) {
         it.el.style.display = 'none';
         continue;
       }

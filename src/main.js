@@ -108,9 +108,14 @@ class GalaxyApp {
   _updateReticle(sv, transitioning) {
     const r = this._reticle;
     if (!r) return;
+    const fc = this.infoPanel ? this.infoPanel.focusEl : null;
+    const hide = () => {
+      r.classList.remove('visible');
+      if (fc) fc.classList.remove('visible');
+    };
     const f = sv._focus;
     if (!f || f.entering || transitioning) {
-      r.classList.remove('visible');
+      hide();
       return;
     }
     const cam = sv.camera;
@@ -118,7 +123,7 @@ class GalaxyApp {
     f.obj.getWorldPosition(c);
     const cp = c.clone().project(cam);
     if (cp.z >= 1) {
-      r.classList.remove('visible');
+      hide();
       return;
     }
     const w = window.innerWidth;
@@ -135,6 +140,19 @@ class GalaxyApp {
     r.style.width = `${size}px`;
     r.style.height = `${size}px`;
     r.classList.add('visible');
+
+    // park the side callout (label + description) beside the reticle, flipping
+    // to the left when there isn't room on the right
+    if (fc && this.infoPanel.focusActive) {
+      const fcw = fc.offsetWidth || 240;
+      let fx = sx + size / 2 + 18;
+      if (fx + fcw > w - 16) fx = sx - size / 2 - 18 - fcw;
+      fc.style.left = `${Math.max(16, fx)}px`;
+      fc.style.top = `${sy}px`;
+      fc.classList.add('visible');
+    } else if (fc) {
+      fc.classList.remove('visible');
+    }
   }
 
   /** Apply the current view mode to labels, the side panel and the framing. */
@@ -677,7 +695,7 @@ class GalaxyApp {
         this.planetLabels.setVisible(showLabels);
         if (showLabels) {
           const cutoff = sv._focus ? sv.camera.position.distanceTo(sv.controls.target) * 2.6 : 0;
-          this.planetLabels.update(sv.camera, window.innerWidth, window.innerHeight, cutoff);
+          this.planetLabels.update(sv.camera, window.innerWidth, window.innerHeight, cutoff, sv._focus ? sv._focus.obj : null);
         }
         this._updateReticle(sv, transitioning);
       }
