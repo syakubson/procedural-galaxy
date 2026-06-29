@@ -154,7 +154,7 @@ export class Systems {
       new THREE.Vector3(Math.cos(ia) * ir, 0, Math.sin(ia) * ir),
       generateInterstellar(),
       SPECIAL_COLOR,
-      4.8,
+      4.2,
     );
 
     // hand-crafted easter-egg systems (#13/#19/#20), pinned on the arms
@@ -165,8 +165,8 @@ export class Systems {
     };
     // one distinct colour for ALL easter-egg systems so they read as "special"
     const SPECIAL = SPECIAL_COLOR;
-    this._addSpecialSystem(eggPos(2, 0.5), generateSolarSystem(), SPECIAL, 4.7);
-    this._addSpecialSystem(eggPos(4, 0.72), generateDeadSpace(), SPECIAL, 4.6);
+    this._addSpecialSystem(eggPos(2, 0.5), generateSolarSystem(), SPECIAL, 4.1);
+    this._addSpecialSystem(eggPos(4, 0.72), generateDeadSpace(), SPECIAL, 4.0);
     const filmSpots = [
       [0, 0.46],
       [1, 0.62],
@@ -174,12 +174,12 @@ export class Systems {
       [2, 0.78],
     ];
     generateFilmWorlds().forEach((data, k) => {
-      this._addSpecialSystem(eggPos(filmSpots[k][0], filmSpots[k][1]), data, SPECIAL, 4.5);
+      this._addSpecialSystem(eggPos(filmSpots[k][0], filmSpots[k][1]), data, SPECIAL, 4.0);
     });
 
     // the "Death Star" system (#12), pinned on its own arm — a special encounter,
     // marked magenta like the other special systems (#особые)
-    this._addSpecialSystem(eggPos(5, 0.42), generateDeathStar(), SPECIAL, 4.7);
+    this._addSpecialSystem(eggPos(5, 0.42), generateDeathStar(), SPECIAL, 4.2);
   }
 
   // The galactic-centre black hole: a fully-opaque BLACK disk that punches a
@@ -327,15 +327,18 @@ export class Systems {
         continue;
       }
 
-      // Markers stay BRIGHT, OPAQUE and STEADY at any distance (#12). No pulsing
-      // any more (#1) — 80 breathing icons were noise. The ONLY motion is the
-      // hover highlight: the marker eases up in size and tints toward brass while
-      // it's the one under the pointer, so a hovered system is unmistakable.
+      // Markers stay BRIGHT and OPAQUE at any distance (#12). A VERY subtle, slow
+      // «breath» draws the eye (#4) — uncharted breathe a touch more (they invite
+      // a visit). The hover highlight is the strong signal: the marker eases up in
+      // size (far more than the breath) and tints toward brass while it's under
+      // the pointer, so a hovered system is unmistakable.
       const seen = s.visited;
       const isHover = s === this._hovered;
-      s._hov += ((isHover ? 1 : 0) - s._hov) * 0.25; // smooth grow/shrink (interruptible)
-      const base = s.special ? s.baseScale : seen ? 4.0 : 4.4;
-      s.sprite.scale.setScalar(base * (1 + 0.42 * s._hov));
+      s._hov += ((isHover ? 1 : 0) - s._hov) * 0.22; // smooth, interruptible hover ease
+      const breathAmp = seen ? 0.03 : 0.05; // tiny
+      const breath = 1 + breathAmp * Math.sin(pulseTime * 0.6 + s.index * 0.9); // slow
+      const base = s.special ? s.baseScale : seen ? 3.6 : 3.9;
+      s.sprite.scale.setScalar(base * breath * (1 + 0.5 * s._hov)); // hover ≫ breath
       s.sprite.material.opacity = seen ? 0.95 : 1.0;
       // resting colour → brass, blended by the hover amount
       _col.copy(s._restCol).lerp(_hoverCol, s._hov);
@@ -448,82 +451,120 @@ export class Systems {
   }
 }
 
-// Uncharted marker — the cartographer's «survey ring»: a thin hollow ring with
-// a soft dark halo behind it (so the hairline reads on the bright bulge) and a
-// faint centre pip marking the exact plotted point. Baked WHITE and tinted by
-// the sprite material (ivory at rest, brass on hover). Built once, shared.
+// Uncharted marker — the cartographer's «survey ring»: a fine engraved double
+// ring (a crisp inner hairline + a softer outer range ring) with four short
+// cardinal ticks and a tiny centre pip, on a soft dark halo. Reads as a precise
+// chart annotation rather than a plain UI circle. Rendered at 256px for crisp
+// edges, baked WHITE and tinted by the sprite material (ivory at rest, brass on
+// hover). Built once, shared.
 let _ringTex = null;
 function getRingTexture() {
   if (_ringTex) return _ringTex;
-  const size = 128;
+  const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const cx = size / 2;
   const cy = size / 2;
+  ctx.lineCap = 'round';
 
-  // soft dark halo → the thin ring stays legible on the bright galactic core
-  const halo = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.42);
-  halo.addColorStop(0, 'rgba(6,8,16,0.42)');
-  halo.addColorStop(1, 'rgba(6,8,16,0)');
+  // soft dark halo → the hairlines stay legible over the bright galactic core
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.46);
+  halo.addColorStop(0, 'rgba(7,9,18,0.5)');
+  halo.addColorStop(0.7, 'rgba(7,9,18,0.22)');
+  halo.addColorStop(1, 'rgba(7,9,18,0)');
   ctx.fillStyle = halo;
   ctx.fillRect(0, 0, size, size);
 
-  // the hollow ring itself
-  ctx.lineWidth = size * 0.05;
+  const Rin = size * 0.24; // crisp inner ring
+  const Rout = size * 0.36; // faint outer range ring
+
+  // outer range ring — thin and dim, gives the «instrument» double-ring feel
+  ctx.lineWidth = size * 0.012;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, Rout, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // four short cardinal ticks bridging the two rings — a surveyor's reticle
+  ctx.lineWidth = size * 0.018;
+  ctx.strokeStyle = 'rgba(255,255,255,0.78)';
+  for (let k = 0; k < 4; k++) {
+    const a = k * (Math.PI / 2);
+    const dx = Math.cos(a);
+    const dy = Math.sin(a);
+    ctx.beginPath();
+    ctx.moveTo(cx + dx * (Rin + size * 0.02), cy + dy * (Rin + size * 0.02));
+    ctx.lineTo(cx + dx * (Rout - size * 0.012), cy + dy * (Rout - size * 0.012));
+    ctx.stroke();
+  }
+
+  // crisp inner ring — the main mark
+  ctx.lineWidth = size * 0.026;
   ctx.strokeStyle = 'rgba(255,255,255,1)';
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.3, 0, Math.PI * 2);
+  ctx.arc(cx, cy, Rin, 0, Math.PI * 2);
   ctx.stroke();
 
   // faint centre pip — the plotted position
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.04, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.028, 0, Math.PI * 2);
   ctx.fill();
 
   _ringTex = new THREE.CanvasTexture(canvas);
   _ringTex.colorSpace = THREE.SRGBColorSpace;
+  _ringTex.anisotropy = 4;
   return _ringTex;
 }
 
-// Charted marker — a DIFFERENT icon from the survey ring: a filled disc with a
-// dark rim + a soft dark halo, so a discovered system reads as a solid catalogued
-// point. Baked WHITE (NOT per-colour), tinted by the sprite material to the
-// status colour — so the hover highlight can blend it toward brass in one lerp.
+// Charted marker — a DIFFERENT icon: a «catalogued star», a filled core disc
+// inside a thin concentric ring (so it shares the ring family but reads as
+// logged), on a soft dark halo with a crisp dark rim. Rendered at 256px, baked
+// WHITE (NOT per-colour) and tinted by the sprite material to the status colour,
+// so the hover highlight can blend it toward brass in a single lerp.
 let _discTex = null;
 function getDiscTexture() {
   if (_discTex) return _discTex;
-  const size = 128;
+  const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const cx = size / 2;
   const cy = size / 2;
-  const r = size * 0.27;
 
-  // soft dark halo → separates the disc from any background it sits on
-  const halo = ctx.createRadialGradient(cx, cy, size * 0.08, cx, cy, size * 0.46);
-  halo.addColorStop(0, 'rgba(6,7,14,0.6)');
-  halo.addColorStop(1, 'rgba(6,7,14,0)');
+  // soft dark halo → separates the mark from any background it sits on
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.06, cx, cy, size * 0.47);
+  halo.addColorStop(0, 'rgba(7,8,16,0.6)');
+  halo.addColorStop(0.7, 'rgba(7,8,16,0.26)');
+  halo.addColorStop(1, 'rgba(7,8,16,0)');
   ctx.fillStyle = halo;
   ctx.fillRect(0, 0, size, size);
 
-  // solid white fill (tinted to the status colour by material.color)
+  const Rring = size * 0.32;
+
+  // thin concentric ring (ties it to the uncharted survey ring)
+  ctx.lineWidth = size * 0.026;
+  ctx.strokeStyle = 'rgba(255,255,255,1)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, Rring, 0, Math.PI * 2);
+  ctx.stroke();
+  // dark rim just inside the ring for contrast on bright backgrounds
+  ctx.lineWidth = size * 0.014;
+  ctx.strokeStyle = 'rgba(9,11,20,0.85)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, Rring - size * 0.022, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // filled core (tinted to the status colour by material.color)
   ctx.fillStyle = 'rgba(255,255,255,1)';
   ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.16, 0, Math.PI * 2);
   ctx.fill();
-
-  // crisp dark rim for contrast against the disc colour
-  ctx.lineWidth = size * 0.05;
-  ctx.strokeStyle = 'rgba(9,11,20,0.92)';
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
 
   _discTex = new THREE.CanvasTexture(canvas);
   _discTex.colorSpace = THREE.SRGBColorSpace;
+  _discTex.anisotropy = 4;
   return _discTex;
 }
 
