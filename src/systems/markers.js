@@ -400,34 +400,36 @@ function getMarkerTexture() {
   const cx = size / 2;
   const cy = size / 2;
 
-  // Cartographer survey-mark: a ring + a four-point crosshair reticle + a centre
-  // dot — an "uncharted star-chart" mark that reads clearly and invites a click
-  // (#11). Tinted by the sprite material (ivory = uncharted, status colour =
-  // charted), so one texture serves every state.
+  // Circular «target-lock» mark (round variant of the bracket reticle): four arc
+  // segments on the diagonals with open gaps at the cardinals, each ending in a
+  // small outward hook — a target frame that reads as «system, not yet locked».
+  // Tinted by the sprite material (ivory = uncharted, status colour = charted).
   ctx.strokeStyle = 'rgba(255,255,255,1)';
   ctx.lineCap = 'round';
-  // main ring
+  ctx.lineJoin = 'round';
   ctx.lineWidth = size * 0.05;
-  ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.32, 0, Math.PI * 2);
-  ctx.stroke();
-  // four crosshair ticks just outside the ring (N / E / S / W)
-  ctx.lineWidth = size * 0.045;
-  const rIn = size * 0.36;
-  const rOut = size * 0.47;
+  const R = size * 0.33;
+  const hook = size * 0.085;
+  const half = Math.PI * 0.2; // each arc ≈ 72°, gaps ≈ 18° at N/E/S/W
   for (let k = 0; k < 4; k++) {
-    const ang = (k / 4) * Math.PI * 2;
-    const dx = Math.cos(ang);
-    const dy = Math.sin(ang);
+    const a = Math.PI * 0.25 + k * (Math.PI / 2); // arcs centred on the diagonals
     ctx.beginPath();
-    ctx.moveTo(cx + dx * rIn, cy + dy * rIn);
-    ctx.lineTo(cx + dx * rOut, cy + dy * rOut);
+    ctx.arc(cx, cy, R, a - half, a + half);
     ctx.stroke();
+    // a short outward hook at each arc end (the «bracket» feel from the ref)
+    for (const e of [a - half, a + half]) {
+      const dx = Math.cos(e);
+      const dy = Math.sin(e);
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * R, cy + dy * R);
+      ctx.lineTo(cx + dx * (R + hook), cy + dy * (R + hook));
+      ctx.stroke();
+    }
   }
-  // centre dot
-  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  // a faint centre pip marks the exact system point
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.06, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.035, 0, Math.PI * 2);
   ctx.fill();
 
   _markerTex = new THREE.CanvasTexture(canvas);
