@@ -1,364 +1,384 @@
-# Galaxy — процедурная анимированная вселенная
+# Galaxy Explorer
 
-Интерактивная спиральная галактика в браузере в духе вступительной заставки **Spore**:
-вращающийся звёздный диск, светящееся ядро, газовая туманность и сотни разноцветных
-«солнц». Часть из них — настоящие **исследуемые системы**: наводишь — узнаёшь имя и
-статус, кликаешь — плавный варп внутрь, к звезде, планетам на орбитах и их истории.
+An interactive procedural spiral galaxy in the browser, in the spirit of the **Spore**
+intro: a turning star disk, a glowing core, a gas nebula, and hundreds of coloured
+"suns". Some of them are real **explorable systems** — hover to read a name and status,
+click to warp smoothly inside, down to the star, its orbiting planets, and their story.
 
-Вся вселенная **процедурно генерируется из сида**: один и тот же сид → одна и та же
-галактика, до последней планеты. Главная инженерная идея — **работать на слабых ПК**:
-весь звёздный диск рисуется за один вызов отрисовки, а вращение, мерцание и размер
-звёзд считаются на видеокарте. На каждом кадре процессор обновляет ровно одно число —
-он не перебирает десятки тысяч звёзд.
+The whole universe is **procedurally generated from a seed**: the same seed → the same
+galaxy, down to the last planet. The core engineering goal is to **run on weak PCs** — the
+entire star disk is drawn in a single draw call, and rotation, twinkle, and star size are
+computed on the GPU. Each frame the CPU updates exactly one number; it never iterates over
+tens of thousands of stars.
+
+**▶ Live demo — https://galaxy-lyart-one.vercel.app**
+
+<video src="https://github.com/syakubson/procedural-galaxy/raw/main/media/demo.mp4" controls muted loop poster="media/demo-poster.jpg" width="100%"></video>
+
+> If the video doesn't play inline, [watch `media/demo.mp4`](media/demo.mp4) or just open the
+> [live demo](https://galaxy-lyart-one.vercel.app).
+
+![demo](media/demo-poster.jpg)
 
 ---
 
-## Запуск
+## Run locally
 
-ES-модули требуют HTTP (не `file://`). Поднимите любой статический сервер из папки проекта:
+ES modules require HTTP (not `file://`). Serve the project folder with any static server:
 
 ```bash
 cd galaxy
 python3 -m http.server 8000
-# затем откройте http://localhost:8000
+# then open http://localhost:8000
 ```
 
-В репозитории есть `.nocache_server.py` (тот же статик-сервер, но с запретом кеша — удобно
-при разработке):
+The repo also ships `.nocache_server.py` — the same static server but with caching disabled,
+handy while iterating (so a hard refresh is never needed):
 
 ```bash
 python3 .nocache_server.py   # http://localhost:8124
 ```
 
-> Three.js и lil-gui лежат локально в `vendor/` — **интернет для работы не нужен**, сборки нет.
+> Three.js and lil-gui are vendored locally in `vendor/` — **no internet needed, no build step.**
 
 ---
 
-Легенда систем на карте по цвету метки: **зелёные** — обитаемые, **синие** — дикие,
-**оранжевые** — руины, **фиолетовые (магента)** — особые. Всё остальное — управление,
-что внутри систем, как и с какой частотой генерируются события, пасхалки и техническая
-часть — спрятано в разворачиваемых блоках ниже.
+System markers on the map are colour-coded: **green** — inhabited, **blue** — wild, **amber**
+— ruins, **magenta** — special. Two icon shapes encode discovery: an **uncharted** system is a
+fine hollow "survey ring"; once **charted** (visited) it becomes a filled status-colour disc (a
+"catalogued star"). Everything else — controls, what lives inside a system, how and how often the
+world is generated, the easter eggs, and the technical write-up — is tucked into the collapsible
+sections below.
 
 <details>
-<summary><b>Управление и панель настроек</b></summary>
+<summary><b>Controls &amp; the settings panel</b></summary>
 
 <br>
 
-### Управление
----
+### Controls
 
-| Действие | Что делает |
+| Action | What it does |
 | --- | --- |
-| **Колесо мыши / пинч** | приблизиться к курсору и отдалиться |
-| **Зажать ЛКМ / тащить** | повернуть камеру вокруг центра |
-| **Навести на кольцо** | подсказка-таблица: звезда · планет · эпоха · народ + тизер |
-| **Клик по кольцу** | варп в систему: звезда, планеты, описание |
-| **«Назад» / Esc** | вернуться из системы в галактику |
-| **Кнопка настроек (сверху справа)** | открыть/закрыть панель настроек |
-| **«Флот и станции» (снизу слева)** | галерея всех кораблей и станций (`gallery.html`) |
-| **Кнопка режима (снизу справа)** | режим отображения системы (см. ниже) |
-| **Кнопки звука (снизу справа)** | вкл/выкл эмбиент и следующий трек |
+| **Mouse wheel / pinch** | zoom toward the cursor and back out |
+| **Hold LMB / drag** | orbit the camera around the centre |
+| **Arrow keys / WASD** | orbit the camera (keyboard) |
+| **Q / E** (or **+ / −**) | zoom in / out |
+| **R** | start / stop the map rotation |
+| **C** | toggle the cinematic auto-tour |
+| **M** | toggle ambient music |
+| **Hover a marker** | a hint table: star · planets · epoch · people + a teaser |
+| **Click a marker** | warp into the system: star, planets, lore |
+| **Esc** | one step back: focused planet → system overview → galaxy |
+| **Space** | drop a focused planet back to the system overview |
+| **"?" button (top-right)** | open the controls cheat-sheet |
+| **Settings gear (top-right)** | open / close the generator panel |
+| **"Fleet & stations" (top-right)** | gallery of every ship and station (`gallery.html`) |
+| **Play/pause &amp; camera buttons (bottom-left)** | map rotation toggle &amp; cinematic tour |
+| **View-mode button (bottom-right)** | system display mode (see below) |
+| **Sound buttons (bottom-right)** | toggle ambient + next track (music is on by default) |
 
-> **Замирание вселенной.** Пока вы не трогаете мышь, галактика медленно сама вращается.
-> Как только берётесь за камеру (зум/поворот) — **вся вселенная замирает** (а не только
-> поворот камеры): звёзды, солнца, газовая туманность и метки систем встают. Авто-вращение
-> возвращается через **30 секунд** простоя. Мерцание звёзд при этом не останавливается,
-> чтобы сцена не казалась мёртвой.
+> **The universe freezes.** While you don't touch the mouse, the galaxy slowly auto-rotates.
+> The moment you grab the camera (zoom / orbit) the **whole universe freezes** (not just the
+> camera): stars, suns, the gas nebula, and the system markers all stop. Auto-rotation returns
+> after **30 seconds** of idle. Star twinkle keeps running so the scene never looks dead.
 
-**Режим отображения** (кнопка снизу справа, только внутри системы) переключается по кругу:
+> **Markers don't pulse.** Every marker is steady — only a very subtle, slow "breath" draws the
+> eye. Hovering a marker is the strong signal: it eases up in size and tints toward brass.
 
-1. **подписи** — кликабельные ярлыки планет, флагмана и станций;
-2. **чистая сцена** — без подписей, только объекты;
-3. **кино** — прячет панель и сдвигает объект в центр кадра.
+**View mode** (button bottom-right, only inside a system) cycles through:
 
-### Панель настроек (lil-gui)
----
+1. **labels** — clickable tags for planets, the flagship, and stations;
+2. **clean scene** — no labels, objects only;
+3. **cinematic** — hides the panel and centres the object in frame.
 
-- **Палитра** — 5 цветовых схем (Spore, Ember, Emerald, Ice, Rose).
-- **Качество** — `Низкое` (слабый ПК) / `Среднее` / `Высокое`: масштабирует число звёзд,
-  антиалиасинг и предел pixel ratio (значения — в `config.js`).
-- **Сид** + случайный бросок — детерминированная генерация: один сид → одна и та же галактика.
-- **Форма** — число звёзд, рукава, закрутка, толщина рукавов, разброс, размер и плотность
-  ядра, толщина диска. *(меняют геометрию — пересборка при отпускании ползунка)*
-- **Солнца** — количество и размер цветных солнц.
-- **Движение** — скорость вращения, дифференциальное вращение, мерцание, авто-вращение камеры.
-- **Свет и туманность** — экспозиция тонмаппинга, размер звёзд, газовая туманность и её плотность.
-- **Системы** — доля исследуемых систем, метки вкл/выкл, кнопка «случайная система».
+### Settings panel (lil-gui)
 
-</details>
-
-<details>
-<summary><b>Что внутри системы: звёзды, планеты, цивилизации</b></summary>
-
-<br>
-
-При клике по кольцу камера **доезжает зумом** до обзора системы (без резкого чёрного кадра).
-Внутри — процедурная звезда своего класса (гранулы, пятна, ореол-корона из лучей) и **2–7
-планет на кеплеровских орбитах** (внешние медленнее, ω ∝ a⁻¹·⁵).
-
-### Планеты
----
-
-Поверхность рисует шейдер по архетипу планеты:
-
-- **земного типа** — биомы (океанический · джунгли · ледяной · пустынный · мир-город),
-  материки/океаны/облака, блик на воде, день/ночь-терминатор, атмосферный ободок;
-- **газовый гигант** — полосы зон и поясов, шторм, **кольца** со щелью Кассини, тенью планеты и прозрачностью;
-- **лавовая** (светящиеся жилы), **ледяная**, **каменистая**, **пустынная**;
-- у части планет — небольшие **луны** (реалистично мелкие и медленные).
-
-У каждой планеты — карточка: диаметр (км), масса (в массах Земли), ресурсы, число лун,
-статус (родина / колония / руины / безжизненная) и описание.
-
-### Звёзды
----
-
-Классы **O / B / A / F / G / K / M** с весами. Горячие O/B недолговечны и **не** бывают
-обитаемыми; у обитаемых систем звезда всегда долгоживущая (A–M). Масса указана в массах Солнца.
-Часть систем — **двойные** (близкая пара), планеты тогда обращаются вокруг барицентра.
-
-### Цивилизации
----
-
-Обитаемые миры живут на одном из трёх этапов, и это видно прямо на планете:
-
-1. **Племена** — тёмная ночная сторона;
-2. **Индустриальная эпоха** — огни городов + спутники на орбите;
-3. **Космическая цивилизация** — яркие мегаполисы, орбитальная станция-кольцо, **колонии** на
-   соседних планетах и **корабли-огоньки**, снующие между мирами.
-
-Описание родного мира включает отдельный блок про **расу** (кто они, на каком этапе, во что
-верят, к чему стремятся). У вымерших цивилизаций — история катастрофы: почему мир опустел.
-
-### Вовлечение
----
-
-- на hover — краткая инфо-таблица + тизер «нажмите, чтобы исследовать →» (полная история — по клику);
-- счётчик **«Исследовано N / M»**, непосещённые метки ярче пульсируют;
-- в панели каждой системы — **астрофизический факт**;
-- у каждой планеты — диегетический кликабельный ярлык прямо в сцене.
+- **Palette** — 5 colour schemes (Spore, Ember, Emerald, Ice, Rose).
+- **Quality** — `Low` (weak PC) / `Medium` / `High`: scales star count, anti-aliasing, and the
+  pixel-ratio cap (values live in `config.js`).
+- **Seed** + random roll — deterministic generation: one seed → the same galaxy.
+- **Shape** — star count, arms, spin, arm width, scatter, core size and density, disk thickness.
+  *(these change geometry — a rebuild fires when you release the slider)*
+- **Suns** — count and size of the coloured suns.
+- **Motion** — rotation speed, differential rotation, twinkle, camera auto-rotation.
+- **Light & nebula** — tonemap exposure, star size, gas nebula and its density.
+- **Systems** — share of explorable systems, markers on/off, "random system" button.
 
 </details>
 
 <details>
-<summary><b>События и частоты — как генерируется мир</b></summary>
+<summary><b>Inside a system: stars, planets, civilisations</b></summary>
 
 <br>
 
-Мир **детерминирован**: всё, что вы видите, выкатывается из сида при сборке системы — никаких
-случайных событий «по таймеру» нет. Поэтому «события» здесь двух родов:
+Clicking a marker **dollies the camera in** to the system overview (no hard black cut). Inside is
+a procedural star of its class (granules, spots, a coronal halo of rays) and **2–7 planets on
+Keplerian orbits** (outer ones slower, ω ∝ a⁻¹·⁵).
 
-- **A. Исходы генерации** — броски `0..1` от сида, решаются один раз. Их вероятности — ниже.
-- **B. Живые анимации** — то, что непрерывно движется каждый кадр (орбиты, корабли, кометы, вращение).
+### Planets
 
-Все вероятности собраны в одном месте — `src/systems/genParams.js` (объект `GEN`), доля
-исследуемых систем и пресеты качества — в `src/config.js`. Крутить баланс — там.
+A shader paints the surface by planet archetype:
 
-> Перед первым броском статуса генератор делает **два холостых `rng.next()`**: первый бросок
-> mulberry32 на строковом сиде смещён, и без «прогрева» доли статусов перекашивало.
+- **terran** — biomes (ocean · jungle · ice · desert · city-world), continents/oceans/clouds, a
+  specular glint on water, a day/night terminator, an atmospheric rim;
+- **gas giant** — banded zones and belts, a storm, **rings** with a Cassini gap, planet shadow,
+  and transparency;
+- **lava** (glowing veins), **ice**, **rocky**, **desert**;
+- some planets carry small **moons** (realistically tiny and slow).
 
-### A. Исходы генерации и их частота
----
+Each planet has a card: diameter (km), mass (Earth masses), resources, moon count, status
+(homeworld / colony / ruins / lifeless) and a description.
 
-**Статус системы** (бросок `0..1`) — цель ≈ 2/1/1:
+### Stars
 
-| Исход | Условие | Доля |
+Classes **O / B / A / F / G / K / M**, weighted. Hot O/B stars are short-lived and **never**
+inhabited; inhabited systems always have a long-lived star (A–M). Mass is in solar masses. Some
+systems are **binaries** (a close pair) — planets then orbit the barycentre.
+
+### Civilisations
+
+Inhabited worlds sit at one of three stages, visible right on the planet:
+
+1. **Tribal** — a dark night side;
+2. **Industrial** — city lights + satellites in orbit;
+3. **Spacefaring** — bright megacities, an orbital ring station, **colonies** on neighbouring
+   planets, and **ship-lights** shuttling between worlds.
+
+A homeworld's description includes a dedicated **race** block (who they are, their stage, what
+they believe, what they strive for). Extinct civilisations carry the story of their catastrophe.
+
+### Engagement
+
+- on hover — a brief info table + a "click to explore →" teaser (the full story is one click away);
+- an **"Explored N / M"** counter; uncharted markers breathe subtly to invite a visit;
+- each system panel shows an **astrophysics fact**;
+- each planet has a diegetic, clickable label right in the scene.
+
+</details>
+
+<details>
+<summary><b>Events &amp; frequencies — how the world is generated</b></summary>
+
+<br>
+
+The world is **deterministic**: everything you see rolls out of the seed when a system is built —
+there are no random "timer" events. So "events" come in two kinds:
+
+- **A. Generation outcomes** — `0..1` rolls from the seed, decided once. Their probabilities are below.
+- **B. Live animations** — what moves continuously each frame (orbits, ships, comets, rotation).
+
+All probabilities live in one place — `src/systems/genParams.js` (the `GEN` object); the share of
+explorable systems and the quality presets are in `src/config.js`. Tune the balance there.
+
+> Before the first status roll the generator does **two throwaway `rng.next()` calls**: the first
+> mulberry32 roll on a string seed is biased, and without a "warm-up" the status mix skewed.
+
+### A. Generation outcomes and their frequency
+
+**System status** (roll `0..1`) — target ≈ 2/1/1:
+
+| Outcome | Condition | Share |
 | --- | --- | --- |
-| обитаемая | `< 0.50` | ~50% |
-| дикая | `0.50…0.75` | ~25% |
-| руины (мёртвая) | `≥ 0.75` | ~25% |
+| inhabited | `< 0.50` | ~50% |
+| wild | `0.50…0.75` | ~25% |
+| ruins (dead) | `≥ 0.75` | ~25% |
 
-**Этап цивилизации** (только обитаемые, бросок `0..1`):
+**Civilisation stage** (inhabited only, roll `0..1`):
 
-| Этап | Условие | Что видно |
+| Stage | Condition | What you see |
 | --- | --- | --- |
-| Племена | `< 0.38` | тёмная ночь |
-| Индустрия | `0.38…0.72` | огни + спутники |
-| Космос | `≥ 0.72` | мегаполисы, станция-кольцо, колонии, корабли |
+| Tribal | `< 0.38` | dark night |
+| Industrial | `0.38…0.72` | lights + satellites |
+| Spacefaring | `≥ 0.72` | megacities, ring station, colonies, ships |
 
-**Характер руин** (только мёртвые миры, бросок `0..1`):
+**Nature of ruins** (dead worlds only, roll `0..1`):
 
-| Тип | Условие | Деталь |
+| Type | Condition | Detail |
 | --- | --- | --- |
-| Роботы | `< 0.25` | вымерли, машины держат депо + 2–4 грузовика, холодные огни ещё горят |
-| Кратер | `0.25…0.50` | след катастрофы (отдельным цветом на поверхности) |
-| Разнесена | `0.50…0.85` | планета разорвана в поле обломков |
-| Серые руины | `≥ 0.85` | просто опустевший мир |
+| Robots | `< 0.25` | extinct, machines keep a depot + 2–4 freighters, cold lights still on |
+| Crater | `0.25…0.50` | a catastrophe scar (a distinct colour on the surface) |
+| Shattered | `0.50…0.85` | the planet is torn into a debris field |
+| Grey ruins | `≥ 0.85` | simply an emptied world |
 
-Для разрушенных миров **беженцы** уходят в колонию на соседней планете с шансом **0.70**
-(иначе живут на **флагмане** — флот 2–4 корабля).
+For destroyed worlds, **refugees** flee to a colony on a neighbouring planet with chance **0.70**
+(otherwise they live on a **flagship** — a fleet of 2–4 ships).
 
-**Структура и население системы:**
+**System structure &amp; population:**
 
-| Параметр | Значение |
+| Parameter | Value |
 | --- | --- |
-| Двойная звезда | шанс **0.28** |
-| Планет в системе | **2–7** |
-| Кометы | шанс **0.70**, при наличии — **1–3** шт. |
-| Одинокий флагман-разведчик в дикой системе | шанс **0.33** |
-| Доля солнц, ставших исследуемыми системами | **0.40** (`config.realSystemFraction`) |
-| Кольца у планеты | газовые ~55%, ледяные ~12% |
-| Луны | gas ≤ 3, terran/ocean ≤ 2, прочие ≤ 1 |
+| Binary star | chance **0.28** |
+| Planets per system | **2–7** |
+| Comets | chance **0.70**, when present — **1–3** |
+| Lone scout flagship in a wild system | chance **0.33** |
+| Share of suns that become explorable systems | **0.40** (`config.realSystemFraction`) |
+| Planet rings | gas ~55%, ice ~12% |
+| Moons | gas ≤ 3, terran/ocean ≤ 2, others ≤ 1 |
 
-### B. Живые события (анимации)
----
+### B. Live events (animations)
 
-| Событие | Частота / темп |
+| Event | Frequency / pace |
 | --- | --- |
-| Вращение галактики | непрерывно в простое; **замирает при взаимодействии**, возобновляется через **30 с** |
-| Орбиты планет | кеплеровские, ω ∝ a⁻¹·⁵ (внешние медленнее) |
-| Корабли космической цивилизации | непрерывно курсируют между планетами (родина ↔ колонии) |
-| Флагман-разведчик / флот беженцев | бороздят систему (роуминг) в поисках мира под колонию |
-| Грузовики роботов | возят грузы между депо мёртвого мира |
-| Кометы | медленно проходят по случайной хорде (не падают в звезду) |
-| Мерцание звёзд и пульс солнц | всегда, даже когда вращение заморожено |
+| Galaxy rotation | continuous while idle; **freezes on interaction**, resumes after **30 s** |
+| Planet orbits | Keplerian, ω ∝ a⁻¹·⁵ (outer ones slower) |
+| Spacefaring ships | continuously commute between planets (home ↔ colonies) |
+| Scout flagship / refugee fleet | roam the system looking for a world to colonise |
+| Robot freighters | haul cargo between depots of a dead world |
+| Comets | drift slowly along a random chord (they never fall into the star) |
+| Star twinkle &amp; sun pulse | always, even when rotation is frozen |
 
-**Фракции.** На обитаемых системах фракции назначаются **по кругу** (round-robin), так что все
-6 рас/стилей кораблей гарантированно встречаются. Полный «бестиарий» флота — в `gallery.html`.
+**Factions.** On inhabited systems, factions are assigned **round-robin**, so all 6 ship races /
+styles are guaranteed to appear. The full fleet "bestiary" is in `gallery.html`.
 
 </details>
 
 <details>
-<summary><b>Особые системы (пасхалки)</b></summary>
+<summary><b>Special systems (easter eggs)</b></summary>
 
 <br>
 
-Помечены **отдельным цветом — магента «особые»**, их планеты в панели идут с особым тегом, и в
-счётчик «Исследовано» они **не** входят. Это рукотворные сцены, закреплённые на рукавах:
+Marked in a **separate colour — magenta "special"**, their planets carry a special tag in the
+panel, and they do **not** count toward the "Explored" counter. These are hand-crafted scenes
+pinned to the arms:
 
-- **Стрелец A\*** — сверхмассивная чёрная дыра в центре галактики: чёрный горизонт, аккреционный
-  диск (температурный градиент + кеплеровская закрутка + доплеровское усиление), фотонное кольцо.
-- **Гаргантюа («Интерстеллар»)** — диск, «оборачивающийся» над и под дырой за счёт линзирования,
-  и вращающаяся станция-кольцо **«Эндюранс»** на орбите вокруг неё.
-- **Наша Солнечная** — 8 планет 1:1.
-- **«Чёрный Карантин»** (в духе Dead Space) — планета-обелиск, над которой завис корабль-«планетокол»
-  **«Ишимура»**.
-- **4 мира из фильмов** — Двусолнечье, Пряный Предел, Спутник Бурь, Ледяная Глушь, каждый с
-  настоящей кино-/игровой справкой.
-- **Боевая станция «Длань»** (Звезда Смерти) — бронированная сфера с экваториальным рвом, широтными
-  бороздами и вогнутой чашей суперлазера с зелёным излучателем; **летит по орбите**, окружена эскортом
-  из 5 имперских кораблей. Стоит в **«Секторе Альдераан»** рядом с разнесённой в обломки планетой —
-  воссозданная сцена из фильма.
+- **Sagittarius A\*** — the supermassive black hole at the galactic centre: a black horizon, an
+  accretion disk (temperature gradient + Keplerian shear + Doppler boosting), a photon ring.
+- **Gargantua ("Interstellar")** — a disk that "wraps" above and below the hole via lensing, with
+  the rotating ring station **Endurance** in orbit around it.
+- **Our Solar System** — 8 planets, 1:1.
+- **"Black Quarantine"** (Dead Space-flavoured) — an obelisk world with the planet-cracker ship
+  **Ishimura** hanging above it.
+- **4 film worlds** — Twin-Sun, Spice Reach, Storm Moon, Ice Wilds, each with a real film/game ref.
+- **Battle station "Hand"** (Death Star) — an armoured sphere with an equatorial trench, latitude
+  furrows, and a concave superlaser dish with a green emitter; it **orbits** the star with an escort
+  of 5 imperial ships, parked in the **"Alderaan Sector"** next to a shattered planet — a recreated scene.
 
 </details>
 
 <details>
-<summary><b>Техническая часть и производительность</b></summary>
+<summary><b>Technical notes &amp; performance</b></summary>
 
 <br>
 
-### Стек
----
+### Stack
 
-- **Three.js 0.160**, чистые ES-модули + import map, всё вендорится в `vendor/` — **без сборки**,
-  без npm-install, без интернета.
-- Рендер — `WebGLRenderer` + HDR-конвейер (`EffectComposer` / `OutputPass`) с ACES-тонмаппингом.
-- `OrbitControls` для камеры, `lil-gui` для панели.
+- **Three.js 0.160**, pure ES modules + an import map, everything vendored in `vendor/` — **no
+  build**, no `npm install`, no internet.
+- Rendering — `WebGLRenderer` + an HDR pipeline (`EffectComposer` / `OutputPass`) with ACES tonemapping.
+- `OrbitControls` for the camera, `lil-gui` for the panel.
 
-### Почему оно тянет слабые ПК
----
+### Why it runs on weak PCs
 
-- **Один draw call** на весь звёздный диск (`BufferGeometry` + `THREE.Points`).
-- **Вращение, мерцание и размер — на GPU** в вершинном шейдере: процессор обновляет одно число
-  в кадр, а не перебирает звёзды.
-- **Два таймера вращения.** `uRotTime` (часы вращения) идёт только в простое и **замерзает при
-  взаимодействии**; `uTime` (мерцание/пульс) идёт всегда. Газовая туманность тоже сидит на
-  `uRotTime`, поэтому замирает вместе со звёздами и не отрывается от рукавов.
-- **Жёсткое (rigid) вращение** — весь диск (и туманность) крутится с одной угловой скоростью.
-  Спираль «вшита» в позиции звёзд, поэтому диск просто поворачивается и **никогда не закручивается**
-  даже после долгого простоя. *(Дифференциальное вращение красиво первую минуту, но за час сматывает
-  рукава в тугую спираль — этот баг и закрыт жёстким вращением.)*
-- **Без текстур** — спрайты звёзд рисуются процедурно во фрагментном шейдере.
-- **HDR + ACES вместо тяжёлого bloom**: ядро светится мягко, без дорогого многоступенчатого пост-эффекта.
-- **Размер точек ограничен** аппаратным лимитом GPU (`ALIASED_POINT_SIZE_RANGE`) — меньше overdraw,
-  нет «обрыва» драйвера на слабых картах.
-- **Pixel ratio ограничен** пресетом качества; **MSAA 4×** включается только на «Среднем»/«Высоком».
-- **Пауза рендера** на скрытой вкладке.
-- **Авто-снижение качества**: при стабильно низком FPS pixel ratio разово падает до 1.0.
+- **One draw call** for the whole star disk (`BufferGeometry` + `THREE.Points`).
+- **Rotation, twinkle, and size on the GPU** in the vertex shader: the CPU updates one number per
+  frame instead of iterating over stars.
+- **Two rotation clocks.** `uRotTime` (the spin clock) only advances while idle and **freezes on
+  interaction**; `uTime` (twinkle/pulse) always runs. The gas nebula also rides `uRotTime`, so it
+  freezes with the stars and never detaches from the arms.
+- **Rigid rotation** — the whole disk (and nebula) turns at one angular speed. The spiral is baked
+  into the star positions, so the disk simply rotates and **never winds up** even after a long idle.
+  *(Differential rotation looks great for the first minute but coils the arms into a tight spiral
+  over an hour — that bug is closed by rigid rotation.)*
+- **No textures** — star sprites are drawn procedurally in the fragment shader.
+- **HDR + ACES instead of heavy bloom**: the core glows softly without an expensive multi-pass post effect.
+- **Point size clamped** to the GPU hardware limit (`ALIASED_POINT_SIZE_RANGE`) — less overdraw, no driver cutoff on weak cards.
+- **Pixel ratio capped** by the quality preset; **MSAA 4×** only on Medium / High.
+- **Render paused** on a hidden tab.
+- **Auto-downgrade**: on sustained low FPS, pixel ratio drops to 1.0 once.
 
-Ориентир: «Среднее» (38k звёзд) комфортно идёт на интегрированной графике; «Низкое» (16k) — для
-совсем слабых машин.
+Reference: Medium (38k stars) runs comfortably on integrated graphics; Low (16k) is for very weak machines.
 
-### Звук
----
+### Sound
 
-Эмбиент — три лицензированных трека (`audio/tracks/`): **Kevin MacLeod (CC-BY)** и **yd (CC0)**.
-Атрибуция показывается в подписи трека и в `audio/CREDITS.txt`. Включается и переключается кнопками
-звука в правом нижнем углу.
+Ambient — three licensed tracks (`audio/tracks/`): **Kevin MacLeod (CC-BY)** and **yd (CC0)**.
+Attribution is shown in the track caption and in `audio/CREDITS.txt`. Toggled with the sound
+buttons in the bottom-right corner (music is on by default, starting on your first interaction).
 
 </details>
 
 <details>
-<summary><b>Структура проекта</b></summary>
+<summary><b>Project structure</b></summary>
 
 <br>
 
 ```
 galaxy/
-├── index.html              # canvas + import map + оверлеи
+├── index.html              # canvas + import map + overlays
 ├── styles.css
-├── .nocache_server.py      # статик-сервер без кеша (порт 8124)
-├── gallery.html            # галерея всех кораблей и станций
-├── vendor/                 # локальные Three.js core/addons + lil-gui
-├── audio/tracks/           # эмбиент (CC-BY / CC0) + CREDITS.txt
-├── docs/                   # GENERATION.md, ENGAGEMENT.md, INTERFACE_RESEARCH.md
+├── favicon.svg             # brass cartographer survey-ring favicon
+├── .nocache_server.py      # no-cache static server (port 8124)
+├── gallery.html            # gallery of every ship and station
+├── vercel.json             # static-deploy headers (always revalidate)
+├── media/                  # README demo video + poster
+├── vendor/                 # vendored Three.js core/addons + lil-gui
+├── audio/tracks/           # ambient (CC-BY / CC0) + CREDITS.txt
 └── src/
-    ├── main.js             # рендерер, камера, OrbitControls, цикл, адаптивность
-    ├── config.js           # дефолты + пресеты качества (число звёзд/солнц)
-    ├── palettes.js         # цветовые схемы
-    ├── rng.js              # seeded PRNG (mulberry32) для воспроизводимости
-    ├── galaxy.js           # генерация звёздного диска + балджа
-    ├── suns.js             # слой цветных «солнц»
-    ├── background.js       # дальнее звёздное поле + газовая туманность
-    ├── nebulaClouds.js     # газовые облака в глубоком фоне
-    ├── postfx.js           # HDR-конвейер + ACES-тонмаппинг
-    ├── gui.js              # панель lil-gui
-    ├── audio/ambient.js    # эмбиент-плеер (треки + переключение)
-    ├── systems/            # исследуемые системы
-    │   ├── genParams.js    # ВСЕ вероятности/доли генерации (GEN)
-    │   ├── systemData.js   # генерация системы из сида + спец-системы
-    │   ├── markers.js      # метки систем в галактике (hover/клик/raycast)
-    │   ├── lore.js         # имена, истории, расы, ресурсы, факты
-    │   ├── planet.js       # планета: меш + шейдер + кольца + луны
-    │   ├── systemView.js   # сцена системы: звезда + планеты + орбиты, enter/exit
-    │   ├── blackHole.js    # чёрная дыра (горизонт + аккреционный диск)
-    │   ├── comet.js        # кометы
-    │   ├── debris.js       # поле обломков разрушенных планет
-    │   ├── endurance.js    # станция-кольцо «Эндюранс»
-    │   ├── deathStar.js    # Звезда Смерти (бронесфера + чаша суперлазера)
-    │   ├── ishimura.js     # корабль-планетокол «Ишимура»
-    │   ├── stations.js     # орбитальные станции цивилизаций
-    │   ├── ships.js        # корабли-огоньки + перелёты
-    │   └── ships/          # фракции, роли, стили кораблей
+    ├── main.js             # renderer, camera, OrbitControls, loop, keyboard, adaptivity
+    ├── config.js           # defaults + quality presets (star/sun counts)
+    ├── palettes.js         # colour schemes
+    ├── rng.js              # seeded PRNG (mulberry32) for reproducibility
+    ├── galaxy.js           # star-disk + bulge generation
+    ├── suns.js             # the coloured "suns" layer
+    ├── background.js       # far star field + gas nebula
+    ├── nebulaClouds.js     # gas clouds in the deep background
+    ├── postfx.js           # HDR pipeline + ACES tonemapping
+    ├── gui.js              # the lil-gui panel
+    ├── audio/ambient.js    # ambient player (tracks + switching)
+    ├── systems/            # explorable systems
+    │   ├── genParams.js    # ALL generation probabilities / shares (GEN)
+    │   ├── systemData.js   # build a system from a seed + the special systems
+    │   ├── markers.js      # galaxy markers (survey ring / catalogued disc, hover, raycast)
+    │   ├── focusConfig.js  # per-object-type camera framing distances
+    │   ├── lore.js         # names, stories, races, resources, facts
+    │   ├── planet.js       # planet: mesh + shader + rings + moons + trail
+    │   ├── systemView.js   # system scene: star + planets + orbits, enter/exit, focus
+    │   ├── blackHole.js    # black hole (horizon + accretion disk)
+    │   ├── comet.js        # comets
+    │   ├── debris.js       # debris field of destroyed planets
+    │   ├── endurance.js    # the Endurance ring station
+    │   ├── deathStar.js    # the Death Star (armoured sphere + superlaser dish)
+    │   ├── ishimura.js     # the Ishimura planet-cracker
+    │   ├── dragon.js       # a Crew Dragon en route to Mars (Solar System easter egg)
+    │   ├── stations.js     # civilisation orbital stations
+    │   ├── ships.js        # ship-lights + transfers
+    │   └── ships/          # fleet factions, roles, ship styles
     ├── ui/
-    │   ├── hud.js          # панель лора, подсказка-таблица, легенда, переход
-    │   └── planetLabels.js # диегетические ярлыки планет/станций
+    │   ├── hud.js          # lore panel, hint table, legend, transition overlay
+    │   └── planetLabels.js # diegetic planet/station labels (real-size de-overlap)
     └── shaders/
-        ├── starShader.js          # вращение/мерцание/размер звёзд галактики (GPU)
-        ├── sunShader.js           # солнца с пульсацией
-        ├── nebulaShader.js        # газовый диск (fbm-шум + эхо рукавов)
-        ├── planetShader.js        # поверхность планет по типу
-        ├── starSurfaceShader.js   # звезда системы: гранулы + потемнение к краю + корона
-        └── blackHoleShader.js     # аккреционный диск + линзирование
+        ├── starShader.js          # galaxy stars: rotation/twinkle/size (GPU)
+        ├── sunShader.js           # pulsing suns
+        ├── nebulaShader.js        # gas disk (fbm noise + arm echo)
+        ├── planetShader.js        # per-type planet surfaces
+        ├── starSurfaceShader.js   # system star: granules + limb darkening + corona
+        └── blackHoleShader.js     # accretion disk + lensing
 ```
 
-Подробная карта правил генерации (что, сколько и где) — в `docs/GENERATION.md`.
+A detailed map of the generation rules (what, how much, where) is in `docs/GENERATION.md`.
 
 </details>
 
 <details>
-<summary><b>Dev-консоль</b></summary>
+<summary><b>Dev console</b></summary>
 
 <br>
 
-Приложение доступно как `window.galaxyApp` — можно крутить параметры из DevTools:
+The app is exposed as `window.galaxyApp` — you can tweak parameters from DevTools:
 
 ```js
 galaxyApp.config.rotationSpeed = 0.12;
-galaxyApp.applyLive();          // применить «живые» параметры без пересборки
+galaxyApp.applyLive();          // apply "live" parameters without a rebuild
 
 galaxyApp.config.seed = 'orion';
-galaxyApp.rebuild();            // полная пересборка геометрии под новый сид
+galaxyApp.rebuild();            // full geometry rebuild for the new seed
 ```
 
 </details>
+
+---
+
+## Deploy
+
+Static site, no build step — deployable to any static host. It runs live on **Vercel**
+(<https://galaxy-lyart-one.vercel.app>); `vercel.json` sets always-revalidate cache headers so a
+redeploy is picked up immediately, and `.vercelignore` keeps dev-only files out of the bundle.
