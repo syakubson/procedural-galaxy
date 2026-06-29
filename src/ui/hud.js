@@ -302,8 +302,10 @@ export class InfoPanel {
    *  characteristics (mono data rows) + resources (chips). */
   _setFocusCallout(name, sub, desc, metaHtml, resHtml) {
     const fc = this._fc;
-    fc.name.textContent = name || '';
-    fc.sub.textContent = sub || '';
+    // name + type already head the left panel — keep them out of the callout to
+    // avoid duplication; the callout is purely the spec sheet (desc + data + res).
+    fc.name.style.display = 'none';
+    fc.sub.style.display = 'none';
     fc.desc.textContent = desc || '';
     fc.desc.style.display = desc ? '' : 'none';
     fc.meta.innerHTML = metaHtml || '';
@@ -312,7 +314,7 @@ export class InfoPanel {
     fc.res.innerHTML = resHtml || '';
     fc.res.style.display = resHtml ? '' : 'none';
     fc.resTitle.style.display = resHtml ? '' : 'none';
-    this.focusActive = !!(name || desc || metaHtml);
+    this.focusActive = !!(desc || metaHtml || resHtml);
   }
   _clearFocusCallout() {
     this.focusActive = false;
