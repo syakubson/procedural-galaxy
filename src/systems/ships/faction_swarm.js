@@ -1,4 +1,4 @@
-// Faction style-kit: РОЙ (Swarm) — an organic, grown fleet (#11 matrix).
+// Faction style-kit: SWARM — an organic, grown fleet (#11 matrix).
 // Consumed by every role builder in roles.js: amber-brown chitinous carapace,
 // mossy-green ridges and bio-luminescent green glow restyle all 9 silhouettes
 // into one living swarm. The `flourish` hook adds the grown, not-built reading:

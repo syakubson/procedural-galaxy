@@ -10,3 +10,7 @@ scratchpad/
 # Scratch roadmap + session checkpoints (not public docs)
 TODO.md
 CHECKPOINT.md
+
+# Dev artifacts — not part of the product (purged from history)
+docs/
+shots/

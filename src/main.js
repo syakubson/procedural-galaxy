@@ -120,7 +120,7 @@ class GalaxyApp {
     this._hoverObj = null;
     this._hoverR = 1;
     this._viewMode = 0;
-    this._viewModeIcons = ['❏', '○', '▣']; // подписи / чистая сцена / кино (monochrome glyphs)
+    this._viewModeIcons = ['❏', '○', '▣']; // labels / clean scene / cinematic (monochrome glyphs)
     if (!btn) return;
     btn.addEventListener('click', () => {
       this._viewMode = (this._viewMode + 1) % 3;
@@ -236,7 +236,7 @@ class GalaxyApp {
     if (this._helpPanel) this._helpPanel.classList.remove('open');
   }
 
-  /** Wire the «▶ Кинопоказ» cinematic auto-tour (#5): a hands-off camera show that
+  /** Wire the cinematic auto-tour (#5): a hands-off camera show that
    *  dives system to system, lingering on each highlight with a slow cinematic
    *  drift. Any interaction ends it. */
   _initCinematic() {
@@ -340,9 +340,9 @@ class GalaxyApp {
     const byName = (n) => list.find((s) => s.data && s.data.name === n);
     const stops = [];
     const push = (s) => s && !stops.includes(s) && stops.push(s);
-    push(byName('Солнечная система')); // Земля + Crew Dragon
-    push(byName('Чёрный Карантин')); // Ишимура крушит планету
-    push(byName('Гаргантюа')); // чёрная дыра + станция «Эндюранс»
+    push(byName('Солнечная система')); // Earth + Crew Dragon
+    push(byName('Чёрный Карантин')); // the Ishimura cracks a planet
+    push(byName('Гаргантюа')); // black hole + the Endurance station
     // the rest of the hand-built specials (events/phenomena/transport), skipping
     // only the galactic-core void
     for (const s of list) if (s.special && !s.noFade) push(s);
@@ -355,12 +355,12 @@ class GalaxyApp {
    *  (transport, phenomena, events), then a couple of standout worlds (#cine). */
   _cineHighlights(sv) {
     const acts = [];
-    if (sv.dragon) acts.push(() => this._focusHit('dragon', sv.dragon)); // транспорт
-    if (sv.ishimura) acts.push(() => this._focusHit('ishimura', sv.ishimura)); // событие
-    if (sv.deathStar) acts.push(() => this._focusHit('deathstar', sv.deathStar)); // событие
-    if (sv.endurance) acts.push(() => this._cineFocusEndurance(sv)); // транспорт у чёрной дыры
+    if (sv.dragon) acts.push(() => this._focusHit('dragon', sv.dragon)); // transport
+    if (sv.ishimura) acts.push(() => this._focusHit('ishimura', sv.ishimura)); // event
+    if (sv.deathStar) acts.push(() => this._focusHit('deathstar', sv.deathStar)); // event
+    if (sv.endurance) acts.push(() => this._cineFocusEndurance(sv)); // transport near the black hole
     const flag = (sv.ships || []).find((s) => s.type && s.type.cat === 'flagship');
-    if (flag) acts.push(() => this._focusHit('ship', flag)); // флагман флота
+    if (flag) acts.push(() => this._focusHit('ship', flag)); // fleet flagship
     // then a couple of standout worlds
     const planets = sv.planets || [];
     const pick = [];
@@ -376,7 +376,7 @@ class GalaxyApp {
     return acts;
   }
 
-  /** Cinematic focus on the «Эндюранс» ring station (it isn't a normal pickable). */
+  /** Cinematic focus on the Endurance ring station (it isn't a normal pickable). */
   _cineFocusEndurance(sv) {
     if (!sv.endurance) return;
     this._frameObject(sv.endurance.group, 'endurance');
@@ -392,7 +392,7 @@ class GalaxyApp {
           ['Курс', 'к мирам за горизонтом событий'],
         ],
       },
-      null, // not a faction build — keep the «Орбитальная постройка» subtitle
+      null, // not a faction build — keep the "Orbital structure" subtitle
     );
     this.planetLabels.setVisible(false);
   }
@@ -735,8 +735,8 @@ class GalaxyApp {
     if (k.has('ArrowRight') || k.has('KeyD')) az -= 1;
     if (k.has('ArrowUp') || k.has('KeyW')) pol -= 1;
     if (k.has('ArrowDown') || k.has('KeyS')) pol += 1;
-    if (k.has('Equal') || k.has('NumpadAdd') || k.has('KeyQ')) zoom *= 1 - 0.9 * dt; // приближение
-    if (k.has('Minus') || k.has('NumpadSubtract') || k.has('KeyE')) zoom *= 1 + 0.9 * dt; // отдаление
+    if (k.has('Equal') || k.has('NumpadAdd') || k.has('KeyQ')) zoom *= 1 - 0.9 * dt; // zoom in
+    if (k.has('Minus') || k.has('NumpadSubtract') || k.has('KeyE')) zoom *= 1 + 0.9 * dt; // zoom out
     if (!az && !pol && zoom === 1) return;
 
     if (!system) {
@@ -1048,7 +1048,7 @@ class GalaxyApp {
     this.canvas.style.cursor = 'default';
     // settings belong to the galaxy view only — hide the ⚙ + close the panel
     if (this._settingsBtn) this._settingsBtn.style.display = 'none';
-    // the «Флот и станции» link lives next to the ⚙ — both are galaxy-only, so
+    // the "Fleet & stations" link lives next to the ⚙ — both are galaxy-only, so
     // hide it inside a system (the facts box owns the top-right corner there).
     if (this._galleryLink) this._galleryLink.style.display = 'none';
     this.gui.hide();

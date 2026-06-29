@@ -14,9 +14,9 @@ const STATUS_COLOR = {
 // magenta — hand-crafted easter-egg systems (#13/#19/#20)
 const SPECIAL_COLOR = '#d98ae8';
 
-// drop the trailing franchise tag from authored lore: «… восстание. (Star Wars)»
-// → «… восстание.» We keep in-prose parentheticals (spectral class «(G)», a name
-// alias «(Дюна)», «(Битва при Явине)») — only known universe tags are stripped.
+// drop the trailing franchise tag from authored lore: «… uprising. (Star Wars)»
+// → «… uprising.» We keep in-prose parentheticals (spectral class «(G)», a name
+// alias «(Dune)», «(Battle of Yavin)») — only known universe tags are stripped.
 const UNIVERSE_TAG = /\s*\((?:Star\s?Wars|Dead\s?Space|Dune|Avatar|Interstellar|Halo|Mass\s?Effect|Alien[s]?|Warhammer)[^)]*\)\s*$/i;
 function stripUniverseTag(text) {
   return typeof text === 'string' ? text.replace(UNIVERSE_TAG, '') : text;
@@ -66,10 +66,10 @@ export function planetAccent(p) {
 /** A status badge glyph for the diegetic label (#6): home world / colony /
  *  ruins / plain lifeless world — each gets its own mark. */
 export function planetStatusIcon(p) {
-  if (p.inhabited) return '🏛'; // родной мир цивилизации
-  if (p.colony) return '🚩'; // колония
-  if (p.ruined) return '💀'; // руины
-  return '🌑'; // безжизненный мир
+  if (p.inhabited) return '🏛'; // civilisation homeworld
+  if (p.colony) return '🚩'; // colony
+  if (p.ruined) return '💀'; // ruins
+  return '🌑'; // lifeless world
 }
 
 // --- orbital-structure info cards (#6): ring habitats, gas collectors, hubs --
@@ -108,7 +108,7 @@ const STRUCTURE_INFO = {
 export function structureCard(planet) {
   const base = STRUCTURE_INFO[planet.stationKind] || STRUCTURE_INFO.outpost;
   const stationName = planet.data && planet.data.stationName;
-  // give it the named title («Заря» — кольцевой город) when the data has a name
+  // give it the named title («Заря» — a ring city) when the data has a name
   return stationName ? { ...base, name: `${stationName} — ${base.name.toLowerCase()}` } : base;
 }
 
@@ -153,7 +153,7 @@ function planetDesc(p) {
 
 // --- planet physical data (#2): the visual radius is unitless; map it to a
 // plausible diameter (km) and an Earth-mass, then list what the world is made of.
-const KM_PER_UNIT = 19500; // a terran world (r≈0.65) ≈ 12 700 км, как Земля
+const KM_PER_UNIT = 19500; // a terran world (r≈0.65) ≈ 12,700 km, like Earth
 const TYPE_DENSITY = { lava: 1.0, rocky: 0.95, desert: 0.9, terran: 1.0, ocean: 0.95, ice: 0.5, gas: 0.22 };
 const PLANET_RES = {
   lava: ['редкоземельные металлы', 'тяжёлые изотопы', 'сера'],
@@ -229,7 +229,7 @@ export class InfoPanel {
     document.body.appendChild(el);
     this.el = el;
 
-    // #4: the «Назад» control lives OUTSIDE the panel, fixed top-left, so it's
+    // #4: the "Back" control lives OUTSIDE the panel, fixed top-left, so it's
     // always crisp and reachable. It steps up one level (planet→system→galaxy).
     const back = document.createElement('button');
     back.id = 'nav-back';
@@ -513,7 +513,7 @@ export class Tooltip {
 
   show(data, x, y, visited) {
     // Discovery mechanic: an undiscovered system is anonymous — hovering reveals
-    // only «не исследована», never its status or contents (that's the reward for
+    // only "uncharted", never its status or contents (that's the reward for
     // diving in). The galactic-centre black hole (noFade) is always revealed.
     if (!visited && !data.noFade) {
       const label = data.special ? 'Неопознанный объект' : 'Неопознанная система';

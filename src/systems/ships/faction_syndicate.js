@@ -1,4 +1,4 @@
-// Faction style-kit (#11): СИНДИКАТ — a sleek hi-tech corporate fleet. Bright
+// Faction style-kit (#11): SYNDICATE — a sleek hi-tech corporate fleet. Bright
 // white hulls, lots of glass, CYAN glowing accents/engines. Beyond the palette,
 // `flourish` stamps the signature look: thin additive CYAN light-lines running
 // along the hull flanks + a dorsal spine line, a sleek glass sensor dome on the

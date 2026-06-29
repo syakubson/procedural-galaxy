@@ -13,10 +13,9 @@ tens of thousands of stars.
 
 **▶ Live demo — https://galaxy-lyart-one.vercel.app**
 
-[![Galaxy Explorer — click to play the demo](media/demo-poster.jpg)](https://github.com/syakubson/procedural-galaxy/blob/main/media/demo.mp4)
+**▶ [Watch the demo video](media/demo.mp4)** — or click the thumbnail below (it opens in GitHub's player):
 
-> ▶ **Click the image** to play the screen-capture demo (`media/demo.mp4`), or just open the
-> [live demo](https://galaxy-lyart-one.vercel.app).
+[![Galaxy Explorer — watch the demo](media/demo-poster.jpg)](media/demo.mp4)
 
 ---
 
@@ -352,7 +351,7 @@ galaxy/
         └── blackHoleShader.js     # accretion disk + lensing
 ```
 
-A detailed map of the generation rules (what, how much, where) is in `docs/GENERATION.md`.
+A detailed map of the generation rules (what, how much, where) is in `GENERATION.md`.
 
 </details>
 

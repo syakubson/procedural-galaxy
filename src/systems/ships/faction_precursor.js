@@ -1,4 +1,4 @@
-// Faction style-kit: ПРЕДТЕЧИ (precursor / ancient). A sacred, mysterious fleet —
+// Faction style-kit: PRECURSORS (ancient). A sacred, mysterious fleet —
 // gold-and-bronze hulls etched with glowing rune-bands and ringed by FLOATING
 // geometric shards held aloft in light. Consumed by every role builder in
 // roles.js (the silhouette stays shared; this kit restyles its palette + adds a

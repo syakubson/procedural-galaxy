@@ -450,7 +450,7 @@ export function generateInterstellar() {
     seed: 'interstellar',
     kind: 'blackhole',
     variant: 'gargantua',
-    special: true, // a special encounter — magenta «особые» marker + badge
+    special: true, // a special encounter — magenta "special" marker + badge
     name: 'Гаргантюа',
     status: 'blackhole',
     statusLabel: 'Чёрная дыра · «Интерстеллар»',

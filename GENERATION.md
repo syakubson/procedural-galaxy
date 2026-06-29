@@ -1,80 +1,83 @@
-# Генерация мира — что, сколько и где
+# World generation — what, how much, and where
 
-Карта файлов и правил процедурной генерации галактики. Всё **детерминировано от
-сида**: один и тот же сид → одна и та же галактика.
+A map of the files and rules behind the galaxy's procedural generation. Everything is
+**deterministic from a seed**: the same seed → the same galaxy.
 
-## Где что лежит
+## Where things live
 
-| Файл | За что отвечает |
+| File | Responsibility |
 |---|---|
-| `src/systems/genParams.js` | **Все тюнинг-параметры** (вероятности, доли, диапазоны) — `GEN`. Крутить баланс тут. |
-| `src/systems/systemData.js` | Логика генерации одной системы из сида + спец-системы (пасхалки). |
-| `src/systems/markers.js` | Размещение систем в галактике (на рукавах, без наложения, зона у центра) + цвета меток + спец-метки. |
-| `src/systems/lore.js` | Тексты: имена, лор, история, ресурсы, расы, факты. |
-| `src/config.js` | Форма галактики: `realSystemFraction` (доля солнц → систем), пресеты качества (кол-во звёзд/солнц). |
+| `src/systems/genParams.js` | **All tuning parameters** (probabilities, shares, ranges) — `GEN`. Tune the balance here. |
+| `src/systems/systemData.js` | Logic for generating a single system from a seed + the special systems (easter eggs). |
+| `src/systems/markers.js` | Placing systems in the galaxy (on the arms, no overlap, a clear zone at the centre) + marker colours + special markers. |
+| `src/systems/lore.js` | Text: names, lore, history, resources, races, facts. |
+| `src/config.js` | Galaxy shape: `realSystemFraction` (share of suns → systems), quality presets (star/sun counts). |
 
-## Сколько чего (значения — в `genParams.js`)
+## How much of what (values in `genParams.js`)
 
-### Статусы систем (#1) — цель ≈ 2/1/1
-Бросок `0..1`: `< GEN.statusInhabited (0.5)` → **обитаемая**, иначе `< GEN.statusWild (0.75)` →
-**дикая**, иначе **руины (мёртвая)**. Итог ≈ 50% / 25% / 25%.
-*(Перед броском генератор «прогревается» двумя холостыми `rng.next()` — первый бросок mulberry32
-на строковом сиде смещён и без прогрева перекашивал доли.)*
+### System status (#1) — target ≈ 2/1/1
+Roll `0..1`: `< GEN.statusInhabited (0.5)` → **inhabited**, else `< GEN.statusWild (0.75)` →
+**wild**, else **ruins (dead)**. Result ≈ 50% / 25% / 25%.
+*(Before the roll the generator "warms up" with two throwaway `rng.next()` calls — the first
+mulberry32 roll on a string seed is biased and skewed the shares without the warm-up.)*
 
-### Звёзды
-`STAR_TYPES` в `systemData.js`: O/B/A/F/G/K/M с весами. Горячие O/B — недолговечные, **не** могут
-быть обитаемыми и старыми. У обитаемых систем звезда всегда долгоживущая (A–M).
-**Двойные:** `GEN.binaryChance` = 0.28. Планеты тогда обращаются вокруг барицентра.
+### Stars
+`STAR_TYPES` in `systemData.js`: O/B/A/F/G/K/M, weighted. Hot O/B stars are short-lived and **cannot**
+be inhabited or old. Inhabited systems always have a long-lived star (A–M).
+**Binaries:** `GEN.binaryChance` = 0.28. Planets then orbit the barycentre.
 
-### Планеты
-`GEN.planetCount` = 2…7 на систему. Архетипы (`PLANET_DEFS`): lava / rocky / desert / terran /
-ocean / ice / gas. Зоны: inner (lava/rocky/desert) → mid (terran/ocean/…) → outer (gas/ice).
-Размещение — модель «half-extent + MIN_GAP»: каждое тело (радиус + кольца + луны) не задевает
-соседа; первая планета держит зазор от звезды. Скорость по орбите ∝ `a^-1.5` (Кеплер).
-**Кольца:** газовые ~55%, ледяные ~12%. **Луны:** gas ≤3, terran/ocean ≤2, прочие ≤1.
-**Биомы обитаемых** (`BIOMES`): earthlike / ocean / jungle / tundra / desert / city.
+### Planets
+`GEN.planetCount` = 2…7 per system. Archetypes (`PLANET_DEFS`): lava / rocky / desert / terran /
+ocean / ice / gas. Zones: inner (lava/rocky/desert) → mid (terran/ocean/…) → outer (gas/ice).
+Placement uses a "half-extent + MIN_GAP" model: each body (radius + rings + moons) never touches its
+neighbour; the first planet keeps a gap from the star. Orbital speed ∝ `a^-1.5` (Kepler).
+**Rings:** gas ~55%, ice ~12%. **Moons:** gas ≤3, terran/ocean ≤2, others ≤1.
+**Inhabited biomes** (`BIOMES`): earthlike / ocean / jungle / tundra / desert / city.
 
-### Цивилизации (обитаемые)
-Этап: `< GEN.civTribal (0.38)` племена → `< GEN.civIndustrial (0.72)` индустрия → иначе
-**космическая**. Только космические имеют корабли, станции и **колонии** (#2: у каждой колонии
-свой хаб-станция), скиммеры на газовых гигантах. Корабли: 4 у космической.
-**Фракции (#24):** на обитаемых системах фракции назначаются **round-robin** (`markers.js`,
-`FLEET_FACTIONS`), так что все 6 рас/стилей гарантированно встречаются и используются все 54 корабля.
+### Civilisations (inhabited)
+Stage: `< GEN.civTribal (0.38)` tribal → `< GEN.civIndustrial (0.72)` industrial → else
+**spacefaring**. Only spacefaring ones have ships, stations, and **colonies** (#2: each colony gets
+its own hub station), plus skimmers on gas giants. Ships: 4 for a spacefaring civ.
+**Factions (#24):** on inhabited systems factions are assigned **round-robin** (`markers.js`,
+`FLEET_FACTIONS`), so all 6 races/styles are guaranteed to appear and all 54 ships are used.
 
-### Руины / мёртвые миры (#8/#9/#10)
-Флавор (бросок `0..1`): `< GEN.ruinRobotic (0.25)` **роботы** (вымерли, машины держат депо +
-грузовики `GEN.roboticShips` 2–4) → `< GEN.ruinDestroyed (0.5)` **кратер-катастрофа** →
-`< GEN.ruinObliterated (0.85)` **разнесена в обломки** → иначе просто серые руины.
-**Беженцы** (для destroyed/obliterated): с шансом `GEN.ruinRefugeChance (0.7)` уходят в колонию на
-соседнем мире (+хаб рядом с мёртвой планетой), иначе живут на **флагмане** (`GEN.fleetShips` 2–4).
+### Ruins / dead worlds (#8/#9/#10)
+Flavour (roll `0..1`): `< GEN.ruinRobotic (0.25)` **robots** (extinct, machines keep a depot +
+freighters `GEN.roboticShips` 2–4) → `< GEN.ruinDestroyed (0.5)` **crater catastrophe** →
+`< GEN.ruinObliterated (0.85)` **torn into debris** → else plain grey ruins.
+**Refugees** (for destroyed/obliterated): with chance `GEN.ruinRefugeChance (0.7)` they flee to a
+colony on a neighbouring world (+ a hub near the dead planet), otherwise they live on a **flagship**
+(`GEN.fleetShips` 2–4).
 
-### Дикие миры (#25)
-С шансом `GEN.scoutFlagshipChance (0.33)` в дикой системе есть **одинокий флагман-разведчик**,
-бороздящий систему в поисках планеты под колонию (роуминг + соответствующий лор). Грузовиков
-роботов это правило не касается.
+### Wild worlds (#25)
+With chance `GEN.scoutFlagshipChance (0.33)` a wild system has a **lone scout flagship** roaming the
+system in search of a planet to colonise (roaming + matching lore). This rule does not apply to robot
+freighters.
 
-### Кометы
-`GEN.cometChance (0.7)` → `GEN.cometCount` 1–3. Летят медленно по произвольной хорде (не в звезду).
+### Comets
+`GEN.cometChance (0.7)` → `GEN.cometCount` 1–3. They drift slowly along a random chord (not into the star).
 
-## Спец-системы (пасхалки)
-Ручные генераторы в `systemData.js` через `makeSpecialSystem` + `specPlanet`:
-- `generateSolarSystem()` — наша Солнечная 1:1 (#13).
-- `generateDeadSpace()` — «Чёрный Карантин» в духе Dead Space (#19).
-- `generateFilmWorlds()` — 4 мира из фильмов: Двусолнечье, Пряный Предел, Спутник Бурь, Ледяная Глушь (#20).
-- `generateGalacticCore()` / `generateInterstellar()` — две чёрные дыры.
-- `generateDeathStar()` — «Боевая станция «Длань»», пасхалка-событие #12 (`kind: 'deathstar'`,
-  `event: true`). Рендерится модулем `deathStar.js`: бронированная сфера + экваториальный ров +
-  широтные борозды + вогнутая чаша суперлазера с зелёным излучателем. Вокруг — эскорт из 5 имперских
-  кораблей (`faction: 'imperial'`, флагманы-клинья + истребители), они дрейфуют (roam) вокруг
-  станции. Единственный освещённый объект в системном виде — `systemView._loadDeathStar` добавляет
-  directional + ambient свет (корабли — unlit MeshBasic, свет игнорируют).
+## Special systems (easter eggs)
+Hand-authored generators in `systemData.js` via `makeSpecialSystem` + `specPlanet`:
+- `generateSolarSystem()` — our Solar System, 1:1 (#13).
+- `generateDeadSpace()` — "Black Quarantine", Dead Space-flavoured (#19).
+- `generateFilmWorlds()` — 4 film worlds: Twin-Sun, Spice Reach, Storm Moon, Ice Wilds (#20).
+- `generateGalacticCore()` / `generateInterstellar()` — two black holes.
+- `generateDeathStar()` — the Death Star "Hand", event easter egg #12 (`kind: 'deathstar'`,
+  `event: true`). Rendered by `deathStar.js`: an armoured sphere + an equatorial trench + latitude
+  furrows + a concave superlaser dish with a green emitter. Around it — an escort of 5 imperial ships
+  (`faction: 'imperial'`, wedge flagships + fighters) roaming around the station. The only lit object
+  in the system view — `systemView._loadDeathStar` adds directional + ambient light (the ships are
+  unlit MeshBasic and ignore lighting).
 
-Метки спецсистем — отдельным цветом **магента `#e879ff`** (`markers.js` `SPECIAL_COLOR`), помечены
-в легенде как «особые», их планеты в панели — тегом ✦. `special: true` ⇒ они **не** входят в
-счётчик «Исследовано». Объекты-**события** (`event: true` — обе чёрные дыры и Звезда Смерти)
-рисуются меткой `_addSpecial` (тёмный диск с кольцом) янтарного цвета и пульсируют сильнее.
+Special-system markers use a distinct colour — **magenta `#e879ff`** (`markers.js` `SPECIAL_COLOR`),
+are flagged as "special" in the legend, and their planets carry a ✦ tag in the panel. `special: true`
+⇒ they do **not** count toward the "Charted" counter. **Event** objects (`event: true` — both black
+holes and the Death Star) are drawn with the `_addSpecial` marker (a dark disc with a ring) in amber
+and pulse more strongly.
 
-## Метки в галактике (`markers.js`)
-Цвета статусов: обитаемые `#7dffb0`, дикие `#5aa0ff`, руины `#ffb066`, особые `#e879ff`. Метки —
-непрозрачные иконки поверх всего (#12), не накладываются (minSep), вокруг центральной чёрной дыры —
-зона без систем (#21). Доля систем от числа солнц — `config.realSystemFraction` (0.4).
+## Galaxy markers (`markers.js`)
+Status colours: inhabited `#7dffb0`, wild `#5aa0ff`, ruins `#ffb066`, special `#e879ff`. Markers are
+opaque icons drawn on top of everything (#12), never overlap (minSep), and leave a system-free zone
+around the central black hole (#21). The share of systems relative to the sun count is
+`config.realSystemFraction` (0.4).

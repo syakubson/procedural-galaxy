@@ -1,4 +1,4 @@
-// Faction style-kit: ИМПЕРИЯ (imperial). A menacing militaristic fleet — dark
+// Faction style-kit: EMPIRE (imperial). A menacing militaristic fleet — dark
 // charcoal angular hulls, harsh red signature, red-orange engines, cold lights.
 // Consumed by every role builder in roles.js (the silhouette stays shared; this
 // kit restyles its palette + adds a signature `flourish`). Schema matches the

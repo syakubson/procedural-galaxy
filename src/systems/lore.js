@@ -392,7 +392,7 @@ const EXTINCT_PEAK = [
 ];
 
 // the catastrophe — the "why", varied and nodding to famous disaster fiction
-// (#7: «загугли популярные произведения о катастрофах»). Keyed by ruin type.
+// (#7: «google popular disaster fiction»). Keyed by ruin type.
 const DEATH_CAUSE = {
   // a self-inflicted end (a scarred crater world)
   destroyed: [

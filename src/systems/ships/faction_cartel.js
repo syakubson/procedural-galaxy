@@ -1,4 +1,4 @@
-// Faction style-kit: КАРТЕЛЬ (Cartel / scrap pirates). One of the six kits that
+// Faction style-kit: CARTEL (scrap pirates). One of the six kits that
 // restyle every role in roles.js. Schema matches ALLIANCE in factions.js.
 //
 // Identity: rusty browns + scavenged panels, ORANGE engines/markings, and —

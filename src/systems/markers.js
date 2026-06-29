@@ -147,7 +147,7 @@ export class Systems {
     // supermassive black hole, fixed at the galactic centre — a real black void
     this._addGalacticBlackHole();
     // the "Interstellar" system, sitting on an arm — a "special" encounter,
-    // marked magenta like the other special systems (#особые)
+    // marked magenta like the other special systems (special)
     const ir = 0.6 * radius;
     const ia = (1 / c.arms) * TAU + (ir / radius) * c.spin;
     this._addSpecialSystem(
@@ -178,7 +178,7 @@ export class Systems {
     });
 
     // the "Death Star" system (#12), pinned on its own arm — a special encounter,
-    // marked magenta like the other special systems (#особые)
+    // marked magenta like the other special systems (special)
     this._addSpecialSystem(eggPos(5, 0.42), generateDeathStar(), SPECIAL, 4.2);
   }
 
