@@ -251,17 +251,28 @@ class GalaxyApp {
     const byName = (n) => list.find((s) => s.data && s.data.name === n);
     const stops = [];
     const push = (s) => s && !stops.includes(s) && stops.push(s);
-    push(byName('Солнечная система'));
-    push(byName('Чёрный Карантин'));
-    for (const s of list) if (s.special && !s.noFade && s.data && s.data.kind !== 'blackhole') push(s);
+    push(byName('Солнечная система')); // Земля + Crew Dragon
+    push(byName('Чёрный Карантин')); // Ишимура крушит планету
+    push(byName('Гаргантюа')); // чёрная дыра + станция «Эндюранс»
+    // the rest of the hand-built specials (events/phenomena/transport), skipping
+    // only the galactic-core void
+    for (const s of list) if (s.special && !s.noFade) push(s);
     const inhab = list.filter((s) => !s.special && s.data && s.data.status === 'inhabited');
     for (const s of inhab.slice(0, 4)) push(s);
     return stops;
   }
 
-  /** Ordered focus actions for the notable objects in the current system. */
+  /** Ordered focus actions for the current system — the interesting stuff first
+   *  (transport, phenomena, events), then a couple of standout worlds (#cine). */
   _cineHighlights(sv) {
     const acts = [];
+    if (sv.dragon) acts.push(() => this._focusHit('dragon', sv.dragon)); // транспорт
+    if (sv.ishimura) acts.push(() => this._focusHit('ishimura', sv.ishimura)); // событие
+    if (sv.deathStar) acts.push(() => this._focusHit('deathstar', sv.deathStar)); // событие
+    if (sv.endurance) acts.push(() => this._cineFocusEndurance(sv)); // транспорт у чёрной дыры
+    const flag = (sv.ships || []).find((s) => s.type && s.type.cat === 'flagship');
+    if (flag) acts.push(() => this._focusHit('ship', flag)); // флагман флота
+    // then a couple of standout worlds
     const planets = sv.planets || [];
     const pick = [];
     const inhab = planets.find((p) => p.data && (p.data.inhabited || p.data.ruined));
@@ -269,16 +280,32 @@ class GalaxyApp {
     const gas = planets.find((p) => p.data && p.data.type === 'gas' && !pick.includes(p));
     if (gas) pick.push(gas);
     for (const p of planets) {
-      if (pick.length >= 3) break;
+      if (pick.length >= 2) break;
       if (!pick.includes(p)) pick.push(p);
     }
     for (const p of pick) acts.push(() => this._focusPlanet(p));
-    if (sv.dragon) acts.push(() => this._focusHit('dragon', sv.dragon));
-    if (sv.ishimura) acts.push(() => this._focusHit('ishimura', sv.ishimura));
-    if (sv.deathStar) acts.push(() => this._focusHit('deathstar', sv.deathStar));
-    const flag = (sv.ships || []).find((s) => s.type && s.type.cat === 'flagship');
-    if (flag) acts.push(() => this._focusHit('ship', flag));
     return acts;
+  }
+
+  /** Cinematic focus on the «Эндюранс» ring station (it isn't a normal pickable). */
+  _cineFocusEndurance(sv) {
+    if (!sv.endurance) return;
+    sv.focusObject(sv.endurance.group, 3.4, 2.4);
+    this.infoPanel.showStructure(
+      {
+        kindLabel: 'Станция · экспедиция',
+        name: '«Эндюранс»',
+        desc: 'Вращающаяся станция-кольцо: искусственную тяжесть ей даёт само вращение обода. Горстка людей на ней ищет человечеству новый дом — у самого края чёрной дыры, где время течёт иначе.',
+        meta: [
+          ['Тип', 'кольцевая станция'],
+          ['Экипаж', 'экспедиция'],
+          ['Тяжесть', 'от вращения обода'],
+          ['Курс', 'к мирам за горизонтом событий'],
+        ],
+      },
+      null, // not a faction build — keep the «Орбитальная постройка» subtitle
+    );
+    this.planetLabels.setVisible(false);
   }
 
   async runCinematic() {
@@ -298,7 +325,9 @@ class GalaxyApp {
         document.body.classList.add('cine-show'); // re-assert after the warp
         this.systemView.controls.autoRotate = true;
         this.systemView.controls.autoRotateSpeed = 0.42; // slow, even drift = the "проводка"
-        await this._cineWait(2200); // settle at the overview, let it breathe
+        // dwell at the overview first — long enough to read WHAT this system is
+        // (its left-panel dossier) before diving to a highlight (#cine readability)
+        await this._cineWait(6500);
         if (!this._cineActive()) break;
         for (const act of this._cineHighlights(this.systemView).slice(0, 3)) {
           if (!this._cineActive()) break;
