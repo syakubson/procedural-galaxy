@@ -5,45 +5,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Galaxy — флот и станции</title>
     <style>
+      /* cartographer fonts (offline) — same vendored woff2 as the main app */
+      @font-face { font-family: 'EB Garamond'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('./vendor/fonts/eb-garamond-latin-400-normal.woff2') format('woff2'); }
+      @font-face { font-family: 'EB Garamond'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('./vendor/fonts/eb-garamond-cyrillic-400-normal.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      @font-face { font-family: 'EB Garamond'; font-style: normal; font-weight: 500; font-display: swap;
+        src: url('./vendor/fonts/eb-garamond-latin-500-normal.woff2') format('woff2'); }
+      @font-face { font-family: 'EB Garamond'; font-style: normal; font-weight: 500; font-display: swap;
+        src: url('./vendor/fonts/eb-garamond-cyrillic-500-normal.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      @font-face { font-family: 'EB Garamond'; font-style: italic; font-weight: 400; font-display: swap;
+        src: url('./vendor/fonts/eb-garamond-latin-400-italic.woff2') format('woff2'); }
+      @font-face { font-family: 'EB Garamond'; font-style: italic; font-weight: 400; font-display: swap;
+        src: url('./vendor/fonts/eb-garamond-cyrillic-400-italic.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('./vendor/fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
+      @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap;
+        src: url('./vendor/fonts/ibm-plex-mono-cyrillic-400-normal.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+      :root {
+        --ink-void: #070a16; --vellum: rgba(214, 205, 178, 0.45); --vellum-soft: rgba(214, 205, 178, 0.18);
+        --vellum-strong: rgba(222, 213, 186, 0.78); --ivory: #ece3cd; --ivory-dim: #b8ad90; --parchment: #8a8068;
+        --brass: #cda24e; --brass-bright: #e7c074;
+        --font-serif: 'EB Garamond', Georgia, serif; --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+      }
+      * { box-sizing: border-box; }
       body {
         margin: 0;
-        background: #05060d;
+        background: var(--ink-void);
         overflow: hidden;
-        font-family: system-ui, -apple-system, sans-serif;
-        color: #cdd2ff;
+        font-family: var(--font-serif);
+        color: var(--ivory);
+        -webkit-font-smoothing: antialiased;
       }
       canvas {
         display: block;
       }
       #title {
         position: fixed;
-        top: 14px;
+        top: 16px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 10;
-        font-size: 15px;
-        letter-spacing: 0.04em;
-        opacity: 0.9;
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        color: var(--ivory);
+        text-wrap: balance;
       }
       #back {
         position: fixed;
-        top: 12px;
-        left: 16px;
+        top: 14px;
+        left: 18px;
         z-index: 10;
-        color: #9fb0ff;
+        color: var(--ivory-dim);
         text-decoration: none;
-        font-size: 13px;
-        border: 1px solid rgba(150, 160, 230, 0.25);
-        padding: 6px 12px;
-        border-radius: 10px;
-        background: rgba(10, 11, 24, 0.5);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        border: 1px solid var(--vellum);
+        padding: 9px 14px;
+        border-radius: 2px;
+        background: linear-gradient(180deg, rgba(11, 14, 30, 0.7), rgba(8, 10, 22, 0.7));
+        backdrop-filter: blur(8px);
+        transition: background 0.2s, border-color 0.2s, transform 0.2s;
       }
       #back:hover {
-        background: rgba(30, 32, 60, 0.7);
+        border-color: var(--vellum-strong);
+      }
+      #back:active {
+        transform: scale(0.96);
       }
       #factions {
         position: fixed;
-        top: 44px;
+        top: 52px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 10;
@@ -54,42 +93,51 @@
         max-width: 92vw;
       }
       #factions button {
-        border: 1px solid rgba(150, 160, 230, 0.22);
-        background: rgba(10, 11, 24, 0.55);
-        color: #cdd2ff;
-        font-size: 13px;
-        padding: 6px 14px;
-        border-radius: 999px;
+        border: 1px solid var(--vellum-soft);
+        background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
+        color: var(--ivory-dim);
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 7px 14px;
+        border-radius: 2px;
         cursor: pointer;
-        transition: background 0.15s, border-color 0.15s;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
       }
       #factions button:hover {
-        background: rgba(30, 32, 60, 0.7);
+        border-color: var(--vellum);
+        color: var(--ivory);
       }
       #factions button.on {
-        border-color: rgba(125, 200, 255, 0.6);
-        background: rgba(40, 60, 110, 0.7);
-        color: #fff;
+        border-color: var(--brass);
+        background: linear-gradient(180deg, rgba(22, 18, 10, 0.72), rgba(14, 12, 8, 0.72));
+        color: var(--brass-bright);
       }
       #lore {
         position: fixed;
-        top: 84px;
+        top: 94px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 10;
-        font-size: 12px;
-        opacity: 0.6;
+        font-style: italic;
+        font-size: 15px;
+        color: var(--ivory-dim);
         max-width: 80vw;
         text-align: center;
+        text-wrap: pretty;
       }
       #hint {
         position: fixed;
-        bottom: 14px;
+        bottom: 16px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 10;
-        font-size: 12px;
-        opacity: 0.5;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--parchment);
       }
     </style>
     <script type="importmap">
@@ -121,7 +169,7 @@
       document.body.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color('#05060d');
+      scene.background = new THREE.Color('#070a16');
       {
         const n = 600;
         const pos = new Float32Array(n * 3);
