@@ -406,8 +406,11 @@ export class SystemView {
   /** Cinematic toggle (#view-mode): 0 centres the object, 0.12 makes room for
    *  the left panel. Applied live and remembered for the next _frame(). */
   setBaseShift(frac) {
+    // tween from the current applied offset → the new target (#3); _frame() still
+    // applies it instantly on first build via _applyViewShift.
+    const from = this._viewShiftFrac != null ? this._viewShiftFrac : this.baseShift != null ? this.baseShift : frac;
     this.baseShift = frac;
-    this._applyViewShift(frac);
+    this._shiftTween = { from, to: frac, t: 0, dur: 0.5 };
   }
 
   /** Raycast planets + ships + structures; returns {kind, ref, obj} or null. */
@@ -610,6 +613,15 @@ export class SystemView {
   }
 
   update(dt, time) {
+    // ease the view-offset framing between «room for the panel» and «centred»
+    // so toggling the cinematic view glides instead of snapping (#3).
+    if (this._shiftTween) {
+      const s = this._shiftTween;
+      s.t = Math.min(s.t + dt / s.dur, 1);
+      const e = 1 - Math.pow(1 - s.t, 3); // easeOutCubic
+      this._applyViewShift(s.from + (s.to - s.from) * e);
+      if (s.t >= 1) this._shiftTween = null;
+    }
     for (const m of this._starMats) if (m.uniforms) m.uniforms.uTime.value = time; // skip the glow sprite
     if (this._binary) this.starGroup.rotation.y += dt * 0.15; // the pair revolves
     if (this.blackHole) this.blackHole.update(time);

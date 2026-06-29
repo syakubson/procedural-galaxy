@@ -103,7 +103,10 @@ export class PlanetLabels {
 
   setVisible(v) {
     this.visible = v;
-    this.root.style.display = v ? '' : 'none';
+    // fade the whole layer (opacity) instead of display:none so toggling labels
+    // glides (#3); update() early-returns when hidden, freezing them mid-fade.
+    this.root.style.opacity = v ? '1' : '0';
+    this.root.style.pointerEvents = v ? '' : 'none';
   }
 
   clear() {
@@ -125,27 +128,27 @@ export class PlanetLabels {
       // the focused object carries its info in the side callout, so hide its
       // own in-world label to keep the reticle clean (#15)
       if (!it.body || it.body === focusedBody) {
-        it.el.style.display = 'none';
+        it.el.classList.add('is-hidden');
         continue;
       }
       // declutter: structures only show up close (#6); never at overview
       if (overview && it.kind === 'structure') {
-        it.el.style.display = 'none';
+        it.el.classList.add('is-hidden');
         continue;
       }
       it.body.getWorldPosition(this._v);
       if (!overview && camera.position.distanceTo(this._v) > nearCutoff) {
-        it.el.style.display = 'none'; // too far for this close-up
+        it.el.classList.add('is-hidden'); // too far for this close-up
         continue;
       }
       this._v.project(camera);
       if (this._v.z >= 1) {
-        it.el.style.display = 'none'; // behind the camera
+        it.el.classList.add('is-hidden'); // behind the camera
         continue;
       }
       it.sx = (this._v.x * 0.5 + 0.5) * w;
       it.sy = (-this._v.y * 0.5 + 0.5) * h;
-      it.el.style.display = '';
+      it.el.classList.remove('is-hidden');
       vis.push(it);
     }
     // de-overlap: nudge labels that land too close apart in Y (a few relaxation
