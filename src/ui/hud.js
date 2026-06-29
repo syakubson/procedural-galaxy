@@ -186,6 +186,7 @@ export class InfoPanel {
     const el = document.createElement('div');
     el.id = 'system-panel';
     el.innerHTML = `
+      <div class="sp-eyebrow">Лист описи</div>
       <div class="sp-status"></div>
       <h1 class="sp-name"></h1>
       <div class="sp-star"></div>
@@ -263,7 +264,8 @@ export class InfoPanel {
   /** Show/hide the top-right fact card (#10) — only the system view has one. */
   _setFact(fact) {
     if (fact) {
-      this.factEl.textContent = '💡 ' + fact;
+      this.factEl.innerHTML = `<div class="fact-head">✦ Заметка на полях</div><p></p>`;
+      this.factEl.querySelector('p').textContent = fact;
       this.factEl.classList.add('visible');
     } else {
       this.factEl.classList.remove('visible');
