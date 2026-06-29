@@ -968,3 +968,48 @@ body.clean-view #fact-box {
 .plabel--structure .plabel__txt {
   opacity: 0.82;
 }
+
+/* --- ranging reticle: brass corner brackets locked onto the focused object --- */
+#reticle {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+#reticle.visible {
+  opacity: 0.92;
+}
+#reticle .rt {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--brass);
+}
+#reticle .c1 {
+  top: 0;
+  left: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+#reticle .c2 {
+  top: 0;
+  right: 0;
+  border-left: 0;
+  border-bottom: 0;
+}
+#reticle .c3 {
+  bottom: 0;
+  left: 0;
+  border-right: 0;
+  border-top: 0;
+}
+#reticle .c4 {
+  bottom: 0;
+  right: 0;
+  border-left: 0;
+  border-top: 0;
+}

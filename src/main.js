@@ -93,6 +93,7 @@ class GalaxyApp {
   _initViewMode() {
     const btn = document.getElementById('view-mode');
     this._viewModeBtn = btn;
+    this._reticle = document.getElementById('reticle');
     this._viewMode = 0;
     this._viewModeIcons = ['❏', '○', '▣']; // подписи / чистая сцена / кино (monochrome glyphs)
     if (!btn) return;
@@ -100,6 +101,40 @@ class GalaxyApp {
       this._viewMode = (this._viewMode + 1) % 3;
       this._applyViewMode();
     });
+  }
+
+  /** Position the brass ranging reticle over the focused object (#15). Hidden
+   *  during the dolly-in / transitions and whenever nothing is focused. */
+  _updateReticle(sv, transitioning) {
+    const r = this._reticle;
+    if (!r) return;
+    const f = sv._focus;
+    if (!f || f.entering || transitioning) {
+      r.classList.remove('visible');
+      return;
+    }
+    const cam = sv.camera;
+    const c = new THREE.Vector3();
+    f.obj.getWorldPosition(c);
+    const cp = c.clone().project(cam);
+    if (cp.z >= 1) {
+      r.classList.remove('visible');
+      return;
+    }
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const sx = (cp.x * 0.5 + 0.5) * w;
+    const sy = (-cp.y * 0.5 + 0.5) * h;
+    // project a point one radius to the camera-right → on-screen radius in px
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
+    const edge = c.clone().addScaledVector(right, f.radius || 1).project(cam);
+    const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
+    const size = Math.max(44, pxR * 2 + 28);
+    r.style.left = `${sx}px`;
+    r.style.top = `${sy}px`;
+    r.style.width = `${size}px`;
+    r.style.height = `${size}px`;
+    r.classList.add('visible');
   }
 
   /** Apply the current view mode to labels, the side panel and the framing. */
@@ -483,6 +518,7 @@ class GalaxyApp {
     this.mode = 'transition';
     this.infoPanel.hide();
     this.planetLabels.setVisible(false);
+    if (this._reticle) this._reticle.classList.remove('visible');
     // reset the view-mode for the next dive + hide its button
     this._viewMode = 0;
     document.body.classList.remove('clean-view');
@@ -643,6 +679,7 @@ class GalaxyApp {
           const cutoff = sv._focus ? sv.camera.position.distanceTo(sv.controls.target) * 2.6 : 0;
           this.planetLabels.update(sv.camera, window.innerWidth, window.innerHeight, cutoff);
         }
+        this._updateReticle(sv, transitioning);
       }
     }
 

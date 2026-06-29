@@ -427,6 +427,7 @@ export class SystemView {
     this.controls.maxDistance = radius * 40 + 12;
     this._focus = {
       obj,
+      radius, // used by the ranging reticle to bracket the object on screen
       entering: true,
       t: 0,
       dur: 0.95, // a touch slower → more cinematic approach
