@@ -379,6 +379,25 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* «Кинопоказ» filmic chrome-off: hide ALL the HUD except the left dossier panel,
+   the reticle + its callout and the exit indicator (#4). Each element fades via
+   its own opacity transition. */
+body.cine-show #system-legend,
+body.cine-show #fact-box,
+body.cine-show #hint,
+body.cine-show #nav-back,
+body.cine-show #settings-toggle,
+body.cine-show #gallery-link,
+body.cine-show #view-mode,
+body.cine-show #rotate-toggle,
+body.cine-show #cine-toggle,
+body.cine-show #music-toggle,
+body.cine-show #music-next,
+body.cine-show #music-track {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* view-mode cycle button (system view only): full UI → no labels → cinematic */
 #view-mode {
   position: fixed;
@@ -1139,8 +1158,9 @@ body.clean-view #fact-box {
 }
 
 /* --- ranging reticle: brass corner brackets locked onto the focused object --- */
-/* soft brass hover ring — a lighter cue than the focus reticle, highlighting
-   whatever's under the pointer in the system view (#9) */
+/* hover selection — the same brass corner brackets as the focus reticle, only
+   lighter and a touch smaller, so hover reads as «could lock on» vs the locked
+   focus (#1). Open sides keep it clear of the side label (#2). */
 #hover-ring {
   position: fixed;
   left: 0;
@@ -1148,14 +1168,11 @@ body.clean-view #fact-box {
   z-index: 5;
   pointer-events: none;
   transform: translate(-50%, -50%);
-  border: 1px solid var(--brass);
-  border-radius: 50%;
-  box-shadow: 0 0 14px rgba(205, 162, 78, 0.3), inset 0 0 12px rgba(205, 162, 78, 0.1);
   opacity: 0;
   transition: opacity 0.18s ease;
 }
 #hover-ring.visible {
-  opacity: 0.7;
+  opacity: 0.62;
 }
 
 #reticle {
@@ -1171,31 +1188,40 @@ body.clean-view #fact-box {
 #reticle.visible {
   opacity: 0.92;
 }
-#reticle .rt {
+#reticle .rt,
+#hover-ring .rt {
   position: absolute;
   width: 16px;
   height: 16px;
   border: 1px solid var(--brass);
 }
-#reticle .c1 {
+#hover-ring .rt {
+  width: 12px;
+  height: 12px;
+}
+#reticle .c1,
+#hover-ring .c1 {
   top: 0;
   left: 0;
   border-right: 0;
   border-bottom: 0;
 }
-#reticle .c2 {
+#reticle .c2,
+#hover-ring .c2 {
   top: 0;
   right: 0;
   border-left: 0;
   border-bottom: 0;
 }
-#reticle .c3 {
+#reticle .c3,
+#hover-ring .c3 {
   bottom: 0;
   left: 0;
   border-right: 0;
   border-top: 0;
 }
-#reticle .c4 {
+#reticle .c4,
+#hover-ring .c4 {
   bottom: 0;
   right: 0;
   border-left: 0;

@@ -96,10 +96,13 @@ class GalaxyApp {
     const btn = document.getElementById('view-mode');
     this._viewModeBtn = btn;
     this._reticle = document.getElementById('reticle');
-    // soft brass hover ring — a lighter cue than the focus reticle (#9)
+    // hover selection — brass corner brackets, same square shape as the focus
+    // reticle but lighter (#1); open sides keep it off the side label (#2)
     this._hoverRing = document.createElement('div');
     this._hoverRing.id = 'hover-ring';
     this._hoverRing.setAttribute('aria-hidden', 'true');
+    this._hoverRing.innerHTML =
+      '<span class="rt c1"></span><span class="rt c2"></span><span class="rt c3"></span><span class="rt c4"></span>';
     document.body.appendChild(this._hoverRing);
     this._hoverObj = null;
     this._hoverR = 1;
@@ -116,29 +119,48 @@ class GalaxyApp {
    *  map still (and suppresses the 7s idle-resume) until the user restarts it. */
   _initRotateToggle() {
     this._rotationLocked = false;
+    this._rotBtnRotating = null;
     const btn = document.createElement('button');
     btn.id = 'rotate-toggle';
     btn.type = 'button';
-    btn.title = 'Остановить вращение карты';
-    btn.textContent = '⏸';
     btn.classList.add('visible'); // galaxy mode is shown from the start
+    btn.innerHTML = this._rotIcon(true);
     btn.addEventListener('click', () => {
-      this._rotationLocked = !this._rotationLocked;
-      if (this._rotationLocked) {
-        if (this.controls) this.controls.autoRotate = false;
-        btn.textContent = '↻';
-        btn.title = 'Вращать карту';
-        btn.classList.add('on');
+      if (!this.controls) return;
+      if (this.controls.autoRotate) {
+        // spinning → hard-stop (lock so it won't auto-resume after 7s)
+        this._rotationLocked = true;
+        this.controls.autoRotate = false;
       } else {
+        // stopped — by the button OR by a mouse drag — → spin again right now
+        this._rotationLocked = false;
+        this.controls.autoRotate = true;
         this._lastInteract = this._time;
-        if (this.controls && this.config.cameraAutoRotate) this.controls.autoRotate = true;
-        btn.textContent = '⏸';
-        btn.title = 'Остановить вращение карты';
-        btn.classList.remove('on');
       }
+      this._syncRotateBtn(true);
     });
     document.body.appendChild(btn);
     this._rotateBtn = btn;
+  }
+
+  /** Media-player play/pause glyphs for the map-rotate toggle (#7). */
+  _rotIcon(rotating) {
+    return rotating
+      ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="7" y="5.5" width="3.6" height="13" rx="0.9"/><rect x="13.4" y="5.5" width="3.6" height="13" rx="0.9"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M8 5.4 18.6 12 8 18.6Z"/></svg>';
+  }
+
+  /** Keep the rotate button in sync with the ACTUAL spin state (#6): pause icon
+   *  while spinning, play icon while stopped — including a mouse-drag pause — so
+   *  the user can always click to spin again. */
+  _syncRotateBtn(force) {
+    if (!this._rotateBtn || !this.controls) return;
+    const rotating = !!this.controls.autoRotate;
+    if (!force && this._rotBtnRotating === rotating) return;
+    this._rotBtnRotating = rotating;
+    this._rotateBtn.innerHTML = this._rotIcon(rotating);
+    this._rotateBtn.title = rotating ? 'Остановить вращение карты' : 'Вращать карту';
+    this._rotateBtn.classList.toggle('on', !rotating);
   }
 
   /** Wire the «▶ Кинопоказ» cinematic auto-tour (#5): a hands-off camera show that
@@ -150,7 +172,8 @@ class GalaxyApp {
     btn.id = 'cine-toggle';
     btn.type = 'button';
     btn.title = 'Кинопоказ — авто-облёт миров';
-    btn.textContent = '▶';
+    btn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="7" width="12.5" height="10" rx="1.6"/><path d="M15.5 10.4 21 7.6v8.8l-5.5-2.8z"/></svg>';
     btn.classList.add('visible');
     btn.addEventListener('click', () => {
       if (this._cineActive()) this.stopCinematic();
@@ -182,10 +205,7 @@ class GalaxyApp {
     this._cine = { active: true };
     this._suppressClick = true; // swallow the click that started the show
     this._hoverObj = null;
-    if (this._cineBtn) {
-      this._cineBtn.textContent = '■';
-      this._cineBtn.classList.add('on');
-    }
+    if (this._cineBtn) this._cineBtn.classList.add('on'); // camera lights up while running
     if (this._cineHintEl) this._cineHintEl.classList.add('visible');
     this.runCinematic();
   }
@@ -200,12 +220,10 @@ class GalaxyApp {
   /** Idempotent teardown — hands normal control back after the tour ends/breaks. */
   _endCinematic() {
     this._cine = null;
-    if (this._cineBtn) {
-      this._cineBtn.textContent = '▶';
-      this._cineBtn.classList.remove('on');
-    }
+    if (this._cineBtn) this._cineBtn.classList.remove('on');
     if (this._cineHintEl) this._cineHintEl.classList.remove('visible');
     document.body.classList.remove('clean-view');
+    document.body.classList.remove('cine-show');
     if (this.systemView) this.systemView.controls.autoRotate = false;
     // restore the galaxy chrome that the tour kept hidden
     if (this.mode === 'galaxy') {
@@ -274,23 +292,23 @@ class GalaxyApp {
       while (this._cineActive()) {
         const entry = stops[i % stops.length];
         i++;
-        document.body.classList.add('clean-view'); // filmic — slide the big panel out
+        document.body.classList.add('cine-show'); // hide chrome, keep panel + reticle
         await this.enterSystem(entry);
         if (!this._cineActive()) break;
-        document.body.classList.add('clean-view'); // re-assert after the warp
+        document.body.classList.add('cine-show'); // re-assert after the warp
         this.systemView.controls.autoRotate = true;
-        this.systemView.controls.autoRotateSpeed = 0.5; // slow drift = the "проводка"
-        await this._cineWait(1600); // settle at the overview
+        this.systemView.controls.autoRotateSpeed = 0.42; // slow, even drift = the "проводка"
+        await this._cineWait(2200); // settle at the overview, let it breathe
         if (!this._cineActive()) break;
         for (const act of this._cineHighlights(this.systemView).slice(0, 3)) {
           if (!this._cineActive()) break;
           act();
-          await this._cineWait(9000); // ~9s lingering on each highlight
+          await this._cineWait(11000); // ~11s per highlight — time to read the card
         }
         if (!this._cineActive()) break;
         await this.exitSystem();
         if (!this._cineActive()) break;
-        await this._cineWait(1200);
+        await this._cineWait(1500);
       }
     } catch (e) {
       // a failed transition just ends the show gracefully
@@ -600,9 +618,9 @@ class GalaxyApp {
       case 'structure':
         return hit.ref.stationScale || hit.ref.data.radius * 0.3;
       case 'ship':
-        return hit.ref.baseScale || 0.5;
+        return (hit.ref.baseScale || 0.5) * 0.6; // ships are long & thin — bracket tight (#3)
       case 'ishimura':
-        return 1.5;
+        return 1.0;
       case 'deathstar':
         return (this.systemView.deathStar && this.systemView.deathStar.R) || 5;
       default:
@@ -636,7 +654,7 @@ class GalaxyApp {
     const right = new THREE.Vector3().setFromMatrixColumn(sv.camera.matrixWorld, 0);
     const edge = c.clone().addScaledVector(right, this._hoverR || 1).project(sv.camera);
     const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
-    const size = Math.max(40, pxR * 2 + 22);
+    const size = Math.max(32, pxR * 2 + 12); // brackets hug the object tightly
     ring.style.left = `${sx}px`;
     ring.style.top = `${sy}px`;
     ring.style.width = `${size}px`;
@@ -995,6 +1013,7 @@ class GalaxyApp {
         }
         this.controls.update();
       }
+      this._syncRotateBtn(); // keep the play/pause glyph matching the spin state (#6)
     }
     if (this.mode === 'system' || this.mode === 'transition') {
       this.systemView.update(dt, this._time);
@@ -1005,8 +1024,8 @@ class GalaxyApp {
         // focus mode, so the focused planet's stations get clickable labels (#6).
         const sv = this.systemView;
         const transitioning = sv._zoom || (sv._focus && sv._focus.entering);
-        // labels only in view-mode 0 (off in «clean scene» + «cinematic»)
-        const showLabels = this._viewMode === 0 && !transitioning;
+        // labels only in view-mode 0 (off in «clean scene» + «cinematic» + the show)
+        const showLabels = this._viewMode === 0 && !transitioning && !this._cineActive();
         this.planetLabels.setVisible(showLabels);
         if (showLabels) {
           const cutoff = sv._focus ? sv.camera.position.distanceTo(sv.controls.target) * 2.6 : 0;

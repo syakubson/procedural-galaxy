@@ -49,9 +49,28 @@ export class AmbientMusic {
     btn.addEventListener('click', () => {
       const on = this.toggle();
       btn.classList.toggle('on', on);
+      this._userToggled = true; // the user took control — don't auto-start anymore
     });
     document.body.appendChild(btn);
     this._btn = btn;
+
+    this._armAutostart();
+  }
+
+  /** Music is ON by default (#5). Browsers block autoplay, so light the toggle
+   *  now and kick playback off on the user's very first interaction — unless they
+   *  manually turned it off first. */
+  _armAutostart() {
+    this._btn.classList.add('on');
+    const start = () => {
+      window.removeEventListener('pointerdown', start, true);
+      window.removeEventListener('keydown', start, true);
+      if (this._userToggled || this.playing) return;
+      const on = this.toggle();
+      this._btn.classList.toggle('on', on);
+    };
+    window.addEventListener('pointerdown', start, true);
+    window.addEventListener('keydown', start, true);
   }
 
   _load(i) {
