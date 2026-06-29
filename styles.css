@@ -391,12 +391,12 @@ body.cine-show #gallery-link,
 body.cine-show #view-mode,
 body.cine-show #rotate-toggle,
 body.cine-show #cine-toggle,
-body.cine-show #music-toggle,
 body.cine-show #music-next,
 body.cine-show #music-track {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+/* #music-toggle stays live in the show so you can mute it (#cine) */
 
 /* view-mode cycle button (system view only): full UI → no labels → cinematic */
 #view-mode {

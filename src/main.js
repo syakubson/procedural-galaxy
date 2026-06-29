@@ -189,9 +189,11 @@ class GalaxyApp {
     document.body.appendChild(hint);
     this._cineHintEl = hint;
 
-    // any interaction (except the toggle itself) ends the show
+    // any interaction ends the show — EXCEPT the cinematic toggle itself and the
+    // music on/off button, which stays live so you can mute during the show (#cine)
+    const exempt = (t) => t === this._cineBtn || (t && t.closest && t.closest('#music-toggle'));
     document.addEventListener('pointerdown', (e) => {
-      if (this._cineActive() && e.target !== this._cineBtn) this.stopCinematic();
+      if (this._cineActive() && !exempt(e.target)) this.stopCinematic();
     });
     window.addEventListener('wheel', () => this._cineActive() && this.stopCinematic(), { passive: true });
     window.addEventListener('keydown', () => this._cineActive() && this.stopCinematic());
@@ -208,6 +210,11 @@ class GalaxyApp {
     this._hoverObj = null;
     if (this._cineBtn) this._cineBtn.classList.add('on'); // camera lights up while running
     if (this._cineHintEl) this._cineHintEl.classList.add('visible');
+    // the exit hint only shows for the first 10s, then fades away (#cine)
+    clearTimeout(this._cineHintTimer);
+    this._cineHintTimer = setTimeout(() => {
+      if (this._cineHintEl) this._cineHintEl.classList.remove('visible');
+    }, 10000);
     this.runCinematic();
   }
 
@@ -215,6 +222,7 @@ class GalaxyApp {
     if (!this._cine) return;
     this._cine.active = false;
     this._suppressClick = true; // swallow the interrupting click
+    if (this.overlay) this.overlay.fadeTo(0, 300); // reveal at once (we may be mid-black)
     this._endCinematic();
   }
 
@@ -226,8 +234,15 @@ class GalaxyApp {
     document.body.classList.remove('clean-view');
     document.body.classList.remove('cine-show');
     if (this.systemView) this.systemView.controls.autoRotate = false;
-    // restore the galaxy chrome that the tour kept hidden
+    clearTimeout(this._cineHintTimer);
+    // restore the galaxy chrome the tour kept hidden (when we land back in galaxy)
     if (this.mode === 'galaxy') {
+      if (this._settingsBtn) this._settingsBtn.style.display = '';
+      if (this._galleryLink) this._galleryLink.style.display = '';
+      this.legend.setVisible(this.config.showMarkers);
+      this.controls.enabled = true;
+      this.controls.autoRotate = this.config.cameraAutoRotate;
+      this._lastInteract = this._time;
       if (this._rotateBtn) this._rotateBtn.classList.add('visible');
       if (this._cineBtn) this._cineBtn.classList.add('visible');
     }
@@ -317,32 +332,40 @@ class GalaxyApp {
     }
     let i = 0;
     try {
+      await this.overlay.fadeTo(1, 480); // the show begins from black
       while (this._cineActive()) {
         const entry = stops[i % stops.length];
         i++;
-        document.body.classList.add('cine-show'); // hide chrome, keep panel + reticle
-        await this.enterSystem(entry);
+        document.body.classList.add('cine-show');
+        await this.enterSystem(entry); // built behind the black — no warp flight
         if (!this._cineActive()) break;
-        document.body.classList.add('cine-show'); // re-assert after the warp
+        document.body.classList.add('cine-show');
         this.systemView.controls.autoRotate = true;
-        this.systemView.controls.autoRotateSpeed = 0.42; // slow, even drift = the "проводка"
-        // dwell at the overview first — long enough to read WHAT this system is
-        // (its left-panel dossier) before diving to a highlight (#cine readability)
+        this.systemView.controls.autoRotateSpeed = 0.42; // slow, even drift
+        // fade IN on the overview — time to read WHAT this system is
+        await this.overlay.fadeTo(0, 650);
         await this._cineWait(6500);
         if (!this._cineActive()) break;
         for (const act of this._cineHighlights(this.systemView).slice(0, 3)) {
           if (!this._cineActive()) break;
+          await this.overlay.fadeTo(1, 460); // fade to black between objects
+          if (!this._cineActive()) break;
           act();
-          await this._cineWait(11000); // ~11s per highlight — time to read the card
+          this.systemView.snapFocus(); // cut to the framed object behind the black
+          await this._cineWait(120);
+          await this.overlay.fadeTo(0, 600); // fade in on the new object
+          await this._cineWait(11000); // ~11s — time to read the card
         }
         if (!this._cineActive()) break;
-        await this.exitSystem();
+        await this.overlay.fadeTo(1, 460); // fade out before leaving the system
         if (!this._cineActive()) break;
-        await this._cineWait(1500);
+        await this.exitSystem(); // teardown behind the black
+        await this._cineWait(250);
       }
     } catch (e) {
       // a failed transition just ends the show gracefully
     }
+    await this.overlay.fadeTo(0, 320).catch(() => {}); // never leave the screen black
     this._endCinematic();
   }
 
@@ -874,6 +897,17 @@ class GalaxyApp {
     this.systemView.setSize(window.innerWidth, window.innerHeight);
     const compiled = this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
 
+    if (this._cineActive()) {
+      // cinematic: no warp flight — the show fades to/from black itself (#cine).
+      // load() already placed the camera at the overview, so just reveal it.
+      await compiled;
+      this.postfx.setView(this.systemView.scene, this.systemView.camera);
+      this.systemView.enter();
+      this.infoPanel.show(entry.data);
+      this.mode = 'system';
+      return;
+    }
+
     await this._galaxyDollyTo(toPos, entry.worldPos.clone(), 0.6);
     await compiled; // ensure shaders are ready before we reveal (usually already done)
 
@@ -907,6 +941,17 @@ class GalaxyApp {
     if (this._rotateBtn && !this._cineActive()) this._rotateBtn.classList.add('visible');
     if (this._cineBtn && !this._cineActive()) this._cineBtn.classList.add('visible');
     this.systemView.baseShift = 0.12;
+
+    if (this._cineActive()) {
+      // cinematic: tear down with no exit-zoom / fade / galaxy flight (#cine)
+      this.systemView.exit();
+      this.postfx.setView(this.scene, this.camera);
+      this.systemView.clear();
+      this.planetLabels.clear();
+      this.controls.enabled = false; // the show drives the camera
+      this.mode = 'galaxy';
+      return;
+    }
 
     // #3: first zoom the system camera back OUT (reverse of the entry flight),
     // then a brief PARTIAL dip — not a hard black cut — so the exit reads as one
