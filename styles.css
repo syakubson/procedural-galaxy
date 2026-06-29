@@ -1032,6 +1032,8 @@ body.clean-view #fact-box {
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 3px rgba(214, 205, 178, 0.04);
   pointer-events: none;
   opacity: 0;
+  max-height: calc(100vh - 120px);
+  overflow: hidden;
   transition: opacity 0.25s ease;
 }
 #focus-callout.visible {
@@ -1059,4 +1061,33 @@ body.clean-view #fact-box {
   line-height: 1.45;
   color: var(--ivory-dim);
   text-wrap: pretty;
+}
+.fc-meta-title,
+.fc-res-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--parchment);
+  margin: 12px 0 7px;
+  padding-top: 11px;
+  border-top: 1px solid var(--vellum-soft);
+}
+.fc-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ivory);
+  font-variant-numeric: tabular-nums;
+}
+.fc-meta b {
+  color: var(--parchment);
+  font-weight: 400;
+}
+.fc-res {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }

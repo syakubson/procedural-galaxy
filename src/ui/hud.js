@@ -231,13 +231,24 @@ export class InfoPanel {
     // focused object's name + type + description (moved out of the left panel).
     const fc = document.createElement('div');
     fc.id = 'focus-callout';
-    fc.innerHTML = '<div class="fc-name"></div><div class="fc-sub"></div><div class="fc-desc"></div>';
+    fc.innerHTML =
+      '<div class="fc-name"></div>' +
+      '<div class="fc-sub"></div>' +
+      '<div class="fc-desc"></div>' +
+      '<div class="fc-meta-title">Характеристики</div>' +
+      '<div class="fc-meta"></div>' +
+      '<div class="fc-res-title">Ресурсы</div>' +
+      '<div class="fc-res"></div>';
     document.body.appendChild(fc);
     this.focusEl = fc;
     this._fc = {
       name: fc.querySelector('.fc-name'),
       sub: fc.querySelector('.fc-sub'),
       desc: fc.querySelector('.fc-desc'),
+      metaTitle: fc.querySelector('.fc-meta-title'),
+      meta: fc.querySelector('.fc-meta'),
+      resTitle: fc.querySelector('.fc-res-title'),
+      res: fc.querySelector('.fc-res'),
     };
     this.focusActive = false;
 
@@ -286,12 +297,21 @@ export class InfoPanel {
     }
   }
 
-  /** Fill the side callout (focused object's name + type + description). */
-  _setFocusCallout(name, sub, desc) {
-    this._fc.name.textContent = name || '';
-    this._fc.sub.textContent = sub || '';
-    this._fc.desc.textContent = desc || '';
-    this.focusActive = !!(name || desc);
+  /** Fill the side callout: focused object's name + type + description +
+   *  characteristics (mono data rows) + resources (chips). */
+  _setFocusCallout(name, sub, desc, metaHtml, resHtml) {
+    const fc = this._fc;
+    fc.name.textContent = name || '';
+    fc.sub.textContent = sub || '';
+    fc.desc.textContent = desc || '';
+    fc.desc.style.display = desc ? '' : 'none';
+    fc.meta.innerHTML = metaHtml || '';
+    fc.meta.style.display = metaHtml ? '' : 'none';
+    fc.metaTitle.style.display = metaHtml ? '' : 'none';
+    fc.res.innerHTML = resHtml || '';
+    fc.res.style.display = resHtml ? '' : 'none';
+    fc.resTitle.style.display = resHtml ? '' : 'none';
+    this.focusActive = !!(name || desc || metaHtml);
   }
   _clearFocusCallout() {
     this.focusActive = false;
@@ -313,6 +333,7 @@ export class InfoPanel {
     r.star.textContent = data.binary
       ? `Двойная звезда · ${data.star.label} + ${data.binary.star2.label}`
       : `${data.star.label} — ${data.star.desc}`;
+    r.about.style.display = '';
     r.desc.style.display = '';
     r.desc.textContent = data.description;
     this._clearFocusCallout(); // the system view has no focus callout
@@ -347,23 +368,20 @@ export class InfoPanel {
     r.status.style.borderColor = color;
     r.name.textContent = name || planetLabel(p);
     r.star.textContent = TYPE_DESC[p.type] || planetLabel(p);
-    // description + label move to a side callout by the reticle (#15); the left
-    // panel keeps the dossier (name, type, physical data, civilisation).
+    // label + description + characteristics + resources all live in the side
+    // callout by the reticle now; the left panel keeps status/name + civilisation.
     r.desc.textContent = '';
     r.desc.style.display = 'none';
-    this._setFocusCallout(name || planetLabel(p), TYPE_DESC[p.type] || planetLabel(p), p.ref || planetDesc(p));
-    // #2: real-feeling physical data instead of the unitless radius/orbit
     const moonN = p.moons ? p.moons.length : 0;
-    r.meta.innerHTML =
+    const metaHtml =
       `<span><b>Диаметр:</b> ≈ ${groupThousands(planetDiameterKm(p))} км</span>` +
       `<span><b>Масса:</b> ≈ ${fmtEarths(planetMassEarth(p))} ⊕ (Земли)</span>` +
       (moonN ? `<span><b>Луны:</b> ${moonN}</span>` : '');
-    r.history.textContent = '';
-    // #2: what the planet is made of (a dead/blown world has nothing to mine)
     const res = p.obliterated ? [] : PLANET_RES[p.type] || [];
-    r.resTitle.textContent = 'Ресурсы';
-    r.res.innerHTML = res.map((x) => `<span class="chip">${x}</span>`).join('');
-    r.resBlock.style.display = res.length ? '' : 'none';
+    const resHtml = res.map((x) => `<span class="chip">${x}</span>`).join('');
+    this._setFocusCallout(name || planetLabel(p), TYPE_DESC[p.type] || planetLabel(p), p.ref || planetDesc(p), metaHtml, resHtml);
+    r.history.textContent = '';
+    r.about.style.display = 'none'; // characteristics + resources moved to the callout
 
     // civilisation lore on the home planet — alive OR dead (#7): a ruined world
     // still tells the story of who lived (and died) there.
@@ -388,22 +406,24 @@ export class InfoPanel {
     r.status.style.borderColor = color;
     r.name.textContent = named || role.name;
     r.star.textContent = faction && faction.name ? `Флот: ${faction.name}` : 'Корабль';
-    // story + label move to the side callout by the reticle (#15)
+    // story + label + specs all move to the side callout by the reticle (#15)
     r.desc.textContent = '';
     r.desc.style.display = 'none';
-    this._setFocusCallout(
-      named || role.name,
-      faction && faction.name ? `Флот: ${faction.name}` : 'Корабль',
-      ship && ship.lore ? ship.lore.join(' ') : role.desc,
-    );
-    r.meta.innerHTML =
+    const metaHtml =
       `<span><b>Класс:</b> ${role.name}</span>` +
       `<span><b>Длина:</b> ${role.lengthM} м</span>` +
       `<span><b>Скорость:</b> ${role.speed}</span>` +
       `<span><b>Экипаж:</b> ${role.crew}</span>` +
       `<span><b>Вооружение:</b> ${role.arm}</span>`;
-    r.history.textContent = named ? role.desc : faction && faction.lore ? faction.lore : '';
-    r.resBlock.style.display = 'none';
+    this._setFocusCallout(
+      named || role.name,
+      faction && faction.name ? `Флот: ${faction.name}` : 'Корабль',
+      ship && ship.lore ? ship.lore.join(' ') : role.desc,
+      metaHtml,
+      '',
+    );
+    r.history.textContent = '';
+    r.about.style.display = 'none';
     this._setRace(null);
     this._setFact(null);
     this.el.scrollTop = 0;
@@ -425,10 +445,10 @@ export class InfoPanel {
     r.star.textContent = faction && faction.name ? `Постройка флота: ${faction.name}` : 'Орбитальная постройка';
     r.desc.textContent = '';
     r.desc.style.display = 'none';
-    this._setFocusCallout(info.name, info.kindLabel, info.desc);
-    r.meta.innerHTML = (info.meta || []).map(([k, v]) => `<span><b>${k}:</b> ${v}</span>`).join('');
+    const metaHtml = (info.meta || []).map(([k, v]) => `<span><b>${k}:</b> ${v}</span>`).join('');
+    this._setFocusCallout(info.name, info.kindLabel, info.desc, metaHtml, '');
     r.history.textContent = '';
-    r.resBlock.style.display = 'none';
+    r.about.style.display = 'none';
     this._setRace(null);
     this._setFact(null);
     this.el.scrollTop = 0;
