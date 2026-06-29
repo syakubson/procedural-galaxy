@@ -1,7 +1,10 @@
-# Not part of the deployed site — dev docs, QA screenshots, render scripts.
+# Not part of the deployed site — dev docs, QA screenshots, render scripts,
+# the README demo media, and the AI-assistant config.
 docs
 shots
 scripts
+media
+.claude
 *.md
 *.py
 .gitignore

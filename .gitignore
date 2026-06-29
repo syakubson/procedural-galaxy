@@ -6,3 +6,7 @@ scratchpad/
 
 # Vercel link (machine-specific project/org ids)
 .vercel
+
+# Scratch roadmap + session checkpoints (not public docs)
+TODO.md
+CHECKPOINT.md
