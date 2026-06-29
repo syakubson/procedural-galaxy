@@ -637,7 +637,7 @@ export class SystemView {
         const len = _sdir.length();
         if (len > 1e-3) _sdir.multiplyScalar(1 / len);
       }
-      ship.mesh.position.addScaledVector(_sdir, Math.min(dist, ship.speed * dt));
+      ship.mesh.position.addScaledVector(_sdir, Math.min(dist, ship.speed * 0.7 * dt)); // calmer traffic, easier to watch (#6)
       ship.mesh.quaternion.setFromUnitVectors(_FWD, _sdir);
     }
   }
@@ -664,7 +664,7 @@ export class SystemView {
       const len = _sdir.length();
       if (len > 1e-3) _sdir.multiplyScalar(1 / len);
     }
-    ship.mesh.position.addScaledVector(_sdir, Math.min(dist, ship.speed * 0.5 * dt));
+    ship.mesh.position.addScaledVector(_sdir, Math.min(dist, ship.speed * 0.3 * dt)); // flagships drift slowly & majestically (#6)
     ship.mesh.quaternion.setFromUnitVectors(_FWD, _sdir);
   }
 

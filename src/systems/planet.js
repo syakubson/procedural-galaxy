@@ -243,6 +243,10 @@ export class Planet {
         // painted in this system's faction style (#11)
         this.station = createStation(stype, sscale, this._factionStyle);
         this.station.position.x = planet.radius * 2.7;
+        // the gas collector's intake funnel points down its local -Y; the planet
+        // sits at the pivot centre (the station's local -X), so rotate it so the
+        // funnel always faces the gas giant it skims (#25).
+        if (stype === 'collector') this.station.rotation.z = -Math.PI / 2;
         this._stationPivot.add(this.station);
         this._stationSpin = this.station.userData.spin || null; // the habitat wheel
         // make the structure clickable → focus + its own info card (#6)
@@ -259,7 +263,9 @@ export class Planet {
     // per sample form the ribbon; the half-width tapers to 0 at the tail.
     const N = 44;
     this._tN = N;
-    this._tHeadW = Math.max(0.32, planet.radius * 0.85); // cone base width
+    // cone base width — a flat ribbon, so keep it narrow and CAP it; big planets
+    // used to drag a huge flat slab that read as a weird fin (#7).
+    this._tHeadW = Math.min(1.1, Math.max(0.26, planet.radius * 0.45));
     this._tPos = new Float32Array(N * 2 * 3); // 2 ribbon verts per sample
     const tcol = new Float32Array(N * 2 * 3);
     const base = (planet.type === 'lava' ? col('#ff7a2e') : col((planet.def && planet.def.c2) || '#8a8a90')).multiplyScalar(0.95);
@@ -329,7 +335,7 @@ export class Planet {
     // planet (a fixed angular span, fading to black backward). Computed from the
     // orbit so it always reads as a clear tail, independent of framerate — a
     // per-frame history buffer was too short to notice.
-    const span = 0.6; // radians of orbit the tail covers
+    const span = 0.46; // radians of orbit the tail covers — shorter, subtler (#7)
     const si = Math.sin(d.inclination);
     const ci = Math.cos(d.inclination);
     const N = this._tN;
@@ -364,7 +370,7 @@ export class Planet {
     this._tGeo.attributes.position.needsUpdate = true;
 
     for (const moon of this.moons) {
-      moon.angle += moon.data.angularSpeed * dt;
+      moon.angle += moon.data.angularSpeed * dt * 0.6; // slower moons — easier to study (#6)
       moon.mesh.position.set(
         Math.cos(moon.angle) * moon.data.orbit,
         0,
@@ -383,8 +389,8 @@ export class Planet {
           s.angle += s.speed * dt;
           s.mesh.position.set(Math.cos(s.angle) * s.orbit, 0, Math.sin(s.angle) * s.orbit);
         }
-        if (this._stationPivot) this._stationPivot.rotation.y += dt * 0.16; // slow orbit
-        if (this._stationSpin) this._stationSpin.rotation.z += dt * 0.5; // habitat wheel spins
+        if (this._stationPivot) this._stationPivot.rotation.y += dt * 0.1; // slower station orbit (#6)
+        if (this._stationSpin) this._stationSpin.rotation.z += dt * 0.28; // slower habitat wheel (#6)
       }
     }
   }
