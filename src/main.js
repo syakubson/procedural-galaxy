@@ -13,7 +13,7 @@ import { PostFX } from './postfx.js';
 import { buildGUI } from './gui.js';
 import { Systems } from './systems/markers.js';
 import { SystemView } from './systems/systemView.js';
-import { InfoPanel, Tooltip, Overlay, Legend, PlanetCaption } from './ui/hud.js';
+import { InfoPanel, Tooltip, Overlay, Legend, structureCard } from './ui/hud.js';
 import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
 
@@ -35,6 +35,7 @@ class GalaxyApp {
     this.stats = { fps: 0 };
 
     this._time = 0; // accumulated animation time (seconds)
+    this._galaxyRotTime = 0; // galaxy-spin clock — only advances while idle (frozen on interaction)
     this._lastInteract = 0; // time of last camera interaction (auto-rotate idle, #23)
     this._galaxyDolly = null; // galaxy-side camera flight into/out of a system (#9)
     this._preDolly = null; // saved galaxy view to restore on exit (#9)
@@ -61,6 +62,7 @@ class GalaxyApp {
     this.gui = buildGUI(this);
     this.gui.hide(); // minimal galaxy view — the generator panel opens via the ⚙ button
     this._initSettingsToggle();
+    this._initViewMode();
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
@@ -73,6 +75,7 @@ class GalaxyApp {
   _initSettingsToggle() {
     const btn = document.getElementById('settings-toggle');
     this._settingsBtn = btn;
+    this._galleryLink = document.getElementById('gallery-link');
     this._settingsOpen = false;
     if (!btn) return;
     btn.addEventListener('click', () => {
@@ -81,6 +84,31 @@ class GalaxyApp {
       else this.gui.hide();
       btn.classList.toggle('on', this._settingsOpen);
     });
+  }
+
+  /** Wire the bottom-right view-mode cycle (system view only):
+   *   0 — full: labels + side description + object shifted right
+   *   1 — clean scene: labels hidden
+   *   2 — cinematic: labels + description hidden, object centred. */
+  _initViewMode() {
+    const btn = document.getElementById('view-mode');
+    this._viewModeBtn = btn;
+    this._viewMode = 0;
+    this._viewModeIcons = ['🏷️', '🌐', '🎬'];
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      this._viewMode = (this._viewMode + 1) % 3;
+      this._applyViewMode();
+    });
+  }
+
+  /** Apply the current view mode to labels, the side panel and the framing. */
+  _applyViewMode() {
+    const m = this._viewMode;
+    if (this._viewModeBtn) this._viewModeBtn.textContent = this._viewModeIcons[m];
+    document.body.classList.toggle('clean-view', m === 2); // hide panel + facts
+    if (this.systemView) this.systemView.setBaseShift(m === 2 ? 0 : 0.12); // centre vs. make room
+    // labels are re-evaluated every frame in the loop (gated on m === 0)
   }
 
   /** Pre-compile the system-view shaders ONCE, in the background, while the user
@@ -200,20 +228,8 @@ class GalaxyApp {
     });
     this.legend = new Legend();
     this.legend.setVisible(this.config.showMarkers);
-    this.planetLabels = new PlanetLabels();
-    this.planetCaption = new PlanetCaption({
-      // ← К системе: drop the focus and return to the system overview
-      onBack: () => {
-        this.systemView.unfocus();
-        this.planetCaption.hide();
-        if (this.systemView.data) this.infoPanel.show(this.systemView.data);
-      },
-      // Подробнее: open the full detailed planet card
-      onDetails: () => {
-        this.planetCaption.hide();
-        if (this._focusedPlanetData) this.infoPanel.showPlanet(this._focusedPlanetData);
-      },
-    });
+    // clicking a diegetic label focuses that object, exactly like clicking it (#5/#6)
+    this.planetLabels = new PlanetLabels((kind, ref) => this._focusHit(kind, ref));
     this.music = new AmbientMusic();
     this.raycaster = new THREE.Raycaster();
     this._pointer = new THREE.Vector2();
@@ -321,6 +337,72 @@ class GalaxyApp {
     this.legend.setProgress(n, list.length);
   }
 
+  /** Focus a planet + show its card (shared by canvas clicks and label clicks). */
+  _focusPlanet(planet) {
+    this.systemView.focusPlanet(planet);
+    const idx = this.systemView.planets.indexOf(planet);
+    const name = planet.data.label || `${this.systemView.data.name} ${String.fromCharCode(98 + idx)}`;
+    this.infoPanel.showPlanet(planet.data, name);
+    this.planetLabels.setVisible(false);
+  }
+
+  /** Focus + open whatever was picked — a planet, ship or structure (#5/#6).
+   *  Shared by canvas clicks and by clicks on the diegetic labels. */
+  _focusHit(kind, ref) {
+    if (kind === 'planet') {
+      this._focusPlanet(ref);
+    } else if (kind === 'ship') {
+      // #6: ships zoom in + follow, just like planets, plus the ship card.
+      this.systemView.focusObject(ref.mesh, Math.max(0.5, ref.baseScale * 1.6));
+      this.infoPanel.showShip(ref.type, this.systemView._factionStyle, ref);
+      this.planetLabels.setVisible(false);
+    } else if (kind === 'structure') {
+      // #6: orbital structures zoom in + follow + their own info card.
+      const r = (ref.stationScale || ref.data.radius * 0.25) * 2.4;
+      this.systemView.focusObject(ref.station, Math.max(0.4, r));
+      this.infoPanel.showStructure(structureCard(ref), this.systemView._factionStyle);
+      this.planetLabels.setVisible(false);
+    } else if (kind === 'ishimura') {
+      // #5: the planet-cracker — zoom in + its own card
+      const ish = this.systemView.ishimura;
+      this.systemView.focusObject(ish.group, 3);
+      this.infoPanel.showStructure(
+        {
+          kindLabel: 'Корабль · добыча',
+          name: 'USG Ishimura',
+          desc: 'Корабль-трещинник, разламывающий планеты ради руды. Сейчас он завис над Эгидой VII — именно из недр этой планеты подняли Красный Обелиск, после чего колония и сошла с ума. (Dead Space)',
+          meta: [
+            ['Класс', 'planetcracker'],
+            ['Длина', '~1,6 км'],
+            ['Захваты', '52 гравитационных троса'],
+            ['Команда', 'погибла — некроморфы'],
+          ],
+        },
+        this.systemView._factionStyle,
+      );
+      this.planetLabels.setVisible(false);
+    } else if (kind === 'deathstar') {
+      // #10: the battle station — zoom in + its own card
+      const ds = this.systemView.deathStar;
+      this.systemView.focusObject(ds.group, ds.R || 5);
+      this.infoPanel.showStructure(
+        {
+          kindLabel: 'Боевая станция · Империя',
+          name: 'Звезда Смерти «Длань»',
+          desc: 'Бронированная боевая станция размером с малую луну. По её броне тянется глубокий экваториальный ров, а на верхней полусфере зияет вогнутая чаша главного орудия: его зелёный суперлазер способен расколоть планету одним залпом — что и случилось с Альдерааном.',
+          meta: [
+            ['Тип', 'боевая станция'],
+            ['Размер', 'с малую луну (~160 км)'],
+            ['Орудие', 'суперлазер — раскалывает планеты'],
+            ['Флот', 'клиновидные разрушители'],
+          ],
+        },
+        this.systemView._factionStyle,
+      );
+      this.planetLabels.setVisible(false);
+    }
+  }
+
   _onClick(e) {
     if (this.mode === 'galaxy') {
       this._updatePointer(e);
@@ -335,20 +417,7 @@ class GalaxyApp {
       this.raycaster.setFromCamera(this._pointer, this.systemView.camera);
       const hit = this.systemView.pickObject(this.raycaster);
       if (!hit) return;
-      if (hit.kind === 'planet') {
-        // #2: focus + a cinematic caption (not the heavy panel). Designation is
-        // the system name + b/c/d… by orbit index, or the hand-named label.
-        this.systemView.focusPlanet(hit.ref);
-        const idx = this.systemView.planets.indexOf(hit.ref);
-        const d = hit.ref.data;
-        const name = d.label || `${this.systemView.data.name} ${String.fromCharCode(98 + idx)}`;
-        this._focusedPlanetData = d;
-        this.infoPanel.hide();
-        this.planetCaption.show(d, name);
-      } else if (hit.kind === 'ship') {
-        this.planetCaption.hide();
-        this.infoPanel.showShip(hit.ref.type, this.systemView._factionStyle);
-      }
+      this._focusHit(hit.kind, hit.ref);
     }
   }
 
@@ -375,9 +444,13 @@ class GalaxyApp {
     this.canvas.style.cursor = 'default';
     // settings belong to the galaxy view only — hide the ⚙ + close the panel
     if (this._settingsBtn) this._settingsBtn.style.display = 'none';
+    // the «Флот и станции» gallery link shares the bottom-left corner with the
+    // cinematic panel — hide it inside a system so they never overlap.
+    if (this._galleryLink) this._galleryLink.style.display = 'none';
     this.gui.hide();
     this._settingsOpen = false;
     if (this._settingsBtn) this._settingsBtn.classList.remove('on');
+    if (this._viewModeBtn) this._viewModeBtn.classList.add('visible'); // view-mode cycle is system-only
 
     // #9: fly the galaxy camera toward the marker, while the system is BUILT AND
     // COMPILED IN THE BACKGROUND during the approach — so by the time the flight
@@ -389,7 +462,7 @@ class GalaxyApp {
     // build the system now (cheap), and compile its shaders in PARALLEL with the
     // flight (non-blocking via KHR_parallel_shader_compile) — no mid-warp hitch.
     this.systemView.load(entry.data);
-    this.planetLabels.setSystem(this.systemView.planets, entry.data);
+    this.planetLabels.setSystem(this.systemView, entry.data);
     this.systemView.setSize(window.innerWidth, window.innerHeight);
     const compiled = this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
 
@@ -409,8 +482,15 @@ class GalaxyApp {
     if (this.mode !== 'system') return;
     this.mode = 'transition';
     this.infoPanel.hide();
-    this.planetCaption.hide();
     this.planetLabels.setVisible(false);
+    // reset the view-mode for the next dive + hide its button
+    this._viewMode = 0;
+    document.body.classList.remove('clean-view');
+    if (this._viewModeBtn) {
+      this._viewModeBtn.classList.remove('visible');
+      this._viewModeBtn.textContent = this._viewModeIcons[0];
+    }
+    this.systemView.baseShift = 0.12;
 
     // #3: first zoom the system camera back OUT (reverse of the entry flight),
     // then a brief PARTIAL dip — not a hard black cut — so the exit reads as one
@@ -434,6 +514,7 @@ class GalaxyApp {
     this._lastInteract = this._time;
     this.legend.setVisible(this.config.showMarkers);
     if (this._settingsBtn) this._settingsBtn.style.display = ''; // ⚙ back in the galaxy view
+    if (this._galleryLink) this._galleryLink.style.display = ''; // gallery link back too
     this.mode = 'galaxy'; // flip after reveal so a stray click can't double-fire
   }
 
@@ -522,10 +603,15 @@ class GalaxyApp {
 
     if (this.mode === 'galaxy' || this.mode === 'transition') {
       const pr = this.renderer.getPixelRatio();
-      this.galaxy.update(this._time, pr);
-      this.suns.update(this._time, pr);
-      this.background.update(this._time);
-      this.systems.update(this._time, this.camera);
+      // the universe spins only while idle — interaction freezes it, just like
+      // the camera auto-rotation (the rotation clock stops; twinkle stays alive).
+      if (this.controls.autoRotate) this._galaxyRotTime += dt;
+      this.galaxy.update(this._time, this._galaxyRotTime, pr);
+      this.suns.update(this._time, this._galaxyRotTime, pr);
+      // the nebula gas rides the same rotation clock as the stars — it freezes
+      // on interaction with them (not the always-running _time) and stays glued.
+      this.background.update(this._galaxyRotTime);
+      this.systems.update(this._galaxyRotTime, this.camera);
       if (this.mode === 'galaxy') this._processHover();
       if (this._galaxyDolly) {
         this._stepGalaxyDolly(dt); // #9: warp flight in/out — bypass controls
@@ -545,12 +631,17 @@ class GalaxyApp {
       this.systemView.update(dt, this._time);
       if (this.mode === 'system') {
         this._processHoverSystem();
-        // diegetic planet labels — hidden during the entry zoom and while a
-        // single planet is focused (the cinematic caption names it instead)
-        const showLabels = !this.systemView._zoom && !this.systemView._focus;
+        // diegetic labels — hidden only during a transition (entry zoom or the
+        // dolly-in of a focus). At a steady close-up we KEEP them and switch to
+        // focus mode, so the focused planet's stations get clickable labels (#6).
+        const sv = this.systemView;
+        const transitioning = sv._zoom || (sv._focus && sv._focus.entering);
+        // labels only in view-mode 0 (off in «clean scene» + «cinematic»)
+        const showLabels = this._viewMode === 0 && !transitioning;
         this.planetLabels.setVisible(showLabels);
         if (showLabels) {
-          this.planetLabels.update(this.systemView.camera, window.innerWidth, window.innerHeight);
+          const cutoff = sv._focus ? sv.camera.position.distanceTo(sv.controls.target) * 2.6 : 0;
+          this.planetLabels.update(sv.camera, window.innerWidth, window.innerHeight, cutoff);
         }
       }
     }

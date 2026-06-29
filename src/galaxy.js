@@ -149,7 +149,8 @@ export class Galaxy {
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
-        uTime: { value: 0 },
+        uTime: { value: 0 }, // twinkle clock — always advances
+        uRotTime: { value: 0 }, // rotation clock — frozen while the user interacts
         uSize: { value: c.starSize },
         uPixelRatio: { value: 1 },
         uRotationSpeed: { value: c.rotationSpeed },
@@ -173,9 +174,10 @@ export class Galaxy {
     this.points.frustumCulled = false; // single centred object; culling is moot
   }
 
-  /** Per-frame: advance time + push the device pixel ratio. */
-  update(time, pixelRatio) {
+  /** Per-frame: twinkle time + (separately) rotation time + pixel ratio. */
+  update(time, rotTime, pixelRatio) {
     this.material.uniforms.uTime.value = time;
+    this.material.uniforms.uRotTime.value = rotTime;
     this.material.uniforms.uPixelRatio.value = pixelRatio;
   }
 

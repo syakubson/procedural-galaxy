@@ -17,7 +17,7 @@ export const nebulaVertexShader = /* glsl */ `
 export const nebulaFragmentShader = /* glsl */ `
   precision mediump float;
 
-  uniform float uTime;
+  uniform float uTime; // the galaxy's freezable ROTATION clock (frozen on interaction)
   uniform float uIntensity;
   uniform float uArms;
   uniform float uSpin;
@@ -70,9 +70,9 @@ export const nebulaFragmentShader = /* glsl */ `
     float n = fbm(q * 2.6 + vec2(uTime * 0.015, -uTime * 0.01));
 
     // gas concentrated ALONG the spiral arms, LOCKED to the rotating star field
-    // (#1): the star points rotate in their vertex shader with a differential
-    // (inner faster); we reproduce that same per-radius rotation here so the gas
-    // arms stay glued to the star arms instead of drifting apart.
+    // (#1): the stars now spin RIGIDLY (one omega for all radii — see starShader),
+    // so the gas must spin rigidly too, or it shears off the arms over a long idle.
+    // uDifferential is kept only as a uniform; it no longer feeds the rotation.
     //
     // SIGN: the star shader rotates the disk by mat2(c,-s,s,c) which (column-
     // major GLSL) sends each star's angle phi -> phi - omega*t (clockwise). The
@@ -80,7 +80,7 @@ export const nebulaFragmentShader = /* glsl */ `
     // gas ridge track phi = c.spin*r - omega*t we must SUBTRACT omega*t here.
     // Using +omega*t makes the gas counter-rotate and shear off the arms — that
     // was the persistent "gas drifts from the arms" bug.
-    float omega = uRotationSpeed * (1.0 + uDifferential * (uCoreSoftN / (r + uCoreSoftN)));
+    float omega = uRotationSpeed; // rigid — matches starShader, never winds up
     float a = -omega * uTime;
     float arm = 0.5 + 0.5 * cos(uArms * (theta + uSpin * r + a));
     arm = pow(arm, 2.2);

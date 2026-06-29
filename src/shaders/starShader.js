@@ -7,6 +7,7 @@
 
 export const starVertexShader = /* glsl */ `
   uniform float uTime;
+  uniform float uRotTime; // rotation clock (frozen on interaction); twinkle uses uTime
   uniform float uSize;          // global size multiplier
   uniform float uPixelRatio;    // device pixel ratio (for crisp points)
   uniform float uRotationSpeed; // base angular velocity at the rim
@@ -27,12 +28,14 @@ export const starVertexShader = /* glsl */ `
     vec3 p = position;
 
     // --- galactic rotation in the disk plane (XZ) ---
-    // Differential rotation: inner stars sweep faster than the rim, which is
-    // what makes the spiral feel alive. Softened near the centre to avoid a
-    // singularity. This is a flat, cheap 2x2 rotation — no trig per star on CPU.
+    // RIGID rotation: the whole disk turns at one angular speed. The spiral is
+    // baked into the star positions, so a rigid spin just turns it as a whole and
+    // it NEVER winds up. (Differential rotation — inner faster than the rim —
+    // looks alive for a minute but shears the arms into a tight coil over a long
+    // idle, which is the bug this fixes. uDifferential is kept only as a uniform.)
     float r = length(p.xz);
-    float omega = uRotationSpeed * (1.0 + uDifferential * (uCoreSoft / (r + uCoreSoft)));
-    float a = omega * uTime;
+    float omega = uRotationSpeed;
+    float a = omega * uRotTime;
     float s = sin(a);
     float c = cos(a);
     p.xz = mat2(c, -s, s, c) * p.xz;

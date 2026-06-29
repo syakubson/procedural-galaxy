@@ -81,6 +81,7 @@ export class Suns {
     const material = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
+        uRotTime: { value: 0 }, // rotation clock — frozen on interaction
         uSize: { value: c.sunSize },
         uPixelRatio: { value: 1 },
         uRotationSpeed: { value: c.rotationSpeed },
@@ -103,8 +104,9 @@ export class Suns {
     this.points.frustumCulled = false;
   }
 
-  update(time, pixelRatio) {
+  update(time, rotTime, pixelRatio) {
     this.material.uniforms.uTime.value = time;
+    this.material.uniforms.uRotTime.value = rotTime;
     this.material.uniforms.uPixelRatio.value = pixelRatio;
   }
 

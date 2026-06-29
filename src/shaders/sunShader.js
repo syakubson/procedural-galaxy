@@ -4,6 +4,7 @@
 
 export const sunVertexShader = /* glsl */ `
   uniform float uTime;
+  uniform float uRotTime; // rotation clock (frozen on interaction); pulse uses uTime
   uniform float uSize;
   uniform float uPixelRatio;
   uniform float uRotationSpeed;
@@ -23,8 +24,8 @@ export const sunVertexShader = /* glsl */ `
     vec3 p = position;
 
     float r = length(p.xz);
-    float omega = uRotationSpeed * (1.0 + uDifferential * (uCoreSoft / (r + uCoreSoft)));
-    float a = omega * uTime;
+    float omega = uRotationSpeed; // rigid spin — matches starShader, never winds up
+    float a = omega * uRotTime;
     float s = sin(a);
     float c = cos(a);
     p.xz = mat2(c, -s, s, c) * p.xz;

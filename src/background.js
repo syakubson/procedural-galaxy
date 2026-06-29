@@ -163,8 +163,11 @@ export class Background {
     this.group.add(mesh);
   }
 
-  update(time) {
-    this.nebulaMat.uniforms.uTime.value = time;
+  // `rotTime` is the galaxy's freezable rotation clock (NOT the always-running
+  // _time): the gas swirl + arm winding stop the instant the user grabs the
+  // camera, exactly like the stars, and stay locked to them.
+  update(rotTime) {
+    this.nebulaMat.uniforms.uTime.value = rotTime;
   }
 
   applyLiveUniforms() {
