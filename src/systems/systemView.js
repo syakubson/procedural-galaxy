@@ -62,6 +62,8 @@ export class SystemView {
     this.endurance = null;
     this._zoom = null;
     this._wantControls = false;
+    this._planetFocused = false; // set by main when a planet is the focus (#4)
+    this._trailsHidden = false; // current trail-visibility state (toggled on change)
   }
 
   // Equirectangular nebula skybox — an inward-facing sphere with a baked 4K
@@ -524,6 +526,7 @@ export class SystemView {
   unfocus() {
     if (!this._focus) return;
     this._focus = null;
+    this._planetFocused = false; // planet trails come back (#4)
     this.controls.minDistance = this._frameMin;
     this.controls.maxDistance = this._frameMax;
     this.controls.target.copy(this._overview.target);
@@ -621,6 +624,7 @@ export class SystemView {
     const from = this.camera.position.clone();
     const to = from.clone().sub(tgt).multiplyScalar(2.3).add(tgt);
     this._focus = null; // override any planet-follow so the pull-back wins
+    this._planetFocused = false; // restore planet trails as we pull out (#4)
     this._zoom = { t: 0, dur, from, to };
   }
 
@@ -675,6 +679,16 @@ export class SystemView {
       }
     }
     for (const p of this.planets) p.update(dt, time, this.camera);
+    // #4: while a planet is focused, hide EVERY planet's (and moon's) motion trail
+    // so no streaks cross the close-up. Restored on unfocus / exit. Toggle on change.
+    const hideTrails = !!this._planetFocused;
+    if (hideTrails !== this._trailsHidden) {
+      this._trailsHidden = hideTrails;
+      for (const p of this.planets) {
+        if (p.trail) p.trail.visible = !hideTrails;
+        if (p._moonTrails) for (const mt of p._moonTrails) if (mt.line) mt.line.visible = !hideTrails;
+      }
+    }
     this._updateShips(dt);
     for (const c of this.comets) c.update(dt);
     if (this._zoom) {
@@ -780,6 +794,7 @@ export class SystemView {
     this._wantControls = false;
     this._zoom = null;
     this._focus = null;
+    this._planetFocused = false;
   }
 
   setSize(w, h) {
@@ -807,6 +822,8 @@ export class SystemView {
       p.dispose();
     }
     this.planets = [];
+    this._planetFocused = false; // fresh system → trails visible
+    this._trailsHidden = false;
 
     this.starGroup.clear();
     this.starGroup.rotation.set(0, 0, 0); // drop any binary-pair spin

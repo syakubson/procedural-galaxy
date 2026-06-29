@@ -29,6 +29,16 @@ const SYS_TYPE_RU = {
   gas: 'Газовый гигант',
 };
 
+// Held keys that drive the camera each frame (orbit + zoom). Discrete one-shot
+// keys (R/C/M/Esc/Space) are handled on keydown, not tracked here (#2).
+const MOVE_CODES = new Set([
+  'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD',
+  'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract',
+]);
+const _ko = new THREE.Vector3(); // scratch: camera→target offset
+const _ksph = new THREE.Spherical(); // scratch: that offset in spherical coords
+
 class GalaxyApp {
   constructor(canvas) {
     this.canvas = canvas;
@@ -593,9 +603,103 @@ class GalaxyApp {
       const moved = Math.hypot(e.clientX - this._downAt.x, e.clientY - this._downAt.y);
       if (moved < 6) this._onClick(e); // distinguish a click from an orbit-drag
     });
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.mode === 'system') this.exitSystem();
+    // pointer left the canvas → drop any marker hover highlight (#1)
+    this.canvas.addEventListener('pointerleave', () => {
+      if (this.systems) this.systems.setHovered(null);
+      this.tooltip.hide();
     });
+
+    // --- keyboard control (#2) ---
+    this._keys = new Set();
+    window.addEventListener('keydown', (e) => this._onKeyDown(e));
+    window.addEventListener('keyup', (e) => this._keys.delete(e.code));
+    window.addEventListener('blur', () => this._keys.clear());
+  }
+
+  /** Discrete shortcuts + held-movement-key tracking (#2). Movement itself is
+   *  applied per frame in `_applyKeyboard`, so holding a key gives smooth motion. */
+  _onKeyDown(e) {
+    if (this._cineActive()) return; // the show treats any key as «exit» (wired in _initCinematic)
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+
+    switch (e.code) {
+      case 'Escape':
+        if (this.mode === 'system') this.exitSystem();
+        return;
+      case 'KeyR': // toggle map rotation (reuses the corner button's logic)
+        if (this.mode === 'galaxy' && this._rotateBtn) this._rotateBtn.click();
+        return;
+      case 'KeyC': // toggle the cinematic show
+        if (this.mode === 'galaxy' && this._cineBtn) this._cineBtn.click();
+        return;
+      case 'KeyM': { // toggle music
+        const mb = document.getElementById('music-toggle');
+        if (mb) mb.click();
+        return;
+      }
+      case 'Space': // drop a planet focus back to the system overview
+        if (this.mode === 'system' && this.systemView._focus) {
+          e.preventDefault();
+          this.systemView.unfocus();
+          this.systemView._planetFocused = false;
+          if (this.systemView.data) this.infoPanel.show(this.systemView.data);
+          this.planetLabels.setVisible(true);
+        }
+        return;
+    }
+    if (MOVE_CODES.has(e.code)) {
+      this._keys.add(e.code);
+      e.preventDefault(); // arrows/space would otherwise scroll the page
+    }
+  }
+
+  /** Apply held movement keys to the active camera once per frame: arrows / WASD
+   *  orbit around the current target, +/- dolly in and out (clamped to the same
+   *  limits as the mouse). Runs in both galaxy and system view (#2). */
+  _applyKeyboard(dt) {
+    if (this._cineActive() || !this._keys.size) return;
+    const system = this.mode === 'system';
+    const controls = system ? this.systemView.controls : this.controls;
+    const camera = system ? this.systemView.camera : this.camera;
+    if (!controls || !camera) return;
+    // don't fight an automated camera move (warp dolly, entry zoom, focus dolly)
+    if (this._galaxyDolly) return;
+    if (system && (this.systemView._zoom || (this.systemView._focus && this.systemView._focus.entering))) return;
+
+    const k = this._keys;
+    let az = 0;
+    let pol = 0;
+    let zoom = 1;
+    if (k.has('ArrowLeft') || k.has('KeyA')) az += 1;
+    if (k.has('ArrowRight') || k.has('KeyD')) az -= 1;
+    if (k.has('ArrowUp') || k.has('KeyW')) pol -= 1;
+    if (k.has('ArrowDown') || k.has('KeyS')) pol += 1;
+    if (k.has('Equal') || k.has('NumpadAdd')) zoom *= 1 - 0.9 * dt;
+    if (k.has('Minus') || k.has('NumpadSubtract')) zoom *= 1 + 0.9 * dt;
+    if (!az && !pol && zoom === 1) return;
+
+    if (!system) {
+      // a keyboard nudge counts as interaction → freeze the idle auto-spin (#23)
+      this.controls.autoRotate = false;
+      this._lastInteract = this._time;
+    }
+
+    const rot = 1.5 * dt; // orbit speed (rad/sec)
+    _ko.copy(camera.position).sub(controls.target);
+    _ksph.setFromVector3(_ko);
+    _ksph.theta += az * rot;
+    _ksph.phi += pol * rot;
+    const minP = controls.minPolarAngle ?? 0.0001;
+    const maxP = controls.maxPolarAngle ?? Math.PI;
+    _ksph.phi = Math.max(minP + 0.02, Math.min(maxP - 0.02, _ksph.phi));
+    _ksph.radius = Math.max(
+      controls.minDistance || 0.1,
+      Math.min(controls.maxDistance || 1e7, _ksph.radius * zoom),
+    );
+    _ko.setFromSpherical(_ksph);
+    camera.position.copy(controls.target).add(_ko);
+    camera.lookAt(controls.target);
   }
 
   _updatePointer(e) {
@@ -618,6 +722,7 @@ class GalaxyApp {
     this._pointer.y = -(e.y / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this._pointer, this.camera);
     const hit = this.systems.pick(this.raycaster);
+    this.systems.setHovered(hit); // grow + brass-tint the hovered marker (#1)
     if (hit) {
       this.tooltip.show(hit.data, e.x, e.y, hit.visited);
       this.canvas.style.cursor = 'pointer';
@@ -738,6 +843,7 @@ class GalaxyApp {
 
   /** Focus a planet + show its card (shared by canvas clicks and label clicks). */
   _focusPlanet(planet) {
+    this.systemView._planetFocused = true; // hide all planet trails for the close-up (#4)
     this._frameObject(planet.body, 'planet', planet.data.radius);
     const idx = this.systemView.planets.indexOf(planet);
     const name = planet.data.label || `${this.systemView.data.name} ${String.fromCharCode(98 + idx)}`;
@@ -748,6 +854,7 @@ class GalaxyApp {
   /** Focus + open whatever was picked — a planet, ship or structure (#5/#6).
    *  Shared by canvas clicks and by clicks on the diegetic labels. */
   _focusHit(kind, ref) {
+    if (kind !== 'planet') this.systemView._planetFocused = false; // non-planet focus → trails return (#4)
     if (kind === 'planet') {
       this._focusPlanet(ref);
     } else if (kind === 'ship') {
@@ -1078,6 +1185,7 @@ class GalaxyApp {
       // markers rotate on the freezable clock but pulse on the always-on one (#10)
       this.systems.update(this._galaxyRotTime, this._time, this.camera);
       if (this.mode === 'galaxy' && !this._cineActive()) this._processHover();
+      if (this.mode === 'galaxy') this._applyKeyboard(dt); // arrows/WASD/±  (#2)
       if (this._galaxyDolly) {
         this._stepGalaxyDolly(dt); // #9: warp flight in/out — bypass controls
       } else {
@@ -1096,6 +1204,7 @@ class GalaxyApp {
       this._syncRotateBtn(); // keep the play/pause glyph matching the spin state (#6)
     }
     if (this.mode === 'system' || this.mode === 'transition') {
+      if (this.mode === 'system') this._applyKeyboard(dt); // orbit/zoom the system view (#2)
       this.systemView.update(dt, this._time);
       if (this.mode === 'system') {
         if (!this._cineActive()) this._processHoverSystem();
