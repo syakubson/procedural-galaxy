@@ -190,6 +190,7 @@ export class InfoPanel {
       <div class="sp-status"></div>
       <h1 class="sp-name"></h1>
       <div class="sp-star"></div>
+      <div class="sp-flourish">✦</div>
       <p class="sp-desc"></p>
 
       <div class="sp-section sp-about">

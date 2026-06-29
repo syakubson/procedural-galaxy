@@ -633,15 +633,48 @@ body.clean-view #fact-box {
   font-size: 17px;
   font-style: italic;
   color: var(--ivory-dim);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+}
+/* brass crest ornament under the subtitle — breaks up the panel (atlas vibe) */
+.sp-flourish {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--brass);
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  margin: 0 0 18px;
+}
+.sp-flourish::before {
+  content: '';
+  width: 34px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--brass), transparent);
+}
+.sp-flourish::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  max-width: 230px;
+  background: linear-gradient(90deg, var(--vellum-soft), transparent);
 }
 .sp-desc {
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 17.5px;
+  line-height: 1.62;
   color: var(--ivory-dim);
   margin-bottom: 14px;
-  max-width: 460px;
+  max-width: 480px;
   text-wrap: pretty;
+}
+/* illuminated drop-cap on the lead paragraph — manuscript / star-atlas flavour */
+.sp-desc::first-letter {
+  float: left;
+  font-family: var(--font-serif);
+  font-size: 3.3em;
+  line-height: 0.82;
+  font-weight: 500;
+  color: var(--brass);
+  margin: 5px 10px 0 0;
 }
 .sp-planets-title {
   font-family: var(--font-mono);
@@ -763,7 +796,7 @@ body.clean-view #fact-box {
   margin-bottom: 8px;
 }
 .race-name {
-  font-size: 20px;
+  font-size: 23px;
   font-weight: 600;
   color: var(--ivory);
 }
@@ -781,13 +814,22 @@ body.clean-view #fact-box {
   color: var(--st-ruins);
 }
 .sp-race-desc {
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 16.5px;
+  line-height: 1.66;
   color: var(--ivory-dim);
   text-wrap: pretty;
 }
+.sp-race-desc p:first-child::first-letter {
+  float: left;
+  font-family: var(--font-serif);
+  font-size: 3.3em;
+  line-height: 0.82;
+  font-weight: 500;
+  color: var(--brass);
+  margin: 5px 10px 0 0;
+}
 .sp-race-desc p {
-  margin: 0 0 7px;
+  margin: 0 0 11px;
 }
 .sp-race-desc p:last-child {
   margin-bottom: 0;
