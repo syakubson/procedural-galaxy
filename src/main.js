@@ -63,6 +63,7 @@ class GalaxyApp {
     this.gui.hide(); // minimal galaxy view — the generator panel opens via the ⚙ button
     this._initSettingsToggle();
     this._initViewMode();
+    this._initRotateToggle();
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
@@ -108,6 +109,35 @@ class GalaxyApp {
       this._viewMode = (this._viewMode + 1) % 3;
       this._applyViewMode();
     });
+  }
+
+  /** Wire the galaxy-view «stop / rotate» toggle (#4): a hard stop that holds the
+   *  map still (and suppresses the 7s idle-resume) until the user restarts it. */
+  _initRotateToggle() {
+    this._rotationLocked = false;
+    const btn = document.createElement('button');
+    btn.id = 'rotate-toggle';
+    btn.type = 'button';
+    btn.title = 'Остановить вращение карты';
+    btn.textContent = '⏸';
+    btn.classList.add('visible'); // galaxy mode is shown from the start
+    btn.addEventListener('click', () => {
+      this._rotationLocked = !this._rotationLocked;
+      if (this._rotationLocked) {
+        if (this.controls) this.controls.autoRotate = false;
+        btn.textContent = '↻';
+        btn.title = 'Вращать карту';
+        btn.classList.add('on');
+      } else {
+        this._lastInteract = this._time;
+        if (this.controls && this.config.cameraAutoRotate) this.controls.autoRotate = true;
+        btn.textContent = '⏸';
+        btn.title = 'Остановить вращение карты';
+        btn.classList.remove('on');
+      }
+    });
+    document.body.appendChild(btn);
+    this._rotateBtn = btn;
   }
 
   /** Position the brass ranging reticle over the focused object (#15). Hidden
@@ -581,6 +611,7 @@ class GalaxyApp {
     this._settingsOpen = false;
     if (this._settingsBtn) this._settingsBtn.classList.remove('on');
     if (this._viewModeBtn) this._viewModeBtn.classList.add('visible'); // view-mode cycle is system-only
+    if (this._rotateBtn) this._rotateBtn.classList.remove('visible'); // map-rotate toggle is galaxy-only (#4)
 
     // #9: fly the galaxy camera toward the marker, while the system is BUILT AND
     // COMPILED IN THE BACKGROUND during the approach — so by the time the flight
@@ -624,6 +655,7 @@ class GalaxyApp {
       this._viewModeBtn.classList.remove('visible');
       this._viewModeBtn.textContent = this._viewModeIcons[0];
     }
+    if (this._rotateBtn) this._rotateBtn.classList.add('visible'); // back in galaxy → show map-rotate toggle (#4)
     this.systemView.baseShift = 0.12;
 
     // #3: first zoom the system camera back OUT (reverse of the entry flight),
@@ -737,6 +769,9 @@ class GalaxyApp {
 
     if (this.mode === 'galaxy' || this.mode === 'transition') {
       const pr = this.renderer.getPixelRatio();
+      // hard map-stop (#4) overrides everything, incl. the autoRotate reset that
+      // exitSystem does — enforce it every frame so a lock truly holds.
+      if (this._rotationLocked) this.controls.autoRotate = false;
       // the universe spins only while idle — interaction freezes it, just like
       // the camera auto-rotation (the rotation clock stops; twinkle stays alive).
       if (this.controls.autoRotate) this._galaxyRotTime += dt;
@@ -751,11 +786,13 @@ class GalaxyApp {
       if (this._galaxyDolly) {
         this._stepGalaxyDolly(dt); // #9: warp flight in/out — bypass controls
       } else {
-        // resume auto-rotation after 30s of no camera interaction (#23)
+        // resume auto-rotation after 7s of no camera interaction (#4), unless the
+        // user has hard-stopped the map with the rotate toggle.
         if (
           this.config.cameraAutoRotate &&
+          !this._rotationLocked &&
           !this.controls.autoRotate &&
-          this._time - this._lastInteract > 30
+          this._time - this._lastInteract > 7
         ) {
           this.controls.autoRotate = true;
         }

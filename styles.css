@@ -272,6 +272,47 @@ body {
   color: var(--brass-bright);
 }
 
+/* galaxy-view «stop / rotate the map» toggle — bottom-left, mirrors the music
+   cluster (#4). Hidden (faded) in the system view. */
+#rotate-toggle {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 16;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
+  backdrop-filter: blur(8px);
+  color: var(--ivory-dim);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, opacity 0.3s ease;
+}
+#rotate-toggle.visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+#rotate-toggle:hover {
+  background: linear-gradient(180deg, rgba(20, 24, 44, 0.78), rgba(14, 17, 33, 0.78));
+  border-color: var(--vellum-strong);
+}
+#rotate-toggle:active {
+  transform: scale(0.94);
+}
+#rotate-toggle.on {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+
 /* view-mode cycle button (system view only): full UI → no labels → cinematic */
 #view-mode {
   position: fixed;
@@ -308,10 +349,18 @@ body {
 #view-mode:active {
   transform: scale(0.94);
 }
-/* cinematic mode (#mode 2): the side description + facts disappear */
-body.clean-view #system-panel,
+/* cinematic mode (#mode 2): the chrome slides off to the sides as the camera
+   recentres — left panel exits left, the «note» card exits right (#2). The
+   panels already animate transform+opacity over ~0.45s, so this reads as a
+   smooth glide, not a cut. */
+body.clean-view #system-panel {
+  opacity: 0 !important;
+  transform: translateX(-64px) !important;
+  pointer-events: none !important;
+}
 body.clean-view #fact-box {
   opacity: 0 !important;
+  transform: translateX(64px) !important;
   pointer-events: none !important;
 }
 
