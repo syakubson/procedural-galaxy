@@ -34,6 +34,7 @@ const SYS_TYPE_RU = {
 const MOVE_CODES = new Set([
   'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
+  'KeyQ', 'KeyE', // Q/E zoom in/out
   'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract',
 ]);
 const _ko = new THREE.Vector3(); // scratch: camera→target offset
@@ -76,6 +77,7 @@ class GalaxyApp {
     this._initViewMode();
     this._initRotateToggle();
     this._initCinematic();
+    this._initControlsHelp();
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
@@ -174,6 +176,66 @@ class GalaxyApp {
     this._rotateBtn.classList.toggle('on', !rotating);
   }
 
+  /** A «?» button (top-right, by the settings gear) that toggles a small panel
+   *  listing every control — mouse + keyboard (#2). */
+  _initControlsHelp() {
+    const btn = document.createElement('button');
+    btn.id = 'help-toggle';
+    btn.type = 'button';
+    btn.title = 'Управление';
+    btn.setAttribute('aria-label', 'Управление');
+    btn.textContent = '?';
+    btn.classList.add('visible'); // galaxy mode from the start
+    document.body.appendChild(btn);
+
+    const panel = document.createElement('div');
+    panel.id = 'help-panel';
+    panel.setAttribute('aria-hidden', 'true');
+    const rows = [
+      ['Мышь', ''],
+      ['Колесо', 'приблизиться к курсору'],
+      ['Зажать ЛКМ', 'повернуть / облёт'],
+      ['Клавиатура', ''],
+      ['Стрелки / WASD', 'обзор'],
+      ['Q / E · + / −', 'зум'],
+      ['R', 'вращение карты'],
+      ['C', 'кинопоказ'],
+      ['M', 'музыка'],
+      ['Пробел', 'из планеты — к системе'],
+      ['Esc', 'шаг назад'],
+    ];
+    panel.innerHTML =
+      '<h4>Управление</h4>' +
+      rows
+        .map(([k, v]) =>
+          v === ''
+            ? `<div class="help-group">${k}</div>`
+            : `<div class="help-row"><kbd>${k}</kbd><span>${v}</span></div>`,
+        )
+        .join('');
+    document.body.appendChild(panel);
+
+    btn.addEventListener('click', () => {
+      const open = panel.classList.toggle('open');
+      btn.classList.toggle('on', open);
+    });
+    // click outside / Esc closes it
+    document.addEventListener('pointerdown', (e) => {
+      if (panel.classList.contains('open') && e.target !== btn && !panel.contains(e.target)) {
+        panel.classList.remove('open');
+        btn.classList.remove('on');
+      }
+    });
+    this._helpBtn = btn;
+    this._helpPanel = panel;
+  }
+
+  /** Hide the «?» help button + close its panel (called on entering a system). */
+  _hideHelp() {
+    if (this._helpBtn) this._helpBtn.classList.remove('visible', 'on');
+    if (this._helpPanel) this._helpPanel.classList.remove('open');
+  }
+
   /** Wire the «▶ Кинопоказ» cinematic auto-tour (#5): a hands-off camera show that
    *  dives system to system, lingering on each highlight with a slow cinematic
    *  drift. Any interaction ends it. */
@@ -255,6 +317,7 @@ class GalaxyApp {
       this._lastInteract = this._time;
       if (this._rotateBtn) this._rotateBtn.classList.add('visible');
       if (this._cineBtn) this._cineBtn.classList.add('visible');
+      if (this._helpBtn) this._helpBtn.classList.add('visible');
     }
   }
 
@@ -556,11 +619,8 @@ class GalaxyApp {
     this.tooltip = new Tooltip();
     this.infoPanel = new InfoPanel({
       onBack: () => this.exitSystem(),
-      // from a planet/ship card → back to the system overview (#6/#7)
-      onBackToSystem: () => {
-        this.systemView.unfocus();
-        if (this.systemView.data) this.infoPanel.show(this.systemView.data);
-      },
+      // from a planet/ship card → back to the system overview (#6/#7/#1)
+      onBackToSystem: () => this._backToOverview(),
     });
     this.legend = new Legend();
     this.legend.setVisible(this.config.showMarkers);
@@ -624,8 +684,11 @@ class GalaxyApp {
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
 
     switch (e.code) {
-      case 'Escape':
-        if (this.mode === 'system') this.exitSystem();
+      case 'Escape': // one step back: planet focus → system overview → galaxy (#1)
+        if (this.mode === 'system') {
+          if (this.systemView._focus) this._backToOverview();
+          else this.exitSystem();
+        }
         return;
       case 'KeyR': // toggle map rotation (reuses the corner button's logic)
         if (this.mode === 'galaxy' && this._rotateBtn) this._rotateBtn.click();
@@ -641,10 +704,7 @@ class GalaxyApp {
       case 'Space': // drop a planet focus back to the system overview
         if (this.mode === 'system' && this.systemView._focus) {
           e.preventDefault();
-          this.systemView.unfocus();
-          this.systemView._planetFocused = false;
-          if (this.systemView.data) this.infoPanel.show(this.systemView.data);
-          this.planetLabels.setVisible(true);
+          this._backToOverview();
         }
         return;
     }
@@ -675,8 +735,8 @@ class GalaxyApp {
     if (k.has('ArrowRight') || k.has('KeyD')) az -= 1;
     if (k.has('ArrowUp') || k.has('KeyW')) pol -= 1;
     if (k.has('ArrowDown') || k.has('KeyS')) pol += 1;
-    if (k.has('Equal') || k.has('NumpadAdd')) zoom *= 1 - 0.9 * dt;
-    if (k.has('Minus') || k.has('NumpadSubtract')) zoom *= 1 + 0.9 * dt;
+    if (k.has('Equal') || k.has('NumpadAdd') || k.has('KeyQ')) zoom *= 1 - 0.9 * dt; // приближение
+    if (k.has('Minus') || k.has('NumpadSubtract') || k.has('KeyE')) zoom *= 1 + 0.9 * dt; // отдаление
     if (!az && !pol && zoom === 1) return;
 
     if (!system) {
@@ -842,6 +902,14 @@ class GalaxyApp {
   }
 
   /** Focus a planet + show its card (shared by canvas clicks and label clicks). */
+  /** One step back from a focused planet/ship to the system overview (#1): drop
+   *  the focus, restore the system dossier + the diegetic labels + the trails. */
+  _backToOverview() {
+    this.systemView.unfocus(); // also clears _planetFocused → trails return (#4)
+    if (this.systemView.data) this.infoPanel.show(this.systemView.data);
+    this.planetLabels.setVisible(true);
+  }
+
   _focusPlanet(planet) {
     this.systemView._planetFocused = true; // hide all planet trails for the close-up (#4)
     this._frameObject(planet.body, 'planet', planet.data.radius);
@@ -989,6 +1057,7 @@ class GalaxyApp {
     if (this._viewModeBtn) this._viewModeBtn.classList.add('visible'); // view-mode cycle is system-only
     if (this._rotateBtn) this._rotateBtn.classList.remove('visible'); // map-rotate toggle is galaxy-only (#4)
     if (this._cineBtn) this._cineBtn.classList.remove('visible'); // cinematic toggle is galaxy-only (#5)
+    this._hideHelp(); // «?» is galaxy-only — the system facts box owns the top-right corner
 
     // #9: fly the galaxy camera toward the marker, while the system is BUILT AND
     // COMPILED IN THE BACKGROUND during the approach — so by the time the flight
@@ -1047,6 +1116,7 @@ class GalaxyApp {
     // still running (it keeps them hidden as it hops between systems) (#4/#5)
     if (this._rotateBtn && !this._cineActive()) this._rotateBtn.classList.add('visible');
     if (this._cineBtn && !this._cineActive()) this._cineBtn.classList.add('visible');
+    if (this._helpBtn && !this._cineActive()) this._helpBtn.classList.add('visible');
     this.systemView.baseShift = 0.12;
 
     if (this._cineActive()) {

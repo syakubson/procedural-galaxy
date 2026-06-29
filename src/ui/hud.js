@@ -585,10 +585,10 @@ export class Legend {
     el.id = 'system-legend';
     el.innerHTML = `
       <div class="lg-title">Звёздная опись</div>
-      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.inhabited}"></span>обитаемые</div>
-      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.wild}"></span>дикие</div>
-      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.ruins}"></span>руины</div>
-      <div class="lg-row"><span class="lg-dot" style="color:${SPECIAL_COLOR}"></span>особые</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.inhabited}"></span>Обитаемые</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.wild}"></span>Дикие</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${STATUS_COLOR.ruins}"></span>Руины</div>
+      <div class="lg-row"><span class="lg-dot" style="color:${SPECIAL_COLOR}"></span>Особые</div>
       <div class="lg-prog">Вписано в карту <b>0</b> / 0</div>
     `;
     document.body.appendChild(el);

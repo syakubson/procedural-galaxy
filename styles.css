@@ -242,6 +242,105 @@ body {
   transform: rotate(40deg);
 }
 
+/* --- controls help: «?» button (top-right, by the gear) + popover (#2) --- */
+#help-toggle {
+  position: fixed;
+  top: 18px;
+  right: 118px; /* gear(18) + 42+8 (gallery) + 42+8 */
+  z-index: 16;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
+  backdrop-filter: blur(8px);
+  color: var(--ivory-dim);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  /* galaxy-only: hidden by default, shown with .visible (mirrors rotate/cine) */
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+#help-toggle.visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+#help-toggle:hover {
+  background: linear-gradient(180deg, rgba(20, 24, 44, 0.78), rgba(14, 17, 33, 0.78));
+  border-color: var(--vellum-strong);
+  transform: scale(1.06);
+}
+#help-toggle.on {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+#help-panel {
+  position: fixed;
+  top: 68px;
+  right: 18px;
+  z-index: 17;
+  width: 244px;
+  padding: 14px 16px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(12, 15, 31, 0.95), rgba(8, 10, 22, 0.95));
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  color: var(--ivory-dim);
+  font-family: var(--font-mono);
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#help-panel.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#help-panel h4 {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ivory);
+}
+#help-panel .help-group {
+  margin: 11px 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+#help-panel .help-group:first-of-type {
+  margin-top: 2px;
+}
+#help-panel .help-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+}
+#help-panel kbd {
+  flex: 0 0 94px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ivory);
+}
+#help-panel .help-row span {
+  font-size: 12px;
+  color: var(--ivory-dim);
+}
+
 /* --- ambient music toggle --- */
 #music-toggle {
   position: fixed;
@@ -634,13 +733,16 @@ body.clean-view #fact-box {
   line-height: 2;
   letter-spacing: 0.04em;
 }
+/* mini of the charted-system marker: a filled status core + a dark rim + a thin
+   status ring (box-shadow), so the legend matches the new map icons (#legend) */
 #system-legend .lg-dot {
-  width: 12px;
-  height: 12px;
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  border: 1px solid currentColor;
-  background: transparent;
-  box-shadow: 0 0 6px currentColor;
+  border: 1px solid rgba(9, 11, 20, 0.85);
+  background: currentColor;
+  box-shadow: 0 0 0 1.5px currentColor, 0 0 7px color-mix(in srgb, currentColor 70%, transparent);
 }
 
 /* --- system lore panel --- */
