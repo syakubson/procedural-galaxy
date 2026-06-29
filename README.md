@@ -13,9 +13,9 @@ tens of thousands of stars.
 
 **▶ Live demo — https://galaxy-lyart-one.vercel.app**
 
-**▶ [Watch the demo video](media/demo.mp4)** — or click the thumbnail below (it opens in GitHub's player):
+![Galaxy Explorer demo](media/demo.gif)
 
-[![Galaxy Explorer — watch the demo](media/demo-poster.jpg)](media/demo.mp4)
+> The looping preview above plays inline on GitHub. For full quality (1280p) **▶ [watch the MP4](media/demo.mp4)**, or open the [live demo](https://galaxy-lyart-one.vercel.app).
 
 ---
 
