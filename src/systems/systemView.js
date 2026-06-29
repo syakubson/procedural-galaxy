@@ -393,7 +393,7 @@ export class SystemView {
     this._applyViewShift(frac);
   }
 
-  /** Raycast planets + ships + structures; returns {kind, ref} or null (#6/#7). */
+  /** Raycast planets + ships + structures; returns {kind, ref, obj} or null. */
   pickObject(raycaster) {
     const targets = [];
     for (const p of this.planets) {
@@ -408,10 +408,54 @@ export class SystemView {
     if (!hits.length) return null;
     let o = hits[0].object;
     while (o) {
-      if (o.userData && o.userData.pickKind) return { kind: o.userData.pickKind, ref: o.userData.pickRef };
+      if (o.userData && o.userData.pickKind) return { kind: o.userData.pickKind, ref: o.userData.pickRef, obj: o };
       o = o.parent;
     }
     return null;
+  }
+
+  /** Every pickable object with the metadata needed for screen-space picking and
+   *  the hover ring: [obj, kind, ref, radius]. (#9) */
+  _pickables() {
+    const out = [];
+    for (const p of this.planets) {
+      if (p.body) out.push([p.body, 'planet', p, p.data.radius]);
+      if (p.station) out.push([p.station, 'structure', p, p.stationScale || p.data.radius * 0.3]);
+    }
+    for (const s of this.ships) if (s.mesh) out.push([s.mesh, 'ship', s, s.baseScale || 0.5]);
+    if (this.ishimura) out.push([this.ishimura.group, 'ishimura', this.ishimura, 1.5]);
+    if (this.deathStar) out.push([this.deathStar.group, 'deathstar', this.deathStar, this.deathStar.R || 5]);
+    return out;
+  }
+
+  /** Screen-space "near miss" pick (#9): when the precise raycast misses, return
+   *  the pickable whose projected centre is closest to the pointer AND inside a
+   *  generous zone (its own on-screen radius + a fixed pad) — a big, forgiving
+   *  click target around every planet / ship / structure. */
+  pickNearestScreen(px, py, w, h) {
+    const cam = this.camera;
+    const c = new THREE.Vector3();
+    const right = new THREE.Vector3();
+    const edge = new THREE.Vector3();
+    let best = null;
+    let bestD = Infinity;
+    for (const [obj, kind, ref, r] of this._pickables()) {
+      obj.getWorldPosition(c);
+      edge.copy(c).project(cam);
+      if (edge.z >= 1) continue;
+      const sx = (edge.x * 0.5 + 0.5) * w;
+      const sy = (-edge.y * 0.5 + 0.5) * h;
+      right.setFromMatrixColumn(cam.matrixWorld, 0);
+      edge.copy(c).addScaledVector(right, r).project(cam);
+      const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
+      const d = Math.hypot(sx - px, sy - py);
+      const zone = Math.max(pxR + 26, 42); // generous, but never swallows the whole screen
+      if (d <= zone && d < bestD) {
+        bestD = d;
+        best = { kind, ref, obj, radius: r };
+      }
+    }
+    return best;
   }
 
   /** Dolly the camera in to a clicked planet and then follow it on its orbit (#6). */

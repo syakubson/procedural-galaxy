@@ -94,6 +94,13 @@ class GalaxyApp {
     const btn = document.getElementById('view-mode');
     this._viewModeBtn = btn;
     this._reticle = document.getElementById('reticle');
+    // soft brass hover ring — a lighter cue than the focus reticle (#9)
+    this._hoverRing = document.createElement('div');
+    this._hoverRing.id = 'hover-ring';
+    this._hoverRing.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(this._hoverRing);
+    this._hoverObj = null;
+    this._hoverR = 1;
     this._viewMode = 0;
     this._viewModeIcons = ['❏', '○', '▣']; // подписи / чистая сцена / кино (monochrome glyphs)
     if (!btn) return;
@@ -362,7 +369,13 @@ class GalaxyApp {
     this._pointer.x = (e.x / window.innerWidth) * 2 - 1;
     this._pointer.y = -(e.y / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this._pointer, this.systemView.camera);
-    const hit = this.systemView.pickObject(this.raycaster);
+    // precise raycast first; fall back to the generous screen-space zone (#9)
+    const hit =
+      this.systemView.pickObject(this.raycaster) ||
+      this.systemView.pickNearestScreen(e.x, e.y, window.innerWidth, window.innerHeight);
+    // remember what's under the pointer so the hover ring can track it (#9)
+    this._hoverObj = hit ? hit.obj : null;
+    this._hoverR = hit ? this._hitRadius(hit) : 1;
     if (hit && hit.kind === 'planet') {
       // already focused on this planet → no "click to approach" prompt
       if (this.systemView._focus && this.systemView._focus.planet === hit.ref) {
@@ -374,13 +387,66 @@ class GalaxyApp {
       const title = d.label || d.biomeLabel || SYS_TYPE_RU[d.type] || 'Планета';
       this.tooltip.showSimple(title, 'нажмите, чтобы приблизиться →', e.x, e.y);
       this.canvas.style.cursor = 'pointer';
-    } else if (hit && hit.kind === 'ship') {
-      this.tooltip.showSimple(hit.ref.type.name, 'нажмите для информации →', e.x, e.y);
+    } else if (hit && (hit.kind === 'ship' || hit.kind === 'structure' || hit.kind === 'ishimura' || hit.kind === 'deathstar')) {
+      const name = hit.kind === 'ship' && hit.ref.type ? hit.ref.type.name : 'Объект';
+      this.tooltip.showSimple(name, 'нажмите для информации →', e.x, e.y);
       this.canvas.style.cursor = 'pointer';
     } else {
       this.tooltip.hide();
       this.canvas.style.cursor = 'grab';
     }
+  }
+
+  /** On-screen radius basis for the hover ring, per pickable kind (#9). */
+  _hitRadius(hit) {
+    switch (hit.kind) {
+      case 'planet':
+        return hit.ref.data.radius;
+      case 'structure':
+        return hit.ref.stationScale || hit.ref.data.radius * 0.3;
+      case 'ship':
+        return hit.ref.baseScale || 0.5;
+      case 'ishimura':
+        return 1.5;
+      case 'deathstar':
+        return (this.systemView.deathStar && this.systemView.deathStar.R) || 5;
+      default:
+        return 1;
+    }
+  }
+
+  /** Position the soft brass hover ring over whatever's under the pointer (#9).
+   *  Hidden when nothing is hovered or the hovered object is already focused
+   *  (the ranging reticle covers that one). */
+  _updateHoverRing() {
+    const ring = this._hoverRing;
+    if (!ring) return;
+    const sv = this.systemView;
+    const obj = this._hoverObj;
+    if (!obj || (sv && sv._focus && sv._focus.obj === obj)) {
+      ring.classList.remove('visible');
+      return;
+    }
+    const c = new THREE.Vector3();
+    obj.getWorldPosition(c);
+    const cp = c.clone().project(sv.camera);
+    if (cp.z >= 1) {
+      ring.classList.remove('visible');
+      return;
+    }
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const sx = (cp.x * 0.5 + 0.5) * w;
+    const sy = (-cp.y * 0.5 + 0.5) * h;
+    const right = new THREE.Vector3().setFromMatrixColumn(sv.camera.matrixWorld, 0);
+    const edge = c.clone().addScaledVector(right, this._hoverR || 1).project(sv.camera);
+    const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
+    const size = Math.max(40, pxR * 2 + 22);
+    ring.style.left = `${sx}px`;
+    ring.style.top = `${sy}px`;
+    ring.style.width = `${size}px`;
+    ring.style.height = `${size}px`;
+    ring.classList.add('visible');
   }
 
   _updateProgress() {
@@ -476,7 +542,10 @@ class GalaxyApp {
       this._pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
       this._pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
       this.raycaster.setFromCamera(this._pointer, this.systemView.camera);
-      const hit = this.systemView.pickObject(this.raycaster);
+      // precise hit first, then the generous screen-space zone (#9)
+      const hit =
+        this.systemView.pickObject(this.raycaster) ||
+        this.systemView.pickNearestScreen(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
       if (!hit) return;
       this._focusHit(hit.kind, hit.ref);
     }
@@ -545,6 +614,9 @@ class GalaxyApp {
     this.infoPanel.hide();
     this.planetLabels.setVisible(false);
     if (this._reticle) this._reticle.classList.remove('visible');
+    // drop the hover ring — its target object is about to be disposed (#9)
+    this._hoverObj = null;
+    if (this._hoverRing) this._hoverRing.classList.remove('visible');
     // reset the view-mode for the next dive + hide its button
     this._viewMode = 0;
     document.body.classList.remove('clean-view');
@@ -707,6 +779,7 @@ class GalaxyApp {
           this.planetLabels.update(sv.camera, window.innerWidth, window.innerHeight, cutoff, sv._focus ? sv._focus.obj : null);
         }
         this._updateReticle(sv, transitioning);
+        this._updateHoverRing();
       }
     }
 
