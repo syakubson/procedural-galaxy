@@ -98,7 +98,8 @@ export class PlanetLabels {
       if (this.onPick) this.onPick(kind, ref);
     });
     this.root.appendChild(el);
-    this.items.push({ el, body, kind });
+    // keep the text box ref so de-overlap can measure its real footprint
+    this.items.push({ el, txt, body, kind, tw: 0, th: 0 });
   }
 
   setVisible(v) {
@@ -149,26 +150,38 @@ export class PlanetLabels {
       it.sx = (this._v.x * 0.5 + 0.5) * w;
       it.sy = (-this._v.y * 0.5 + 0.5) * h;
       it.el.classList.remove('is-hidden');
+      // measure the text box ONCE it's laid out (cached; re-measured while 0)
+      if (!it.tw) {
+        it.tw = it.txt.offsetWidth;
+        it.th = it.txt.offsetHeight;
+      }
       vis.push(it);
     }
-    // de-overlap: nudge labels that land too close apart in Y (a few relaxation
-    // passes). Cheap — no DOM measuring, just constants for the pill footprint.
-    const MIN_DX = 158;
-    const MIN_DY = 38;
+    // de-overlap using each pill's REAL footprint (measured w/h), so tall labels
+    // with a sub-line / mini-line separate fully. The text box sits anchored at
+    // the pin: it extends RIGHT from sx and UP from sy. We resolve any pair that
+    // overlaps in BOTH axes by pushing them apart vertically, a few relax passes.
+    const PAD = 5;
     vis.sort((a, b) => a.sy - b.sy);
-    for (let pass = 0; pass < 3; pass++) {
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
       for (let i = 0; i < vis.length; i++) {
         for (let j = i + 1; j < vis.length; j++) {
           const a = vis[i];
           const b = vis[j];
-          const dy = b.sy - a.sy;
-          if (Math.abs(a.sx - b.sx) < MIN_DX && dy < MIN_DY) {
-            const push = (MIN_DY - dy) / 2 + 0.5;
-            a.sy -= push;
-            b.sy += push;
-          }
+          const tw = Math.max(a.tw, 1);
+          const bw = Math.max(b.tw, 1);
+          const xover = Math.min(a.sx + tw, b.sx + bw) - Math.max(a.sx, b.sx);
+          if (xover <= PAD) continue; // columns don't overlap → leave them
+          const yover = Math.min(a.sy, b.sy) - Math.max(a.sy - a.th, b.sy - b.th);
+          if (yover <= PAD) continue; // rows clear → fine
+          const push = (yover + PAD) / 2;
+          a.sy -= push; // a is higher on screen (sorted by sy) → move it up
+          b.sy += push;
+          moved = true;
         }
       }
+      if (!moved) break;
     }
     for (const it of vis) {
       it.el.style.transform = `translate(${Math.round(it.sx)}px, ${Math.round(it.sy)}px)`;
