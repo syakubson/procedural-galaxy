@@ -695,6 +695,7 @@ function makeSpecialSystem(o) {
     fleetDwelling: !!o.fleetDwelling,
     scoutFlagship: false,
     faction: o.faction || 'alliance',
+    dragonToMars: !!o.dragonToMars, // #8: a Crew Dragon cruising Earth → Mars
     special: true,
     event: !!o.event,
     deathStar: o.deathStar || null, // an in-system battle station (#10)
@@ -725,6 +726,7 @@ export function generateSolarSystem() {
     comets: 2,
     civLevel: 'spacefaring',
     faction: 'alliance',
+    dragonToMars: true, // a Crew Dragon cruising from Earth to Mars (#8)
     planetSpecs: [
       { label: 'Меркурий', biome: 'rocky', radius: 0.35, color: '#8c7853' },
       { label: 'Венера', biome: 'desert', radius: 0.6, color: '#e8c879' },

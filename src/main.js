@@ -557,6 +557,25 @@ class GalaxyApp {
         this.systemView._factionStyle,
       );
       this.planetLabels.setVisible(false);
+    } else if (kind === 'dragon') {
+      // #8: the Crew Dragon en route to Mars — zoom in + its own card
+      const dr = this.systemView.dragon;
+      this.systemView.focusObject(dr.group, 0.9, 0.6);
+      this.infoPanel.showStructure(
+        {
+          kindLabel: 'Корабль · экспедиция',
+          name: 'Crew Dragon',
+          desc: 'Частный многоразовый корабль с экипажем на пути к Марсу. Капсула-«капля» с тепловым щитом сидит на разгонном модуле с солнечными крыльями; внутри — несколько человек и припасы на долгий перелёт.',
+          meta: [
+            ['Тип', 'пилотируемая капсула'],
+            ['Экипаж', 'до 4 человек'],
+            ['Курс', 'Земля → Марс'],
+            ['Двигатели', 'SuperDraco + разгонный модуль'],
+          ],
+        },
+        this.systemView._factionStyle,
+      );
+      this.planetLabels.setVisible(false);
     }
   }
 

@@ -12,6 +12,7 @@ import { BlackHole } from './blackHole.js';
 import { Endurance } from './endurance.js';
 import { DeathStar } from './deathStar.js';
 import { Ishimura } from './ishimura.js';
+import { Dragon } from './dragon.js';
 import { ROLES, buildShip, getFaction } from './ships.js';
 import { Comet } from './comet.js';
 
@@ -190,7 +191,23 @@ export class SystemView {
     const ishIdx = data.planets.findIndex((p) => p.ishimura);
     if (ishIdx >= 0) this._buildIshimura(ishIdx);
 
+    // #8: a Crew Dragon in transit from Earth to Mars (Solar System only)
+    if (data.dragonToMars) this._buildDragon();
+
     this._frame(maxOrbit, starR);
+  }
+
+  /** Build the Crew Dragon and set up its Earth → Mars transit (#8). */
+  _buildDragon() {
+    const earthIdx = this.data.planets.findIndex((p) => p.label === 'Земля');
+    const marsIdx = this.data.planets.findIndex((p) => p.label === 'Марс');
+    if (earthIdx < 0 || marsIdx < 0) return;
+    const d = new Dragon(0.5);
+    d.addTo(this.scene);
+    this.dragon = d;
+    this._dragonRoute = { earthIdx, marsIdx, t: 0.22 };
+    d.group.userData.pickKind = 'dragon';
+    d.group.userData.pickRef = d;
   }
 
   /** Build the USG Ishimura hovering over a planet, holding a torn-off crust
@@ -403,6 +420,7 @@ export class SystemView {
     for (const s of this.ships) if (s.mesh) targets.push(s.mesh);
     if (this.deathStar) targets.push(this.deathStar.group); // the battle station (#10)
     if (this.ishimura) targets.push(this.ishimura.group); // the Ishimura (#5)
+    if (this.dragon) targets.push(this.dragon.group); // the Crew Dragon (#8)
     if (!targets.length) return null;
     const hits = raycaster.intersectObjects(targets, true);
     if (!hits.length) return null;
@@ -425,6 +443,7 @@ export class SystemView {
     for (const s of this.ships) if (s.mesh) out.push([s.mesh, 'ship', s, s.baseScale || 0.5]);
     if (this.ishimura) out.push([this.ishimura.group, 'ishimura', this.ishimura, 1.5]);
     if (this.deathStar) out.push([this.deathStar.group, 'deathstar', this.deathStar, this.deathStar.R || 5]);
+    if (this.dragon) out.push([this.dragon.group, 'dragon', this.dragon, 0.6]);
     return out;
   }
 
@@ -616,6 +635,21 @@ export class SystemView {
         Math.sin(this._endAngle) * r,
       );
     }
+    if (this.dragon && this._dragonRoute) {
+      // cruise along the (moving) Earth → Mars line; when it arrives, depart again
+      const rt = this._dragonRoute;
+      this._planetPos(rt.earthIdx, _sv); // Earth world pos
+      this._planetPos(rt.marsIdx, _sd); // Mars world pos
+      rt.t += dt * 0.045; // slow, readable cruise (~16s per leg)
+      if (rt.t > 0.86) rt.t = 0.16;
+      this.dragon.group.position.lerpVectors(_sv, _sd, rt.t);
+      this.dragon.group.position.y += 0.6; // ride a little above the ecliptic line
+      _sdir.copy(_sd).sub(this.dragon.group.position);
+      if (_sdir.lengthSq() > 1e-6) {
+        _sdir.normalize();
+        this.dragon.group.quaternion.setFromUnitVectors(_FWD, _sdir); // nose → Mars
+      }
+    }
     for (const p of this.planets) p.update(dt, time, this.camera);
     this._updateShips(dt);
     for (const c of this.comets) c.update(dt);
@@ -783,6 +817,12 @@ export class SystemView {
       this.ishimura.dispose();
       this.ishimura = null;
       this._ishFollow = null;
+    }
+    if (this.dragon) {
+      this.scene.remove(this.dragon.group);
+      this.dragon.dispose();
+      this.dragon = null;
+      this._dragonRoute = null;
     }
     if (this._dsLight) {
       this.scene.remove(this._dsLight);

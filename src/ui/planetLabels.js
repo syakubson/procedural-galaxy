@@ -57,6 +57,10 @@ export class PlanetLabels {
     if (view.ishimura) {
       this._add(view.ishimura.group, 'USG Ishimura', 'корабль-трещинник', null, '#ffcf6e', 'ishimura', view.ishimura, '✦');
     }
+    // the Crew Dragon en route to Mars (#8)
+    if (view.dragon) {
+      this._add(view.dragon.group, 'Crew Dragon', 'к Марсу', null, '#bcd0ff', 'dragon', view.dragon, '✦');
+    }
     this.setVisible(this.items.length > 0);
   }
 
