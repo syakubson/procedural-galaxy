@@ -290,7 +290,8 @@ class GalaxyApp {
   /** Cinematic focus on the «Эндюранс» ring station (it isn't a normal pickable). */
   _cineFocusEndurance(sv) {
     if (!sv.endurance) return;
-    sv.focusObject(sv.endurance.group, 3.4, 2.4);
+    const r = this._objectRadius(sv.endurance.group);
+    sv.focusObject(sv.endurance.group, r, r * 0.82);
     this.infoPanel.showStructure(
       {
         kindLabel: 'Станция · экспедиция',
@@ -639,22 +640,21 @@ class GalaxyApp {
     }
   }
 
-  /** On-screen radius basis for the hover ring, per pickable kind (#9). */
+  /** World-space bounding-sphere radius of an object — the true size, so framing
+   *  & brackets fit any model regardless of its scale. */
+  _objectRadius(obj) {
+    const box = new THREE.Box3().setFromObject(obj);
+    if (box.isEmpty()) return 1;
+    const s = box.getBoundingSphere(new THREE.Sphere());
+    return s.radius || 1;
+  }
+
+  /** On-screen radius basis for the hover ring (#9). Planets use their sphere
+   *  radius; everything else hugs its actual model bounds. */
   _hitRadius(hit) {
-    switch (hit.kind) {
-      case 'planet':
-        return hit.ref.data.radius;
-      case 'structure':
-        return hit.ref.stationScale || hit.ref.data.radius * 0.3;
-      case 'ship':
-        return (hit.ref.baseScale || 0.5) * 0.6; // ships are long & thin — bracket tight (#3)
-      case 'ishimura':
-        return 1.0;
-      case 'deathstar':
-        return (this.systemView.deathStar && this.systemView.deathStar.R) || 5;
-      default:
-        return 1;
-    }
+    if (hit.kind === 'planet') return hit.ref.data.radius;
+    if (hit.obj) return this._objectRadius(hit.obj) * 0.72;
+    return 1;
   }
 
   /** Position the soft brass hover ring over whatever's under the pointer (#9).
@@ -719,22 +719,26 @@ class GalaxyApp {
     if (kind === 'planet') {
       this._focusPlanet(ref);
     } else if (kind === 'ship') {
-      // #6: ships zoom in + follow, just like planets, plus the ship card.
-      // a flagship is long & thin, so bracket it tighter than the wide approach (#19).
-      this.systemView.focusObject(ref.mesh, Math.max(0.5, ref.baseScale * 1.6), Math.max(0.35, ref.baseScale * 0.85));
+      // #6: ships zoom in + follow, just like planets, plus the ship card. Frame
+      // by the ship's TRUE bounds so the camera gets close and the visor hugs the
+      // hull (small ships were framed too far, flagships got a huge visor).
+      {
+        const r = this._objectRadius(ref.mesh);
+        this.systemView.focusObject(ref.mesh, r, r * 0.72);
+      }
       this.infoPanel.showShip(ref.type, this.systemView._factionStyle, ref);
       this.planetLabels.setVisible(false);
     } else if (kind === 'structure') {
       // #6: orbital structures zoom in + follow + their own info card.
-      const r = (ref.stationScale || ref.data.radius * 0.25) * 2.4;
-      this.systemView.focusObject(ref.station, Math.max(0.4, r));
+      const r = this._objectRadius(ref.station);
+      this.systemView.focusObject(ref.station, r, r * 0.78);
       this.infoPanel.showStructure(structureCard(ref), this.systemView._factionStyle);
       this.planetLabels.setVisible(false);
     } else if (kind === 'ishimura') {
       // #5: the planet-cracker — zoom in + its own card
       const ish = this.systemView.ishimura;
-      // the Ishimura is a long hull — approach wide (3), bracket tight (1.5) (#19).
-      this.systemView.focusObject(ish.group, 3, 1.5);
+      const ishR = this._objectRadius(ish.group); // frame by its true size (#19)
+      this.systemView.focusObject(ish.group, ishR, ishR * 0.72);
       this.infoPanel.showStructure(
         {
           kindLabel: 'Корабль · добыча',
@@ -753,7 +757,10 @@ class GalaxyApp {
     } else if (kind === 'deathstar') {
       // #10: the battle station — zoom in + its own card
       const ds = this.systemView.deathStar;
-      this.systemView.focusObject(ds.group, ds.R || 5);
+      {
+        const r = this._objectRadius(ds.group);
+        this.systemView.focusObject(ds.group, r, r * 0.8);
+      }
       this.infoPanel.showStructure(
         {
           kindLabel: 'Боевая станция · Империя',
@@ -772,7 +779,10 @@ class GalaxyApp {
     } else if (kind === 'dragon') {
       // #8: the Crew Dragon en route to Mars — zoom in + its own card
       const dr = this.systemView.dragon;
-      this.systemView.focusObject(dr.group, 0.9, 0.6);
+      {
+        const r = this._objectRadius(dr.group);
+        this.systemView.focusObject(dr.group, r, r * 0.72);
+      }
       this.infoPanel.showStructure(
         {
           kindLabel: 'Корабль · экспедиция',

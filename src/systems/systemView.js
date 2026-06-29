@@ -222,7 +222,7 @@ export class SystemView {
 
     const planet = this.planets[planetIdx];
     const pr = planet.data.radius;
-    const ish = new Ishimura(pr * 0.5); // a small ship next to the planet
+    const ish = new Ishimura(pr * 0.32); // a small ship next to the planet (smaller hull)
     ish.addTo(this.scene);
     this.ishimura = ish;
     this._ishFollow = { idx: planetIdx, offset: new THREE.Vector3(pr * 1.4, pr * 1.7, 0) };
@@ -491,7 +491,7 @@ export class SystemView {
    *  decoupled so an elongated ship can be approached wide but bracketed tight (#19). */
   focusObject(obj, radius, reticleRadius = radius) {
     obj.getWorldPosition(_fp);
-    this.controls.minDistance = Math.max(0.3, radius * 1.4);
+    this.controls.minDistance = Math.max(0.18, radius * 0.9);
     this.controls.maxDistance = radius * 40 + 12;
     this._focus = {
       obj,
@@ -500,7 +500,8 @@ export class SystemView {
       entering: true,
       t: 0,
       dur: 0.95, // a touch slower → more cinematic approach
-      dist: radius * 5 + 2,
+      dist: radius * 2.4 + 0.5, // ≈3× the object radius — fills the frame, not far
+
       fromPos: this.camera.position.clone(),
       fromTarget: this.controls.target.clone(),
       lastPos: _fp.clone(),

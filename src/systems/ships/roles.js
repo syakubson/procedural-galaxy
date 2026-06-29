@@ -171,7 +171,7 @@ export const ROLES = [
   { id: 'freighter', name: 'Грузовик', cat: 'transport', size: 'L', lengthM: 90, speed: 5, crew: 8, scale: 1.25, arm: 'карго 8 000 т', purpose: 'перевозка грузов', desc: 'Рабочая лошадка: контейнеры, медленно, надёжно.', make: makeFreighter },
   { id: 'tanker', name: 'Танкер', cat: 'transport', size: 'L', lengthM: 85, speed: 4.5, crew: 6, scale: 1.2, arm: 'танки топлива/газа', purpose: 'топливо и газ', desc: 'Возит топливо и сжатый газ в больших баках.', make: makeTanker },
   { id: 'liner', name: 'Лайнер', cat: 'transport', size: 'L', lengthM: 120, speed: 5.5, crew: 40, scale: 1.35, arm: 'до 4 000 колонистов', purpose: 'пассажиры и колонисты', desc: 'Перевозит людей: ряды окон, обзорные купола.', make: makeLiner },
-  { id: 'flagship', name: 'Флагман', cat: 'flagship', size: 'XL', lengthM: 400, speed: 2.6, crew: 2000, scale: 2.7, arm: 'батареи + ангар', purpose: 'командный дредноут', desc: 'Сердце флота: огромный, медленный, ощетинился орудиями.', make: makeFlagship },
+  { id: 'flagship', name: 'Флагман', cat: 'flagship', size: 'XL', lengthM: 400, speed: 2.6, crew: 2000, scale: 1.9, arm: 'батареи + ангар', purpose: 'командный дредноут', desc: 'Сердце флота: огромный, медленный, ощетинился орудиями.', make: makeFlagship },
 ];
 
 export const ROLE_BY_ID = Object.fromEntries(ROLES.map((r) => [r.id, r]));
