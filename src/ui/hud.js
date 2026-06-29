@@ -13,6 +13,14 @@ const STATUS_COLOR = {
 // magenta — hand-crafted easter-egg systems (#13/#19/#20)
 const SPECIAL_COLOR = '#d089e2';
 
+// drop the trailing franchise tag from authored lore: «… восстание. (Star Wars)»
+// → «… восстание.» We keep in-prose parentheticals (spectral class «(G)», a name
+// alias «(Дюна)», «(Битва при Явине)») — only known universe tags are stripped.
+const UNIVERSE_TAG = /\s*\((?:Star\s?Wars|Dead\s?Space|Dune|Avatar|Interstellar|Halo|Mass\s?Effect|Alien[s]?|Warhammer)[^)]*\)\s*$/i;
+function stripUniverseTag(text) {
+  return typeof text === 'string' ? text.replace(UNIVERSE_TAG, '') : text;
+}
+
 const TYPE_LABEL = {
   lava: 'Лавовая',
   rocky: 'Каменистая',
@@ -124,7 +132,16 @@ const WILD_DESC = {
 };
 
 function planetDesc(p) {
-  if (p.inhabited) return 'Живой обитаемый мир — сердце местной цивилизации. Вокруг него вращаются станции, спутники и корабли.';
+  if (p.inhabited) {
+    // #23: describe what actually orbits the world — a tribal people have no
+    // satellites at all, an industrial one has its first probes but no stations,
+    // and only a spacefaring civ rings its world with stations and ships.
+    if (p.civLevel === 'tribal')
+      return 'Живой обитаемый мир: его народ ещё живёт малыми племенами и не вышел в космос — небо над ним пусто, ни спутников, ни станций.';
+    if (p.civLevel === 'industrial')
+      return 'Живой обитаемый мир: цивилизация только осваивает орбиту — в небе уже кружат первые спутники, но станций и кораблей пока нет.';
+    return 'Живой обитаемый мир — сердце космической цивилизации. Вокруг него вращаются станции, спутники и корабли.';
+  }
   if (p.colony) return 'Колония переселенцев: на ночной стороне горят огни поселений, рядом висит орбитальный хаб.';
   if (p.obliterated) return 'От планеты остались лишь медленно расходящиеся обломки — её разнесли в пыль.';
   if (p.destroyed) return 'Мёртвый мир со шрамом катастрофы: гигантский кратер пересекает кору.';
@@ -186,9 +203,8 @@ export class InfoPanel {
     const el = document.createElement('div');
     el.id = 'system-panel';
     el.innerHTML = `
-      <div class="sp-eyebrow">Лист описи</div>
-      <div class="sp-status"></div>
       <h1 class="sp-name"></h1>
+      <div class="sp-status"></div>
       <div class="sp-star"></div>
       <div class="sp-flourish">✦</div>
       <p class="sp-desc"></p>
@@ -350,7 +366,7 @@ export class InfoPanel {
       : `${data.star.label} — ${data.star.desc}`;
     r.about.style.display = '';
     r.desc.style.display = '';
-    r.desc.textContent = data.description;
+    r.desc.textContent = stripUniverseTag(data.description);
     this._clearFocusCallout(); // the system view has no focus callout
 
     // about: age + star mass (#8) + use + history; NO resources here (#3)
@@ -358,7 +374,7 @@ export class InfoPanel {
       `<span><b>Возраст:</b> ${data.ageGyr} млрд лет</span>` +
       starMassLine(data) +
       `<span><b>Назначение:</b> ${data.useFor}</span>`;
-    r.history.textContent = data.history;
+    r.history.textContent = stripUniverseTag(data.history);
     r.resBlock.style.display = 'none';
 
     this._setFact(data.fact); // tidbit → top-right (#10)
@@ -394,7 +410,7 @@ export class InfoPanel {
       (moonN ? `<span><b>Луны:</b> ${moonN}</span>` : '');
     const res = p.obliterated ? [] : PLANET_RES[p.type] || [];
     const resHtml = res.map((x) => `<span class="chip">${x}</span>`).join('');
-    this._setFocusCallout(name || planetLabel(p), TYPE_DESC[p.type] || planetLabel(p), p.ref || planetDesc(p), metaHtml, resHtml);
+    this._setFocusCallout(name || planetLabel(p), TYPE_DESC[p.type] || planetLabel(p), stripUniverseTag(p.ref || planetDesc(p)), metaHtml, resHtml);
     r.history.textContent = '';
     r.about.style.display = 'none'; // characteristics + resources moved to the callout
 
@@ -433,7 +449,7 @@ export class InfoPanel {
     this._setFocusCallout(
       named || role.name,
       faction && faction.name ? `Флот: ${faction.name}` : 'Корабль',
-      ship && ship.lore ? ship.lore.join(' ') : role.desc,
+      stripUniverseTag(ship && ship.lore ? ship.lore.join(' ') : role.desc),
       metaHtml,
       '',
     );
@@ -461,7 +477,7 @@ export class InfoPanel {
     r.desc.textContent = '';
     r.desc.style.display = 'none';
     const metaHtml = (info.meta || []).map(([k, v]) => `<span><b>${k}:</b> ${v}</span>`).join('');
-    this._setFocusCallout(info.name, info.kindLabel, info.desc, metaHtml, '');
+    this._setFocusCallout(info.name, info.kindLabel, stripUniverseTag(info.desc), metaHtml, '');
     r.history.textContent = '';
     r.about.style.display = 'none';
     this._setRace(null);
