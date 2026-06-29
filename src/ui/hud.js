@@ -37,6 +37,72 @@ export function planetLabel(p) {
   return TYPE_LABEL[p.type] || p.type;
 }
 
+// --- a very short status hook for the in-scene diegetic labels (#5). Plain
+// wild worlds return null (the biome line already says enough). ---------------
+export function planetMiniDesc(p) {
+  if (p.inhabited) return 'дом цивилизации';
+  if (p.colony) return 'колония-поселение';
+  if (p.obliterated) return 'обломки мира';
+  if (p.destroyed) return 'мёртвый мир, кратер';
+  if (p.robotic) return 'мёртвый мир машин';
+  if (p.ruined) return 'безжизненные руины';
+  return null;
+}
+/** Accent colour for a planet's diegetic pin (matches the status palette). */
+export function planetAccent(p) {
+  if (p.inhabited || p.colony) return STATUS_COLOR.inhabited;
+  if (p.ruined) return STATUS_COLOR.ruins;
+  return '#aeb8ee';
+}
+/** A status badge glyph for the diegetic label (#6): home world / colony /
+ *  ruins / plain lifeless world — each gets its own mark. */
+export function planetStatusIcon(p) {
+  if (p.inhabited) return '🏛'; // родной мир цивилизации
+  if (p.colony) return '🚩'; // колония
+  if (p.ruined) return '💀'; // руины
+  return '🌑'; // безжизненный мир
+}
+
+// --- orbital-structure info cards (#6): ring habitats, gas collectors, hubs --
+const STRUCTURE_INFO = {
+  ring: {
+    kindLabel: 'Станция · город-кольцо',
+    name: 'Орбитальный город-кольцо',
+    desc: 'Огромная вращающаяся станция-кольцо: искусственную тяжесть здесь создаёт само вращение обода. Внутри — целый город: жилые ярусы, верфи и причалы для кораблей со всей системы.',
+    meta: [
+      ['Тип', 'кольцевой хабитат'],
+      ['Население', 'десятки тысяч'],
+      ['Назначение', 'столица орбиты, верфь и порт'],
+    ],
+  },
+  collector: {
+    kindLabel: 'Станция · сбор газа',
+    name: 'Газовый коллектор',
+    desc: 'Платформа висит в верхних облаках газового гиганта и черпает из них водород и гелий-3 — топливо для дальних перелётов. Снизу тянутся километровые заборники, сверху швартуются танкеры.',
+    meta: [
+      ['Тип', 'добывающая платформа'],
+      ['Добыча', 'водород · гелий-3'],
+      ['Назначение', 'топливо для флота'],
+    ],
+  },
+  outpost: {
+    kindLabel: 'Станция · форпост',
+    name: 'Орбитальный хаб',
+    desc: 'Скромный модульный форпост на орбите: причал, склады и узел связи с метрополией. Отсюда следят за погодой, кораблями и горизонтом.',
+    meta: [
+      ['Тип', 'модульный форпост'],
+      ['Экипаж', 'небольшой гарнизон'],
+      ['Назначение', 'причал и связь колонии'],
+    ],
+  },
+};
+export function structureCard(planet) {
+  const base = STRUCTURE_INFO[planet.stationKind] || STRUCTURE_INFO.outpost;
+  const stationName = planet.data && planet.data.stationName;
+  // give it the named title («Заря» — кольцевой город) when the data has a name
+  return stationName ? { ...base, name: `${stationName} — ${base.name.toLowerCase()}` } : base;
+}
+
 // --- planet detail copy (#6) -----------------------------------------------
 const TYPE_DESC = {
   lava: 'Раскалённый вулканический мир',
@@ -67,43 +133,70 @@ function planetDesc(p) {
   return WILD_DESC[p.type] || 'Дикий, нетронутый мир.';
 }
 
-function planetFeatures(p) {
-  const t = [];
-  if (p.inhabited) t.push('<span class="tag tag-live">обитаема</span>');
-  else if (p.colony) t.push('<span class="tag tag-live">колония</span>');
-  if (p.ruined) {
-    const l = p.obliterated ? 'уничтожена' : p.destroyed ? 'кратер' : p.robotic ? 'роботы' : 'руины';
-    t.push(`<span class="tag tag-ruin">${l}</span>`);
+// --- planet physical data (#2): the visual radius is unitless; map it to a
+// plausible diameter (km) and an Earth-mass, then list what the world is made of.
+const KM_PER_UNIT = 19500; // a terran world (r≈0.65) ≈ 12 700 км, как Земля
+const TYPE_DENSITY = { lava: 1.0, rocky: 0.95, desert: 0.9, terran: 1.0, ocean: 0.95, ice: 0.5, gas: 0.22 };
+const PLANET_RES = {
+  lava: ['редкоземельные металлы', 'тяжёлые изотопы', 'сера'],
+  rocky: ['железо и никель', 'силикаты', 'редкие металлы'],
+  desert: ['кремний', 'соли и руды', 'следы воды'],
+  terran: ['вода', 'органика', 'плодородная почва'],
+  ocean: ['вода', 'биомасса', 'растворённые соли'],
+  ice: ['водяной лёд', 'аммиак', 'летучие соединения'],
+  gas: ['водород', 'гелий-3', 'аммиак'],
+};
+
+function groupThousands(n) {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); // narrow no-break space
+}
+function planetDiameterKm(p) {
+  return Math.round((p.radius * KM_PER_UNIT) / 100) * 100;
+}
+function planetMassEarth(p) {
+  const d = TYPE_DENSITY[p.type] || 1;
+  return 3.59 * Math.pow(p.radius, 3) * d; // calibrated so an Earth-size world ≈ 1⊕
+}
+function fmtEarths(m) {
+  if (m >= 10) return String(Math.round(m));
+  if (m >= 1) return m.toFixed(1);
+  if (m >= 0.01) return m.toFixed(2);
+  return '<0.01';
+}
+function fmtSolar(m) {
+  if (m >= 10) return String(Math.round(m));
+  if (m >= 1) return m.toFixed(1);
+  return m.toFixed(2);
+}
+/** Star mass line (#8): how heavy the sun is in Suns (handles binaries). */
+function starMassLine(data) {
+  const m = data.star.solarMass;
+  if (m == null) return '';
+  if (data.binary && data.binary.star2.solarMass != null) {
+    return `<span><b>Массы звёзд:</b> ≈ ${fmtSolar(m)} + ${fmtSolar(data.binary.star2.solarMass)} ☉</span>`;
   }
-  if (p.hasRings) t.push('<span class="tag">кольца</span>');
-  if (p.moons && p.moons.length) t.push(`<span class="tag">${p.moons.length} ◐ луны</span>`);
-  if (p.civObjects && p.civObjects.station) t.push('<span class="tag">орбитальная станция</span>');
-  if (p.colonyStation) t.push('<span class="tag">орбитальный хаб</span>');
-  if (p.gasStation) t.push('<span class="tag">газовый коллектор</span>');
-  return t;
+  return `<span><b>Масса звезды:</b> ≈ ${fmtSolar(m)} ☉ (Солнц)</span>`;
 }
 
 export class InfoPanel {
   constructor({ onBack, onBackToSystem }) {
     this.onBack = onBack;
     this.onBackToSystem = onBackToSystem;
-    this._mode = 'system'; // 'system' | 'planet' | 'ship'
+    this._mode = 'system'; // 'system' | 'planet' | 'ship' | 'structure'
     const el = document.createElement('div');
     el.id = 'system-panel';
     el.innerHTML = `
-      <button class="sp-back" type="button">← Назад к галактике</button>
       <div class="sp-status"></div>
       <h1 class="sp-name"></h1>
       <div class="sp-star"></div>
       <p class="sp-desc"></p>
-      <button class="sp-expand" type="button">▾ Подробнее</button>
 
-      <div class="sp-section">
-        <div class="sp-sec-title">Об этой системе</div>
+      <div class="sp-section sp-about">
+        <div class="sp-about-title sp-sec-title">Об этой системе</div>
         <div class="sp-meta"></div>
         <p class="sp-history"></p>
         <div class="sp-res-block">
-          <div class="sp-res-title">Ресурсы</div>
+          <div class="sp-res-title sp-sec-title">Ресурсы</div>
           <div class="sp-res"></div>
         </div>
       </div>
@@ -113,28 +206,29 @@ export class InfoPanel {
         <div class="sp-race-head"></div>
         <p class="sp-race-desc"></p>
       </div>
-
-      <div class="sp-section sp-planets-sec">
-        <div class="sp-sec-title">Планеты</div>
-        <ul class="sp-planets"></ul>
-      </div>
-
-      <div class="sp-fact"></div>
     `;
     document.body.appendChild(el);
     this.el = el;
-    this._backBtn = el.querySelector('.sp-back');
-    this._backBtn.addEventListener('click', () => this._back());
-    // #3: the system overview opens COLLAPSED (compact card) — this toggles the
-    // full detail (history / resources / civ / planets / fact) on demand.
-    this._expandBtn = el.querySelector('.sp-expand');
-    this._expandBtn.addEventListener('click', () => {
-      const collapsed = this.el.classList.toggle('collapsed');
-      this._expandBtn.textContent = collapsed ? '▾ Подробнее' : '▴ Свернуть';
-      this.el.scrollTop = 0;
-    });
+
+    // #4: the «Назад» control lives OUTSIDE the panel, fixed top-left, so it's
+    // always crisp and reachable. It steps up one level (planet→system→galaxy).
+    const back = document.createElement('button');
+    back.id = 'nav-back';
+    back.type = 'button';
+    back.textContent = '← Назад';
+    back.addEventListener('click', () => this._back());
+    document.body.appendChild(back);
+    this.backEl = back;
+
+    // #10: the «did you know» tidbit lives in its own card, top-right.
+    const fact = document.createElement('div');
+    fact.id = 'fact-box';
+    document.body.appendChild(fact);
+    this.factEl = fact;
+
     this._r = {
       status: el.querySelector('.sp-status'),
+      aboutTitle: el.querySelector('.sp-about-title'),
       resTitle: el.querySelector('.sp-res-title'),
       name: el.querySelector('.sp-name'),
       star: el.querySelector('.sp-star'),
@@ -143,20 +237,45 @@ export class InfoPanel {
       history: el.querySelector('.sp-history'),
       res: el.querySelector('.sp-res'),
       resBlock: el.querySelector('.sp-res-block'),
+      about: el.querySelector('.sp-about'),
       civ: el.querySelector('.sp-civ'),
       raceHead: el.querySelector('.sp-race-head'),
       raceDesc: el.querySelector('.sp-race-desc'),
-      planets: el.querySelector('.sp-planets'),
-      planetsSec: el.querySelector('.sp-planets-sec'),
-      fact: el.querySelector('.sp-fact'),
     };
+  }
+
+  /** Fill the civilisation block from a race object (alive or extinct). */
+  _setRace(race) {
+    const r = this._r;
+    if (race) {
+      r.civ.style.display = '';
+      r.raceHead.innerHTML =
+        `<span class="race-name">${race.name}</span>` +
+        `<span class="tag ${race.extinct ? 'tag-ruin' : 'tag-live'}">${race.stageLabel}</span>`;
+      r.raceDesc.innerHTML = race.lore
+        ? race.lore.map((para) => `<p>${para}</p>`).join('')
+        : `<p>${race.description || ''}</p>`;
+    } else {
+      r.civ.style.display = 'none';
+    }
+  }
+
+  /** Show/hide the top-right fact card (#10) — only the system view has one. */
+  _setFact(fact) {
+    if (fact) {
+      this.factEl.textContent = '💡 ' + fact;
+      this.factEl.classList.add('visible');
+    } else {
+      this.factEl.classList.remove('visible');
+    }
   }
 
   show(data) {
     const r = this._r;
     this._mode = 'system';
-    this._backBtn.textContent = '← Назад к галактике';
-    if (r.resTitle) r.resTitle.textContent = 'Ресурсы';
+    this.backEl.textContent = '← Назад к галактике';
+    this.backEl.classList.add('visible');
+    r.aboutTitle.textContent = 'Об этой системе';
     const color = data.event ? '#ffcf6e' : data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status];
     r.status.textContent = (data.event ? '✦ СОБЫТИЕ · ' : '') + data.statusLabel;
     r.status.style.color = color;
@@ -168,129 +287,109 @@ export class InfoPanel {
       : `${data.star.label} — ${data.star.desc}`;
     r.desc.textContent = data.description;
 
-    // about: age + use + history + resources
+    // about: age + star mass (#8) + use + history; NO resources here (#3)
     r.meta.innerHTML =
       `<span><b>Возраст:</b> ${data.ageGyr} млрд лет</span>` +
+      starMassLine(data) +
       `<span><b>Назначение:</b> ${data.useFor}</span>`;
     r.history.textContent = data.history;
-    const res = data.resources || [];
-    r.res.innerHTML = res.map((x) => `<span class="chip">${x}</span>`).join('');
-    r.resBlock.style.display = res.length ? '' : 'none';
+    r.resBlock.style.display = 'none';
 
-    // physics "did you know" tidbit
-    r.fact.textContent = data.fact ? '💡 ' + data.fact : '';
-    r.fact.style.display = data.fact ? '' : 'none';
+    this._setFact(data.fact); // tidbit → top-right (#10)
 
-    // planets section hidden for star-less objects (black holes)
-    r.planetsSec.style.display = data.planets && data.planets.length ? '' : 'none';
+    // the civilisation story lives ONLY on its home planet's card now, not here.
+    this._setRace(null);
 
-    // civilisation (only if a planet here is inhabited and has a race)
-    const home = data.planets.find((p) => p.inhabited && p.race);
-    if (home) {
-      r.civ.style.display = '';
-      r.raceHead.innerHTML =
-        `<span class="race-name">${home.race.name}</span>` +
-        `<span class="tag tag-live">${home.race.stageLabel}</span>`;
-      r.raceDesc.textContent = home.race.description;
-    } else {
-      r.civ.style.display = 'none';
-    }
-
-    // planets
-    r.planets.innerHTML = '';
-    for (const p of data.planets) {
-      const li = document.createElement('li');
-      const tags = [];
-      if (p.inhabited) tags.push('<span class="tag tag-live">обитаема</span>');
-      else if (p.colony) tags.push('<span class="tag tag-live">колония</span>');
-      if (p.ruined) {
-        const lbl = p.obliterated ? 'уничтожена' : p.destroyed ? 'кратер' : p.robotic ? 'роботы' : 'руины';
-        tags.push(`<span class="tag tag-ruin">${lbl}</span>`);
-      }
-      if (p.hasRings) tags.push('<span class="tag">кольца</span>');
-      if (p.moons.length) tags.push(`<span class="tag">${p.moons.length} ◐</span>`);
-      // mark planets that belong to a special easter-egg system
-      if (data.special) tags.push(`<span class="tag" style="border-color:${SPECIAL_COLOR};color:${SPECIAL_COLOR}">✦</span>`);
-      li.innerHTML =
-        planetIcon(p) +
-        `<span class="pt">${planetLabel(p)}</span>` +
-        `<span class="tags">${tags.join('')}</span>`;
-      r.planets.appendChild(li);
-    }
-
-    // open compact: just the name/status/star + a 2-line teaser, full lore on tap
-    this._expandBtn.style.display = '';
-    this._expandBtn.textContent = '▾ Подробнее';
-    this.el.classList.add('collapsed');
-
-    // scroll back to top for the new system
     this.el.scrollTop = 0;
     this.el.classList.add('visible');
   }
 
-  /** Planet detail card in the same panel (#6). */
-  showPlanet(p) {
+  /** Planet detail card (#2) — diameter, mass, resources; cinematic. */
+  showPlanet(p, name) {
     const r = this._r;
     this._mode = 'planet';
-    this.el.classList.remove('collapsed'); // detail views are always full
-    this._expandBtn.style.display = 'none';
-    this._backBtn.textContent = '← Назад к системе';
-    if (r.resTitle) r.resTitle.textContent = 'Что на планете';
+    this.backEl.textContent = '← Назад к системе';
+    this.backEl.classList.add('visible');
+    r.aboutTitle.textContent = 'О планете';
     const color = p.inhabited || p.colony ? STATUS_COLOR.inhabited : p.ruined ? STATUS_COLOR.ruins : STATUS_COLOR.wild;
     r.status.textContent = p.inhabited ? 'Обитаемая планета' : p.colony ? 'Колония' : p.ruined ? 'Мёртвый мир' : 'Планета';
     r.status.style.color = color;
     r.status.style.borderColor = color;
-    r.name.textContent = planetLabel(p);
+    r.name.textContent = name || planetLabel(p);
     r.star.textContent = TYPE_DESC[p.type] || planetLabel(p);
-    r.desc.textContent = planetDesc(p);
+    // a hand-written reference blurb (#2) wins over the generic type description
+    r.desc.textContent = p.ref || planetDesc(p);
+    // #2: real-feeling physical data instead of the unitless radius/orbit
+    const moonN = p.moons ? p.moons.length : 0;
     r.meta.innerHTML =
-      `<span><b>Радиус:</b> ${p.radius.toFixed(2)} (усл.)</span>` +
-      `<span><b>Орбита:</b> ${p.orbit.toFixed(1)}</span>` +
-      `<span><b>Луны:</b> ${p.moons ? p.moons.length : 0}</span>` +
-      `<span><b>Кольца:</b> ${p.hasRings ? 'есть' : 'нет'}</span>`;
+      `<span><b>Диаметр:</b> ≈ ${groupThousands(planetDiameterKm(p))} км</span>` +
+      `<span><b>Масса:</b> ≈ ${fmtEarths(planetMassEarth(p))} ⊕ (Земли)</span>` +
+      (moonN ? `<span><b>Луны:</b> ${moonN}</span>` : '');
     r.history.textContent = '';
-    const feats = planetFeatures(p);
-    r.res.innerHTML = feats.join('');
-    r.resBlock.style.display = feats.length ? '' : 'none';
-    if (p.inhabited && p.race) {
-      r.civ.style.display = '';
-      r.raceHead.innerHTML =
-        `<span class="race-name">${p.race.name}</span>` + `<span class="tag tag-live">${p.race.stageLabel}</span>`;
-      r.raceDesc.textContent = p.race.description;
-    } else {
-      r.civ.style.display = 'none';
-    }
-    r.planetsSec.style.display = 'none';
-    r.fact.style.display = 'none';
+    // #2: what the planet is made of (a dead/blown world has nothing to mine)
+    const res = p.obliterated ? [] : PLANET_RES[p.type] || [];
+    r.resTitle.textContent = 'Ресурсы';
+    r.res.innerHTML = res.map((x) => `<span class="chip">${x}</span>`).join('');
+    r.resBlock.style.display = res.length ? '' : 'none';
+
+    // civilisation lore on the home planet — alive OR dead (#7): a ruined world
+    // still tells the story of who lived (and died) there.
+    this._setRace((p.inhabited || p.ruined) && p.race ? p.race : null);
+    this._setFact(null);
     this.el.scrollTop = 0;
     this.el.classList.add('visible');
   }
 
-  /** Ship detail card in the same panel (#7). */
-  showShip(role, faction) {
+  /** Ship detail card (#6) — flagships & traffic. `ship` carries a flagship's
+   *  own name + unique story (#H), if any. */
+  showShip(role, faction, ship) {
     const r = this._r;
     this._mode = 'ship';
-    this.el.classList.remove('collapsed'); // detail views are always full
-    this._expandBtn.style.display = 'none';
-    this._backBtn.textContent = '← Назад к системе';
+    this.backEl.textContent = '← Назад к системе';
+    this.backEl.classList.add('visible');
+    r.aboutTitle.textContent = 'Характеристики';
     const color = '#bcd0ff';
-    r.status.textContent = `Корабль · ${role.size}`;
+    const named = ship && ship.name;
+    r.status.textContent = named ? 'Флагман флота' : `Корабль · ${role.size}`;
     r.status.style.color = color;
     r.status.style.borderColor = color;
-    r.name.textContent = role.name;
+    r.name.textContent = named || role.name;
     r.star.textContent = faction && faction.name ? `Флот: ${faction.name}` : 'Корабль';
-    r.desc.textContent = role.desc;
+    // the flagship's own story leads; otherwise the class description
+    r.desc.textContent = ship && ship.lore ? ship.lore.join(' ') : role.desc;
     r.meta.innerHTML =
+      `<span><b>Класс:</b> ${role.name}</span>` +
       `<span><b>Длина:</b> ${role.lengthM} м</span>` +
       `<span><b>Скорость:</b> ${role.speed}</span>` +
       `<span><b>Экипаж:</b> ${role.crew}</span>` +
-      `<span><b>Вооружение:</b> ${role.arm}</span>` +
-      `<span><b>Назначение:</b> ${role.purpose}</span>`;
-    r.history.textContent = faction && faction.lore ? faction.lore : '';
+      `<span><b>Вооружение:</b> ${role.arm}</span>`;
+    r.history.textContent = named ? role.desc : faction && faction.lore ? faction.lore : '';
     r.resBlock.style.display = 'none';
-    r.civ.style.display = 'none';
-    r.planetsSec.style.display = 'none';
-    r.fact.style.display = 'none';
+    this._setRace(null);
+    this._setFact(null);
+    this.el.scrollTop = 0;
+    this.el.classList.add('visible');
+  }
+
+  /** Structure detail card (#6) — stations, gas collectors, orbital hubs. */
+  showStructure(info, faction) {
+    const r = this._r;
+    this._mode = 'structure';
+    this.backEl.textContent = '← Назад к системе';
+    this.backEl.classList.add('visible');
+    r.aboutTitle.textContent = 'Характеристики';
+    const color = '#bcd0ff';
+    r.status.textContent = info.kindLabel;
+    r.status.style.color = color;
+    r.status.style.borderColor = color;
+    r.name.textContent = info.name;
+    r.star.textContent = faction && faction.name ? `Постройка флота: ${faction.name}` : 'Орбитальная постройка';
+    r.desc.textContent = info.desc;
+    r.meta.innerHTML = (info.meta || []).map(([k, v]) => `<span><b>${k}:</b> ${v}</span>`).join('');
+    r.history.textContent = '';
+    r.resBlock.style.display = 'none';
+    this._setRace(null);
+    this._setFact(null);
     this.el.scrollTop = 0;
     this.el.classList.add('visible');
   }
@@ -305,59 +404,8 @@ export class InfoPanel {
 
   hide() {
     this.el.classList.remove('visible');
-  }
-}
-
-// A cinematic lower-left caption shown when a planet is focused (#2 of the UI
-// redesign) — kicker + big name + one-line lore + feature chips, instead of the
-// heavy side panel. "Подробнее" still opens the full InfoPanel.showPlanet card.
-export class PlanetCaption {
-  constructor({ onBack, onDetails }) {
-    this.onBack = onBack;
-    this.onDetails = onDetails;
-    const el = document.createElement('div');
-    el.id = 'planet-caption';
-    el.innerHTML = `
-      <div class="pc-kicker"><span class="pc-dot"></span><span class="pc-kicker-txt"></span></div>
-      <h2 class="pc-name"></h2>
-      <p class="pc-desc"></p>
-      <div class="pc-feats"></div>
-      <div class="pc-actions">
-        <button class="pc-back" type="button">← К системе</button>
-        <button class="pc-details" type="button">Подробнее</button>
-      </div>`;
-    document.body.appendChild(el);
-    this.el = el;
-    el.querySelector('.pc-back').addEventListener('click', () => this.onBack && this.onBack());
-    el.querySelector('.pc-details').addEventListener('click', () => this.onDetails && this.onDetails());
-    this._dot = el.querySelector('.pc-dot');
-    this._kicker = el.querySelector('.pc-kicker-txt');
-    this._name = el.querySelector('.pc-name');
-    this._desc = el.querySelector('.pc-desc');
-    this._feats = el.querySelector('.pc-feats');
-  }
-
-  show(p, name) {
-    const inhabited = p.inhabited || p.colony;
-    const kicker = p.inhabited
-      ? 'Обитаемый мир'
-      : p.colony
-        ? 'Колония'
-        : p.ruined
-          ? 'Мёртвый мир'
-          : TYPE_LABEL[p.type] || 'Мир';
-    const color = inhabited ? STATUS_COLOR.inhabited : p.ruined ? STATUS_COLOR.ruins : STATUS_COLOR.wild;
-    this._kicker.textContent = kicker.toUpperCase();
-    this._kicker.parentElement.style.color = color;
-    this._dot.style.background = color;
-    this._name.textContent = name;
-    this._desc.textContent = planetDesc(p);
-    this._feats.innerHTML = planetFeatures(p).join('');
-    this.el.classList.add('visible');
-  }
-
-  hide() {
-    this.el.classList.remove('visible');
+    this.backEl.classList.remove('visible');
+    this.factEl.classList.remove('visible');
   }
 }
 
@@ -370,32 +418,40 @@ export class Tooltip {
   }
 
   show(data, x, y, visited) {
-    // a little real info on hover (#9), then a curiosity-gap teaser
-    let info;
+    // a little real info on hover (#9) — laid out as aligned key→value rows
+    // (a small table) rather than one long «·»-separated enumeration.
+    const rows = [];
     if (data.kind === 'blackhole') {
-      info = data.star.label;
+      rows.push(['Объект', data.star.label]);
+      if (data.star.desc) rows.push(['Масштаб', data.star.desc]);
     } else {
       const n = data.planets ? data.planets.length : 0;
       const home = data.planets && data.planets.find((p) => p.inhabited);
-      // #17: planet count + star, and for inhabited worlds the civ stage + race
-      const starName = data.binary
-        ? `двойная: ${data.star.label.replace(/\s*\(.\)/, '')} + ${data.binary.star2.label.replace(/\s*\(.\)/, '')}`
-        : data.star.label.replace(/\s*\(.\)/, '');
-      let extra = '';
-      if (home) {
-        extra = ` · ${home.civLabel}` + (home.race ? ` · ${home.race.name}` : '');
+      if (data.binary) {
+        rows.push([
+          'Звёзды',
+          `${data.star.label.replace(/\s*\(.\)/, '')} + ${data.binary.star2.label.replace(/\s*\(.\)/, '')}`,
+        ]);
+      } else {
+        rows.push(['Звезда', data.star.label.replace(/\s*\(.\)/, '')]);
       }
-      info = `${starName} · планет: ${n}${extra}`;
+      rows.push(['Планет', String(n)]);
+      if (home) {
+        rows.push(['Эпоха', home.civLabel]);
+        if (home.race) rows.push(['Народ', home.race.name]);
+      }
     }
+    const rowsHtml = rows.map(([k, v]) => `<span class="tt-k">${k}</span><span class="tt-v">${v}</span>`).join('');
     const teaser = visited
-      ? '<span class="tt-teaser tt-seen">✓ исследована · открыть снова</span>'
-      : '<span class="tt-teaser">нажмите, чтобы исследовать →</span>';
-    const eventBadge = data.event ? '<span style="color:#ffcf6e;font-weight:600">✦ СОБЫТИЕ</span>' : '';
+      ? '<div class="tt-teaser tt-seen">✓ исследована · открыть снова</div>'
+      : '<div class="tt-teaser">нажмите, чтобы исследовать →</div>';
+    // special encounters read magenta with a ✦; otherwise the status palette
+    const color = data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status] || '#aab0e0';
+    const mark = data.special ? '✦ ' : '';
     this.el.innerHTML =
-      `<b>${data.name}</b>` +
-      eventBadge +
-      `<span style="color:${STATUS_COLOR[data.status]}">${data.statusLabel}</span>` +
-      `<span class="tt-info">${info}</span>` +
+      `<div class="tt-name">${data.name}</div>` +
+      `<div class="tt-status" style="color:${color}">${mark}${data.statusLabel}</div>` +
+      `<div class="tt-rows">${rowsHtml}</div>` +
       teaser;
     this.el.style.left = `${x + 16}px`;
     this.el.style.top = `${y + 14}px`;
@@ -404,7 +460,7 @@ export class Tooltip {
 
   /** A lightweight hover card for a planet / ship in the system view (#6/#7). */
   showSimple(title, sub, x, y) {
-    this.el.innerHTML = `<b>${title}</b><span class="tt-teaser">${sub}</span>`;
+    this.el.innerHTML = `<div class="tt-name">${title}</div><div class="tt-teaser">${sub}</div>`;
     this.el.style.left = `${x + 16}px`;
     this.el.style.top = `${y + 14}px`;
     this.el.classList.add('visible');
