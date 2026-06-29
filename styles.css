@@ -628,6 +628,8 @@ body.clean-view #fact-box {
   letter-spacing: 0.004em;
   color: var(--ivory);
   text-wrap: balance;
+  width: fit-content; /* shrink to the text so the ✦ divider can match its width */
+  max-width: 100%;
 }
 .sp-star {
   font-size: 17px;
@@ -727,6 +729,13 @@ body.clean-view #fact-box {
   border-top: 1px solid var(--vellum-soft);
   padding-top: 14px;
   margin-top: 16px;
+}
+/* the civilisation block sits right under the ✦ flourish on a focused planet,
+   so it must NOT draw its own divider line — the flourish is the separator */
+.sp-civ {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 4px;
 }
 .sp-sec-title {
   font-family: var(--font-mono);

@@ -268,7 +268,19 @@ export class InfoPanel {
       civ: el.querySelector('.sp-civ'),
       raceHead: el.querySelector('.sp-race-head'),
       raceDesc: el.querySelector('.sp-race-desc'),
+      flourish: el.querySelector('.sp-flourish'),
     };
+
+    // keep the ✦ divider exactly as wide as the title above it (fires on every
+    // name change / font load, so it never ends up too short or too long)
+    if (window.ResizeObserver) {
+      this._flourishRO = new ResizeObserver(() => {
+        if (this._r.flourish && this._r.name) {
+          this._r.flourish.style.width = `${this._r.name.offsetWidth}px`;
+        }
+      });
+      this._flourishRO.observe(this._r.name);
+    }
   }
 
   /** Fill the civilisation block from a race object (alive or extinct). */
