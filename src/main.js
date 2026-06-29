@@ -64,6 +64,7 @@ class GalaxyApp {
     this._initSettingsToggle();
     this._initViewMode();
     this._initRotateToggle();
+    this._initCinematic();
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
@@ -138,6 +139,163 @@ class GalaxyApp {
     });
     document.body.appendChild(btn);
     this._rotateBtn = btn;
+  }
+
+  /** Wire the «▶ Кинопоказ» cinematic auto-tour (#5): a hands-off camera show that
+   *  dives system to system, lingering on each highlight with a slow cinematic
+   *  drift. Any interaction ends it. */
+  _initCinematic() {
+    this._cine = null;
+    const btn = document.createElement('button');
+    btn.id = 'cine-toggle';
+    btn.type = 'button';
+    btn.title = 'Кинопоказ — авто-облёт миров';
+    btn.textContent = '▶';
+    btn.classList.add('visible');
+    btn.addEventListener('click', () => {
+      if (this._cineActive()) this.stopCinematic();
+      else this.startCinematic();
+    });
+    document.body.appendChild(btn);
+    this._cineBtn = btn;
+
+    const hint = document.createElement('div');
+    hint.id = 'cine-hint';
+    hint.textContent = 'Кинопоказ · любое действие — выход';
+    document.body.appendChild(hint);
+    this._cineHintEl = hint;
+
+    // any interaction (except the toggle itself) ends the show
+    document.addEventListener('pointerdown', (e) => {
+      if (this._cineActive() && e.target !== this._cineBtn) this.stopCinematic();
+    });
+    window.addEventListener('wheel', () => this._cineActive() && this.stopCinematic(), { passive: true });
+    window.addEventListener('keydown', () => this._cineActive() && this.stopCinematic());
+  }
+
+  _cineActive() {
+    return !!(this._cine && this._cine.active);
+  }
+
+  startCinematic() {
+    if (this._cineActive() || this.mode !== 'galaxy') return;
+    this._cine = { active: true };
+    this._suppressClick = true; // swallow the click that started the show
+    this._hoverObj = null;
+    if (this._cineBtn) {
+      this._cineBtn.textContent = '■';
+      this._cineBtn.classList.add('on');
+    }
+    if (this._cineHintEl) this._cineHintEl.classList.add('visible');
+    this.runCinematic();
+  }
+
+  stopCinematic() {
+    if (!this._cine) return;
+    this._cine.active = false;
+    this._suppressClick = true; // swallow the interrupting click
+    this._endCinematic();
+  }
+
+  /** Idempotent teardown — hands normal control back after the tour ends/breaks. */
+  _endCinematic() {
+    this._cine = null;
+    if (this._cineBtn) {
+      this._cineBtn.textContent = '▶';
+      this._cineBtn.classList.remove('on');
+    }
+    if (this._cineHintEl) this._cineHintEl.classList.remove('visible');
+    document.body.classList.remove('clean-view');
+    if (this.systemView) this.systemView.controls.autoRotate = false;
+    // restore the galaxy chrome that the tour kept hidden
+    if (this.mode === 'galaxy') {
+      if (this._rotateBtn) this._rotateBtn.classList.add('visible');
+      if (this._cineBtn) this._cineBtn.classList.add('visible');
+    }
+  }
+
+  /** Resolve after `ms`, or early the instant the show is interrupted. */
+  _cineWait(ms) {
+    return new Promise((res) => {
+      const start = performance.now();
+      const tick = () => {
+        if (!this._cineActive() || performance.now() - start >= ms) return res();
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+  }
+
+  /** Curated tour stops: Solar System, the Dead Space system, the other
+   *  hand-built specials, then a handful of inhabited systems. */
+  _buildCineStops() {
+    const list = this.systems.list;
+    const byName = (n) => list.find((s) => s.data && s.data.name === n);
+    const stops = [];
+    const push = (s) => s && !stops.includes(s) && stops.push(s);
+    push(byName('Солнечная система'));
+    push(byName('Чёрный Карантин'));
+    for (const s of list) if (s.special && !s.noFade && s.data && s.data.kind !== 'blackhole') push(s);
+    const inhab = list.filter((s) => !s.special && s.data && s.data.status === 'inhabited');
+    for (const s of inhab.slice(0, 4)) push(s);
+    return stops;
+  }
+
+  /** Ordered focus actions for the notable objects in the current system. */
+  _cineHighlights(sv) {
+    const acts = [];
+    const planets = sv.planets || [];
+    const pick = [];
+    const inhab = planets.find((p) => p.data && (p.data.inhabited || p.data.ruined));
+    if (inhab) pick.push(inhab);
+    const gas = planets.find((p) => p.data && p.data.type === 'gas' && !pick.includes(p));
+    if (gas) pick.push(gas);
+    for (const p of planets) {
+      if (pick.length >= 3) break;
+      if (!pick.includes(p)) pick.push(p);
+    }
+    for (const p of pick) acts.push(() => this._focusPlanet(p));
+    if (sv.dragon) acts.push(() => this._focusHit('dragon', sv.dragon));
+    if (sv.ishimura) acts.push(() => this._focusHit('ishimura', sv.ishimura));
+    if (sv.deathStar) acts.push(() => this._focusHit('deathstar', sv.deathStar));
+    const flag = (sv.ships || []).find((s) => s.type && s.type.cat === 'flagship');
+    if (flag) acts.push(() => this._focusHit('ship', flag));
+    return acts;
+  }
+
+  async runCinematic() {
+    const stops = this._buildCineStops();
+    if (!stops.length) {
+      this._endCinematic();
+      return;
+    }
+    let i = 0;
+    try {
+      while (this._cineActive()) {
+        const entry = stops[i % stops.length];
+        i++;
+        document.body.classList.add('clean-view'); // filmic — slide the big panel out
+        await this.enterSystem(entry);
+        if (!this._cineActive()) break;
+        document.body.classList.add('clean-view'); // re-assert after the warp
+        this.systemView.controls.autoRotate = true;
+        this.systemView.controls.autoRotateSpeed = 0.5; // slow drift = the "проводка"
+        await this._cineWait(1600); // settle at the overview
+        if (!this._cineActive()) break;
+        for (const act of this._cineHighlights(this.systemView).slice(0, 3)) {
+          if (!this._cineActive()) break;
+          act();
+          await this._cineWait(9000); // ~9s lingering on each highlight
+        }
+        if (!this._cineActive()) break;
+        await this.exitSystem();
+        if (!this._cineActive()) break;
+        await this._cineWait(1200);
+      }
+    } catch (e) {
+      // a failed transition just ends the show gracefully
+    }
+    this._endCinematic();
   }
 
   /** Position the brass ranging reticle over the focused object (#15). Hidden
@@ -580,6 +738,15 @@ class GalaxyApp {
   }
 
   _onClick(e) {
+    // the click that interrupted the cinematic show is swallowed, not acted on
+    if (this._suppressClick) {
+      this._suppressClick = false;
+      return;
+    }
+    if (this._cineActive()) {
+      this.stopCinematic();
+      return;
+    }
     if (this.mode === 'galaxy') {
       this._updatePointer(e);
       const hit = this.systems.pick(this.raycaster);
@@ -631,6 +798,7 @@ class GalaxyApp {
     if (this._settingsBtn) this._settingsBtn.classList.remove('on');
     if (this._viewModeBtn) this._viewModeBtn.classList.add('visible'); // view-mode cycle is system-only
     if (this._rotateBtn) this._rotateBtn.classList.remove('visible'); // map-rotate toggle is galaxy-only (#4)
+    if (this._cineBtn) this._cineBtn.classList.remove('visible'); // cinematic toggle is galaxy-only (#5)
 
     // #9: fly the galaxy camera toward the marker, while the system is BUILT AND
     // COMPILED IN THE BACKGROUND during the approach — so by the time the flight
@@ -674,7 +842,10 @@ class GalaxyApp {
       this._viewModeBtn.classList.remove('visible');
       this._viewModeBtn.textContent = this._viewModeIcons[0];
     }
-    if (this._rotateBtn) this._rotateBtn.classList.add('visible'); // back in galaxy → show map-rotate toggle (#4)
+    // back in galaxy → show the galaxy-only toggles, unless the cinematic show is
+    // still running (it keeps them hidden as it hops between systems) (#4/#5)
+    if (this._rotateBtn && !this._cineActive()) this._rotateBtn.classList.add('visible');
+    if (this._cineBtn && !this._cineActive()) this._cineBtn.classList.add('visible');
     this.systemView.baseShift = 0.12;
 
     // #3: first zoom the system camera back OUT (reverse of the entry flight),
@@ -801,7 +972,7 @@ class GalaxyApp {
       this.background.update(this._galaxyRotTime);
       // markers rotate on the freezable clock but pulse on the always-on one (#10)
       this.systems.update(this._galaxyRotTime, this._time, this.camera);
-      if (this.mode === 'galaxy') this._processHover();
+      if (this.mode === 'galaxy' && !this._cineActive()) this._processHover();
       if (this._galaxyDolly) {
         this._stepGalaxyDolly(dt); // #9: warp flight in/out — bypass controls
       } else {
@@ -821,7 +992,7 @@ class GalaxyApp {
     if (this.mode === 'system' || this.mode === 'transition') {
       this.systemView.update(dt, this._time);
       if (this.mode === 'system') {
-        this._processHoverSystem();
+        if (!this._cineActive()) this._processHoverSystem();
         // diegetic labels — hidden only during a transition (entry zoom or the
         // dolly-in of a focus). At a steady close-up we KEEP them and switch to
         // focus mode, so the focused planet's stations get clickable labels (#6).

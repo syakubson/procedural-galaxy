@@ -313,6 +313,72 @@ body {
   color: var(--brass-bright);
 }
 
+/* «Кинопоказ» cinematic auto-tour toggle — sits right of the stop button (#5) */
+#cine-toggle {
+  position: fixed;
+  left: 70px;
+  bottom: 20px;
+  z-index: 16;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
+  backdrop-filter: blur(8px);
+  color: var(--ivory-dim);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, opacity 0.3s ease;
+}
+#cine-toggle.visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+#cine-toggle:hover {
+  background: linear-gradient(180deg, rgba(20, 24, 44, 0.78), rgba(14, 17, 33, 0.78));
+  border-color: var(--vellum-strong);
+}
+#cine-toggle:active {
+  transform: scale(0.94);
+}
+#cine-toggle.on {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+
+/* «Кинопоказ» running indicator — a centred top pill with the exit hint (#5) */
+#cine-hint {
+  position: fixed;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 19;
+  padding: 9px 18px;
+  border-radius: 2px;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.72), rgba(8, 10, 22, 0.72));
+  backdrop-filter: blur(8px);
+  color: var(--ivory-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+#cine-hint.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* view-mode cycle button (system view only): full UI → no labels → cinematic */
 #view-mode {
   position: fixed;
