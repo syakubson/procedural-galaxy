@@ -21,18 +21,19 @@ import {
 
 const TAU = Math.PI * 2;
 
+// muted-jewel status palette, harmonised with the brass accent (#16)
 const STATUS_COLOR = {
-  inhabited: '#76e2a2', // green — alive
-  ruins: '#e2a660', // amber — dead
-  wild: '#76a6e8', // blue — untouched
+  inhabited: '#6fc795', // jade — alive
+  ruins: '#d99a52', // copper — dead
+  wild: '#79a8d8', // sapphire — untouched
 };
 
-// magenta — hand-crafted easter-egg systems (#13/#19/#20), marked distinctly
-const SPECIAL_COLOR = '#d089e2';
+// amethyst — hand-crafted easter-egg systems (#13/#19/#20), marked distinctly
+const SPECIAL_COLOR = '#c08fd0';
 
 // uncharted marker tint — a faint ivory hairline ring, no status colour leaked,
 // until the system is discovered (then it "inks in" to its status colour).
-const UNCHARTED_COLOR = '#d8cfb4';
+const UNCHARTED_COLOR = '#e2d9be';
 
 const _v = new THREE.Vector3();
 

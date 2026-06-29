@@ -3,15 +3,16 @@
 // with a curiosity-gap teaser, a discovery Legend/counter, and a fade Overlay
 // for the warp transition. All plain DOM, styled via classes in styles.css.
 
+// muted-jewel status palette, harmonised with the brass accent (#16)
 const STATUS_COLOR = {
-  inhabited: '#76e2a2',
-  ruins: '#e2a660',
-  wild: '#76a6e8',
-  blackhole: '#c9a24a',
+  inhabited: '#6fc795', // jade
+  ruins: '#d99a52', // copper
+  wild: '#79a8d8', // sapphire
+  blackhole: '#c9a24a', // brass void
 };
 
-// magenta — hand-crafted easter-egg systems (#13/#19/#20)
-const SPECIAL_COLOR = '#d089e2';
+// amethyst — hand-crafted easter-egg systems (#13/#19/#20)
+const SPECIAL_COLOR = '#c08fd0';
 
 // drop the trailing franchise tag from authored lore: «… восстание. (Star Wars)»
 // → «… восстание.» We keep in-prose parentheticals (spectral class «(G)», a name

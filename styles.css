@@ -30,20 +30,23 @@
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
 
 :root {
-  --ink-void: #070a16;
-  --ink-deep: #0b1024;
-  --vellum: rgba(214, 205, 178, 0.45);
-  --vellum-soft: rgba(214, 205, 178, 0.18);
-  --vellum-strong: rgba(222, 213, 186, 0.78);
-  --ivory: #ece3cd;
-  --ivory-dim: #b8ad90;
-  --parchment: #8a8068;
+  /* Cartographer palette — «Тёплый атлас» refinement (#16): richer indigo ground,
+     a brighter text ramp for legibility (#15), and muted-jewel status colours that
+     harmonise with the brass accent instead of reading neon. */
+  --ink-void: #080c1a;
+  --ink-deep: #0d1226;
+  --vellum: rgba(222, 213, 186, 0.5);
+  --vellum-soft: rgba(222, 213, 186, 0.2);
+  --vellum-strong: rgba(228, 219, 192, 0.8);
+  --ivory: #f1ead6;
+  --ivory-dim: #cdbf9d;
+  --parchment: #a89a78;
   --brass: #cda24e;
   --brass-bright: #e7c074;
-  --st-inhabited: #76e2a2;
-  --st-wild: #76a6e8;
-  --st-ruins: #e2a660;
-  --st-special: #d089e2;
+  --st-inhabited: #6fc795;
+  --st-wild: #79a8d8;
+  --st-ruins: #d99a52;
+  --st-special: #c08fd0;
   --font-serif: 'EB Garamond', Georgia, 'Times New Roman', serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
