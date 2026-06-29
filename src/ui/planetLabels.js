@@ -7,6 +7,10 @@
 import * as THREE from 'three';
 import { planetLabel, planetMiniDesc, planetAccent, planetStatusIcon, structureCard } from './hud.js';
 
+// every label sub/mini reads as a caption, so it must start with a capital —
+// the source strings ('флагман', 'форпост', 'дом цивилизации', …) come in lower-case.
+const capFirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 export class PlanetLabels {
   constructor(onPick) {
     this.onPick = onPick; // (kind, ref) => void
@@ -76,12 +80,12 @@ export class PlanetLabels {
     txt.appendChild(b);
     if (sub) {
       const s = document.createElement('i');
-      s.textContent = sub;
+      s.textContent = capFirst(sub);
       txt.appendChild(s);
     }
     if (mini) {
       const m = document.createElement('small');
-      m.textContent = mini;
+      m.textContent = capFirst(mini);
       txt.appendChild(m);
     }
     el.append(pin, txt);

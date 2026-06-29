@@ -443,8 +443,8 @@ export class Tooltip {
     }
     const rowsHtml = rows.map(([k, v]) => `<span class="tt-k">${k}</span><span class="tt-v">${v}</span>`).join('');
     const teaser = visited
-      ? '<div class="tt-teaser tt-seen">✓ исследована · открыть снова</div>'
-      : '<div class="tt-teaser">нажмите, чтобы исследовать →</div>';
+      ? '<div class="tt-teaser tt-seen">✓ Исследована · открыть снова</div>'
+      : '<div class="tt-teaser">Нажмите, чтобы исследовать →</div>';
     // special encounters read magenta with a ✦; otherwise the status palette
     const color = data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status] || '#aab0e0';
     const mark = data.special ? '✦ ' : '';

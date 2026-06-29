@@ -444,8 +444,8 @@ class GalaxyApp {
     this.canvas.style.cursor = 'default';
     // settings belong to the galaxy view only — hide the ⚙ + close the panel
     if (this._settingsBtn) this._settingsBtn.style.display = 'none';
-    // the «Флот и станции» gallery link shares the bottom-left corner with the
-    // cinematic panel — hide it inside a system so they never overlap.
+    // the «Флот и станции» link lives next to the ⚙ — both are galaxy-only, so
+    // hide it inside a system (the facts box owns the top-right corner there).
     if (this._galleryLink) this._galleryLink.style.display = 'none';
     this.gui.hide();
     this._settingsOpen = false;
