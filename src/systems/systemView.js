@@ -480,33 +480,44 @@ export class SystemView {
     return best;
   }
 
-  /** Dolly the camera in to a clicked planet and then follow it on its orbit (#6). */
-  focusPlanet(planet) {
-    this.focusObject(planet.body, planet.data.radius);
-  }
-
-  /** Generalised focus (#6): dolly-in + follow ANY moving object — a planet, a
-   *  ship (flagship) or an orbital structure. `radius` sizes the camera approach;
-   *  `reticleRadius` (defaults to `radius`) sizes the on-screen ranging bracket —
-   *  decoupled so an elongated ship can be approached wide but bracketed tight (#19). */
-  focusObject(obj, radius, reticleRadius = radius) {
+  /** Generalised focus (#6): dolly-in + follow ANY object. `dist` is the absolute
+   *  camera distance (computed by the caller from focusConfig); `reticleRadius`
+   *  sizes the on-screen ranging bracket. */
+  focusObject(obj, dist, reticleRadius) {
     obj.getWorldPosition(_fp);
-    this.controls.minDistance = Math.max(0.18, radius * 0.9);
-    this.controls.maxDistance = radius * 40 + 12;
+    this.controls.minDistance = Math.max(0.18, dist * 0.45);
+    this.controls.maxDistance = dist * 9 + 12;
     this._focus = {
       obj,
-      radius, // approach distance basis
       reticleRadius, // used by the ranging reticle to bracket the object on screen
       entering: true,
       t: 0,
       dur: 0.95, // a touch slower → more cinematic approach
-      dist: radius * 2.4 + 0.5, // ≈3× the object radius — fills the frame, not far
-
+      dist,
       fromPos: this.camera.position.clone(),
       fromTarget: this.controls.target.clone(),
       lastPos: _fp.clone(),
     };
     this.controls.enabled = false; // re-enabled once the dolly-in finishes
+  }
+
+  /** Instantly complete the current focus dolly — used by the cinematic show,
+   *  which fades to black and cuts to the framed object instead of flying (#cine). */
+  snapFocus() {
+    const f = this._focus;
+    if (!f) return;
+    f.obj.getWorldPosition(_fp);
+    _fd.copy(f.fromPos).sub(f.fromTarget);
+    if (_fd.lengthSq() < 1e-6) _fd.set(0, 0.4, 1);
+    _fd.normalize();
+    _ftmp.copy(_fp).addScaledVector(_fd, f.dist);
+    this.camera.position.copy(_ftmp);
+    this.controls.target.copy(_fp);
+    this.camera.lookAt(this.controls.target);
+    f.lastPos.copy(_fp);
+    f.entering = false;
+    f.t = 1;
+    this.controls.enabled = true;
   }
 
   /** Return from a planet focus to the system overview (#6). */
