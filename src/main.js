@@ -313,6 +313,13 @@ class GalaxyApp {
       hide();
       return;
     }
+    // the reticle + its callout belong to the on-scene HUD layer: the «clean
+    // scene» (mode 1) and «cinematic» (mode 2) turn them off — only mode 0 keeps
+    // them (#18). The label-toggle button thus clears the brackets too.
+    if (this._viewMode !== 0) {
+      hide();
+      return;
+    }
     const cam = sv.camera;
     const c = new THREE.Vector3();
     f.obj.getWorldPosition(c);
