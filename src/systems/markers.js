@@ -280,10 +280,13 @@ export class Systems {
     return this.config.rotationSpeed;
   }
 
-  update(time, camera) {
+  /** `rotTime` is the freezable galaxy-spin clock (markers rotate with the disk
+   *  and FREEZE on interaction); `pulseTime` is the always-running clock, so the
+   *  "uncharted" markers keep breathing even when the disk is held still (#10). */
+  update(rotTime, pulseTime, camera) {
     if (!this.group.visible) return; // markers hidden -> skip the CPU work
     for (const s of this.list) {
-      const a = this._omega(s.r) * time;
+      const a = this._omega(s.r) * rotTime;
       const ca = Math.cos(a);
       const sa = Math.sin(a);
       // MUST match the suns/galaxy vertex shader `mat2(c,-s,s,c) * p.xz`,
@@ -305,10 +308,12 @@ export class Systems {
       // disk. Unexplored ones pulse a little; explored ones dim only slightly so
       // they're still distinguishable.
       const seen = s.visited;
-      // "event" objects pulse harder to read as a special encounter on the map
-      const amp = s.data && s.data.event ? 0.24 : seen ? 0.05 : 0.12;
-      const pulse = 1 + amp * Math.sin(time * 2.0 + s.index * 0.7);
-      const base = s.special ? s.baseScale : seen ? 3.7 : 4.4;
+      // "event" objects pulse harder to read as a special encounter on the map;
+      // uncharted markers breathe noticeably to invite a click (#11). Pulse is on
+      // the always-running clock, so it never freezes with the disk (#10).
+      const amp = s.data && s.data.event ? 0.26 : seen ? 0.05 : 0.2;
+      const pulse = 1 + amp * Math.sin(pulseTime * 2.0 + s.index * 0.7);
+      const base = s.special ? s.baseScale : seen ? 4.6 : 5.6;
       s.sprite.scale.setScalar(base * pulse);
       s.sprite.material.opacity = seen ? 0.82 : 1.0;
     }
@@ -337,6 +342,23 @@ export class Systems {
       localStorage.setItem(this._visitedKey(), JSON.stringify([...this._visitedSet]));
     } catch (e) {
       /* storage unavailable — discovery just won't persist this session */
+    }
+  }
+
+  /** Chart EVERY system at once (#13) — inks all markers to their status colour
+   *  and persists. Skips the central black-hole void (it has no status). */
+  markAllVisited() {
+    if (!this._visitedSet) this._visitedSet = new Set();
+    for (const s of this.list) {
+      if (s.noFade) continue; // the galactic-core void isn't a chartable system
+      s.visited = true;
+      if (s.sprite && s.statusColor) s.sprite.material.color.set(s.statusColor);
+      this._visitedSet.add(s.index);
+    }
+    try {
+      localStorage.setItem(this._visitedKey(), JSON.stringify([...this._visitedSet]));
+    } catch (e) {
+      /* storage unavailable — reveal just won't persist this session */
     }
   }
 
@@ -377,18 +399,34 @@ function getMarkerTexture() {
   const cx = size / 2;
   const cy = size / 2;
 
-  // Cartographer marker: a thin hairline RING with a transparent centre + a tiny
-  // core tick — an "uncharted star-chart" mark. Tinted by the sprite material
-  // (ivory = uncharted, status colour = charted), so one texture serves all states.
-  ctx.lineWidth = size * 0.04;
+  // Cartographer survey-mark: a ring + a four-point crosshair reticle + a centre
+  // dot — an "uncharted star-chart" mark that reads clearly and invites a click
+  // (#11). Tinted by the sprite material (ivory = uncharted, status colour =
+  // charted), so one texture serves every state.
   ctx.strokeStyle = 'rgba(255,255,255,1)';
+  ctx.lineCap = 'round';
+  // main ring
+  ctx.lineWidth = size * 0.05;
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.4, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.32, 0, Math.PI * 2);
   ctx.stroke();
-  // faint centre tick
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  // four crosshair ticks just outside the ring (N / E / S / W)
+  ctx.lineWidth = size * 0.045;
+  const rIn = size * 0.36;
+  const rOut = size * 0.47;
+  for (let k = 0; k < 4; k++) {
+    const ang = (k / 4) * Math.PI * 2;
+    const dx = Math.cos(ang);
+    const dy = Math.sin(ang);
+    ctx.beginPath();
+    ctx.moveTo(cx + dx * rIn, cy + dy * rIn);
+    ctx.lineTo(cx + dx * rOut, cy + dy * rOut);
+    ctx.stroke();
+  }
+  // centre dot
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.05, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.06, 0, Math.PI * 2);
   ctx.fill();
 
   _markerTex = new THREE.CanvasTexture(canvas);

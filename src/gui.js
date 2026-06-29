@@ -35,6 +35,14 @@ export function buildGUI(app) {
   };
   gui.add(seedActions, 'random').name('🎲 Новый сид');
 
+  // chart every system at once — turns off the fog-of-war discovery (#13)
+  const chartActions = {
+    revealAll() {
+      app.revealAllSystems();
+    },
+  };
+  gui.add(chartActions, 'revealAll').name('✦ Открыть все системы');
+
   // --- shape (structural) ---
   const fShape = gui.addFolder('Форма');
   fShape.add(c, 'starCount', 5000, 200000, 1000).name('Звёзды').onFinishChange(rebuild);

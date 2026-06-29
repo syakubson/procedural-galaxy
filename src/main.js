@@ -390,6 +390,12 @@ class GalaxyApp {
     this.legend.setProgress(n, list.length);
   }
 
+  /** Chart every system at once (#13) — fog-of-war off; refreshes the counter. */
+  revealAllSystems() {
+    this.systems.markAllVisited();
+    this._updateProgress();
+  }
+
   /** Focus a planet + show its card (shared by canvas clicks and label clicks). */
   _focusPlanet(planet) {
     this.systemView.focusPlanet(planet);
@@ -667,7 +673,8 @@ class GalaxyApp {
       // the nebula gas rides the same rotation clock as the stars — it freezes
       // on interaction with them (not the always-running _time) and stays glued.
       this.background.update(this._galaxyRotTime);
-      this.systems.update(this._galaxyRotTime, this.camera);
+      // markers rotate on the freezable clock but pulse on the always-on one (#10)
+      this.systems.update(this._galaxyRotTime, this._time, this.camera);
       if (this.mode === 'galaxy') this._processHover();
       if (this._galaxyDolly) {
         this._stepGalaxyDolly(dt); // #9: warp flight in/out — bypass controls
