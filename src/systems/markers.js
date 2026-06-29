@@ -32,11 +32,17 @@ const STATUS_COLOR = {
 // magenta — hand-crafted easter-egg systems (#13/#19/#20), marked distinctly
 const SPECIAL_COLOR = '#d98ae8';
 
-// uncharted marker tint — a cool, bright hairline reticle (NOT the old yellowish
-// ivory, which washed out); inks into a solid charted marker on discovery.
-const UNCHARTED_COLOR = '#dfe6f5';
+// uncharted marker tint — warm ivory, matching the cartographer chrome (the
+// hollow «survey ring»); inks into a solid charted disc on discovery.
+const UNCHARTED_COLOR = '#e7dcbe';
+
+// hover accent — bright brass, the UI's interaction colour. A hovered marker
+// grows and tints toward this so the pointer target is unmistakable (#1).
+const HOVER_COLOR = '#e7c074';
 
 const _v = new THREE.Vector3();
+const _hoverCol = new THREE.Color(HOVER_COLOR);
+const _col = new THREE.Color();
 
 export class Systems {
   constructor(config) {
@@ -44,6 +50,7 @@ export class Systems {
     this.group = new THREE.Group();
     this.sprites = [];
     this.list = [];
+    this._hovered = null; // the marker currently under the pointer (#1)
     this._build();
   }
 
@@ -52,12 +59,16 @@ export class Systems {
     const rng = createRng(c.seed + '::systems');
     const radius = c.radius;
     const count = Math.max(1, Math.round(c.sunCount * c.realSystemFraction));
-    const tex = getMarkerTexture();
+    const ringTex = getRingTexture(); // uncharted: hollow survey ring
+    const discTex = getDiscTexture(); // charted: filled status disc (tinted)
 
     // keep markers from piling on top of each other so every system is easy to
-    // click (#12), and place them clear of the central black hole (#21).
+    // click (#12/#3) and never visually overlap, and clear of the central black
+    // hole (#21). Specials reuse this list so they respect the same gap.
     const placed = [];
-    const minSep = radius * 0.075; // larger gap so systems don't pile up on screen
+    const minSep = radius * 0.12; // wider gap so systems never crowd on screen (#3)
+    this._placed = placed;
+    this._minSep = minSep;
     this._visitedSet = this._loadVisited(); // charted systems persist across reloads
     let inhabIdx = 0; // round-robins factions across inhabited systems (#24)
     for (let i = 0; i < count; i++) {
@@ -95,15 +106,18 @@ export class Systems {
 
       const visited = this._visitedSet.has(i);
       const statusColor = STATUS_COLOR[data.status] || UNCHARTED_COLOR;
+      // both icons are baked WHITE and tinted by material.color, so the hover
+      // highlight can blend the resting colour → brass with a single lerp (#1).
+      const restColor = visited ? statusColor : UNCHARTED_COLOR;
       const mat = new THREE.SpriteMaterial({
-        // uncharted → hollow reticle (tinted); charted → a solid colour diamond
-        // with a dark outline (a DIFFERENT icon, not just a recolour)
-        map: visited ? getChartedTexture(statusColor) : tex,
-        color: new THREE.Color(visited ? '#ffffff' : UNCHARTED_COLOR),
+        // uncharted → hollow survey ring; charted → a filled status disc with a
+        // dark rim (a DIFFERENT icon, not just a recolour)
+        map: visited ? discTex : ringTex,
+        color: new THREE.Color(restColor),
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        // NormalBlending (default): a bright, OPAQUE icon that never washes out
+        // NormalBlending (default): a crisp, OPAQUE icon that never washes out
         // against the bright bulge and always reads on top (#12)
       });
       const sprite = new THREE.Sprite(mat);
@@ -119,6 +133,8 @@ export class Systems {
         worldPos: new THREE.Vector3(),
         visited,
         statusColor,
+        _restCol: new THREE.Color(restColor),
+        _hov: 0,
       };
       sprite.userData.system = entry; // fast pick, no array scan
 
@@ -138,7 +154,7 @@ export class Systems {
       new THREE.Vector3(Math.cos(ia) * ir, 0, Math.sin(ia) * ir),
       generateInterstellar(),
       SPECIAL_COLOR,
-      5.4,
+      4.8,
     );
 
     // hand-crafted easter-egg systems (#13/#19/#20), pinned on the arms
@@ -149,8 +165,8 @@ export class Systems {
     };
     // one distinct colour for ALL easter-egg systems so they read as "special"
     const SPECIAL = SPECIAL_COLOR;
-    this._addSpecialSystem(eggPos(2, 0.5), generateSolarSystem(), SPECIAL, 5.2);
-    this._addSpecialSystem(eggPos(4, 0.72), generateDeadSpace(), SPECIAL, 5.0);
+    this._addSpecialSystem(eggPos(2, 0.5), generateSolarSystem(), SPECIAL, 4.7);
+    this._addSpecialSystem(eggPos(4, 0.72), generateDeadSpace(), SPECIAL, 4.6);
     const filmSpots = [
       [0, 0.46],
       [1, 0.62],
@@ -158,12 +174,12 @@ export class Systems {
       [2, 0.78],
     ];
     generateFilmWorlds().forEach((data, k) => {
-      this._addSpecialSystem(eggPos(filmSpots[k][0], filmSpots[k][1]), data, SPECIAL, 4.8);
+      this._addSpecialSystem(eggPos(filmSpots[k][0], filmSpots[k][1]), data, SPECIAL, 4.5);
     });
 
     // the "Death Star" system (#12), pinned on its own arm — a special encounter,
     // marked magenta like the other special systems (#особые)
-    this._addSpecialSystem(eggPos(5, 0.42), generateDeathStar(), SPECIAL, 5.2);
+    this._addSpecialSystem(eggPos(5, 0.42), generateDeathStar(), SPECIAL, 4.7);
   }
 
   // The galactic-centre black hole: a fully-opaque BLACK disk that punches a
@@ -247,10 +263,12 @@ export class Systems {
   // excluded from the discovery counter (it's a bonus find).
   _addSpecialSystem(base, data, color, scale) {
     const idx = this.list.length;
+    const pos = this._avoidOverlap(base.clone()); // keep clear of other markers (#3)
     const visited = this._visitedSet ? this._visitedSet.has(idx) : false;
+    const restColor = visited ? color : UNCHARTED_COLOR;
     const mat = new THREE.SpriteMaterial({
-      map: visited ? getChartedTexture(color) : getMarkerTexture(),
-      color: new THREE.Color(visited ? '#ffffff' : UNCHARTED_COLOR),
+      map: visited ? getDiscTexture() : getRingTexture(),
+      color: new THREE.Color(restColor),
       transparent: true,
       depthWrite: false,
       depthTest: false,
@@ -260,8 +278,8 @@ export class Systems {
     sprite.renderOrder = 8;
     const entry = {
       index: idx,
-      base: base.clone(),
-      r: Math.hypot(base.x, base.z),
+      base: pos,
+      r: Math.hypot(pos.x, pos.z),
       data,
       sprite,
       worldPos: new THREE.Vector3(),
@@ -269,6 +287,8 @@ export class Systems {
       baseScale: scale,
       visited,
       statusColor: color,
+      _restCol: new THREE.Color(restColor),
+      _hov: 0,
     };
     sprite.userData.system = entry;
     this.group.add(sprite);
@@ -307,19 +327,48 @@ export class Systems {
         continue;
       }
 
-      // Markers stay BRIGHT and OPAQUE at any distance (#12) — no fading into the
-      // disk. Unexplored ones pulse a little; explored ones dim only slightly so
-      // they're still distinguishable.
+      // Markers stay BRIGHT, OPAQUE and STEADY at any distance (#12). No pulsing
+      // any more (#1) — 80 breathing icons were noise. The ONLY motion is the
+      // hover highlight: the marker eases up in size and tints toward brass while
+      // it's the one under the pointer, so a hovered system is unmistakable.
       const seen = s.visited;
-      // "event" objects pulse harder to read as a special encounter on the map;
-      // uncharted markers breathe noticeably to invite a click (#11). Pulse is on
-      // the always-running clock, so it never freezes with the disk (#10).
-      const amp = s.data && s.data.event ? 0.26 : seen ? 0.05 : 0.2;
-      const pulse = 1 + amp * Math.sin(pulseTime * 2.0 + s.index * 0.7);
-      const base = s.special ? s.baseScale : seen ? 4.6 : 5.6;
-      s.sprite.scale.setScalar(base * pulse);
-      s.sprite.material.opacity = seen ? 0.82 : 1.0;
+      const isHover = s === this._hovered;
+      s._hov += ((isHover ? 1 : 0) - s._hov) * 0.25; // smooth grow/shrink (interruptible)
+      const base = s.special ? s.baseScale : seen ? 4.0 : 4.4;
+      s.sprite.scale.setScalar(base * (1 + 0.42 * s._hov));
+      s.sprite.material.opacity = seen ? 0.95 : 1.0;
+      // resting colour → brass, blended by the hover amount
+      _col.copy(s._restCol).lerp(_hoverCol, s._hov);
+      s.sprite.material.color.copy(_col);
     }
+  }
+
+  /** Mark `entry` (or null) as the marker under the pointer so update() can grow
+   *  and brass-tint it. Called from the galaxy hover pick each frame (#1). */
+  setHovered(entry) {
+    this._hovered = entry || null;
+  }
+
+  /** Nudge `base` outward along its radial until it clears every already-placed
+   *  marker by `minSep`, then register it. Keeps the pinned special systems from
+   *  landing on top of a random one (#3). */
+  _avoidOverlap(base) {
+    const placed = this._placed;
+    const minSep = this._minSep;
+    if (!placed) return base;
+    const dir = new THREE.Vector3(base.x, 0, base.z);
+    if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0);
+    dir.normalize();
+    let tries = 0;
+    while (
+      tries < 24 &&
+      placed.some((p) => (p.x - base.x) ** 2 + (p.z - base.z) ** 2 < minSep * minSep)
+    ) {
+      base.addScaledVector(dir, minSep * 0.5);
+      tries++;
+    }
+    placed.push({ x: base.x, z: base.z });
+    return base;
   }
 
   _visitedKey() {
@@ -338,9 +387,10 @@ export class Systems {
   markVisited(entry) {
     entry.visited = true;
     if (entry.sprite && entry.statusColor) {
-      entry.sprite.material.map = getChartedTexture(entry.statusColor);
-      entry.sprite.material.color.set('#ffffff');
+      entry.sprite.material.map = getDiscTexture();
+      entry.sprite.material.color.set(entry.statusColor);
       entry.sprite.material.needsUpdate = true;
+      if (entry._restCol) entry._restCol.set(entry.statusColor);
     }
     if (!this._visitedSet) this._visitedSet = new Set();
     this._visitedSet.add(entry.index);
@@ -359,9 +409,10 @@ export class Systems {
       if (s.noFade) continue; // the galactic-core void isn't a chartable system
       s.visited = true;
       if (s.sprite && s.statusColor) {
-        s.sprite.material.map = getChartedTexture(s.statusColor);
-        s.sprite.material.color.set('#ffffff');
+        s.sprite.material.map = getDiscTexture();
+        s.sprite.material.color.set(s.statusColor);
         s.sprite.material.needsUpdate = true;
+        if (s._restCol) s._restCol.set(s.statusColor);
       }
       this._visitedSet.add(s.index);
     }
@@ -397,11 +448,13 @@ export class Systems {
   }
 }
 
-// A soft glowing star-with-halo-ring sprite, built once and shared across all
-// Systems instances (so rebuilds never leak a CanvasTexture).
-let _markerTex = null;
-function getMarkerTexture() {
-  if (_markerTex) return _markerTex;
+// Uncharted marker — the cartographer's «survey ring»: a thin hollow ring with
+// a soft dark halo behind it (so the hairline reads on the bright bulge) and a
+// faint centre pip marking the exact plotted point. Baked WHITE and tinted by
+// the sprite material (ivory at rest, brass on hover). Built once, shared.
+let _ringTex = null;
+function getRingTexture() {
+  if (_ringTex) return _ringTex;
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -409,93 +462,69 @@ function getMarkerTexture() {
   const cx = size / 2;
   const cy = size / 2;
 
-  // Circular «target-lock» mark (round variant of the bracket reticle): four arc
-  // segments on the diagonals with open gaps at the cardinals, each ending in a
-  // small outward hook — a target frame that reads as «system, not yet locked».
-  // Tinted by the sprite material (ivory = uncharted, status colour = charted).
-  ctx.strokeStyle = 'rgba(255,255,255,1)';
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  // soft dark halo → the thin ring stays legible on the bright galactic core
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.42);
+  halo.addColorStop(0, 'rgba(6,8,16,0.42)');
+  halo.addColorStop(1, 'rgba(6,8,16,0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, size, size);
+
+  // the hollow ring itself
   ctx.lineWidth = size * 0.05;
-  const R = size * 0.33;
-  const hook = size * 0.085;
-  const half = Math.PI * 0.2; // each arc ≈ 72°, gaps ≈ 18° at N/E/S/W
-  for (let k = 0; k < 4; k++) {
-    const a = Math.PI * 0.25 + k * (Math.PI / 2); // arcs centred on the diagonals
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, a - half, a + half);
-    ctx.stroke();
-    // a short outward hook at each arc end (the «bracket» feel from the ref)
-    for (const e of [a - half, a + half]) {
-      const dx = Math.cos(e);
-      const dy = Math.sin(e);
-      ctx.beginPath();
-      ctx.moveTo(cx + dx * R, cy + dy * R);
-      ctx.lineTo(cx + dx * (R + hook), cy + dy * (R + hook));
-      ctx.stroke();
-    }
-  }
-  // a faint centre pip marks the exact system point
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = 'rgba(255,255,255,1)';
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.035, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.3, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // faint centre pip — the plotted position
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.04, 0, Math.PI * 2);
   ctx.fill();
 
-  _markerTex = new THREE.CanvasTexture(canvas);
-  _markerTex.colorSpace = THREE.SRGBColorSpace;
-  return _markerTex;
+  _ringTex = new THREE.CanvasTexture(canvas);
+  _ringTex.colorSpace = THREE.SRGBColorSpace;
+  return _ringTex;
 }
 
-// Charted marker — a DIFFERENT icon from the uncharted reticle: a solid colour
-// diamond with a dark outline + a soft dark halo, so a discovered system reads at
-// a glance and pops against the bright disk. The colour is baked in (one cached
-// texture per status colour), so the sprite is drawn with a white tint.
-const _chartedCache = {};
-function getChartedTexture(color) {
-  if (_chartedCache[color]) return _chartedCache[color];
+// Charted marker — a DIFFERENT icon from the survey ring: a filled disc with a
+// dark rim + a soft dark halo, so a discovered system reads as a solid catalogued
+// point. Baked WHITE (NOT per-colour), tinted by the sprite material to the
+// status colour — so the hover highlight can blend it toward brass in one lerp.
+let _discTex = null;
+function getDiscTexture() {
+  if (_discTex) return _discTex;
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const cx = size / 2;
   const cy = size / 2;
-  const r = size * 0.3;
+  const r = size * 0.27;
 
-  // soft dark halo → separates the marker from any background it sits on
+  // soft dark halo → separates the disc from any background it sits on
   const halo = ctx.createRadialGradient(cx, cy, size * 0.08, cx, cy, size * 0.46);
-  halo.addColorStop(0, 'rgba(6,7,14,0.62)');
+  halo.addColorStop(0, 'rgba(6,7,14,0.6)');
   halo.addColorStop(1, 'rgba(6,7,14,0)');
   ctx.fillStyle = halo;
   ctx.fillRect(0, 0, size, size);
 
-  const diamond = () => {
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - r);
-    ctx.lineTo(cx + r, cy);
-    ctx.lineTo(cx, cy + r);
-    ctx.lineTo(cx - r, cy);
-    ctx.closePath();
-  };
-  // solid status-colour fill
-  diamond();
-  ctx.fillStyle = color;
-  ctx.fill();
-  // crisp dark outline for contrast
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = size * 0.05;
-  ctx.strokeStyle = 'rgba(9,11,20,0.9)';
-  diamond();
-  ctx.stroke();
-  // bright inner highlight
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  // solid white fill (tinted to the status colour by material.color)
+  ctx.fillStyle = 'rgba(255,255,255,1)';
   ctx.beginPath();
-  ctx.arc(cx, cy, size * 0.058, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
 
-  const t = new THREE.CanvasTexture(canvas);
-  t.colorSpace = THREE.SRGBColorSpace;
-  _chartedCache[color] = t;
-  return t;
+  // crisp dark rim for contrast against the disc colour
+  ctx.lineWidth = size * 0.05;
+  ctx.strokeStyle = 'rgba(9,11,20,0.92)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  _discTex = new THREE.CanvasTexture(canvas);
+  _discTex.colorSpace = THREE.SRGBColorSpace;
+  return _discTex;
 }
 
 // Marker for black-hole objects: a dark core punched out + a bright ring.
