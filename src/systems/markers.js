@@ -21,19 +21,20 @@ import {
 
 const TAU = Math.PI * 2;
 
-// muted-jewel status palette, harmonised with the brass accent (#16)
+// vivid status palette — bright enough to read against the busy disk; the
+// charted markers also carry a dark outline, so they pop on any background.
 const STATUS_COLOR = {
-  inhabited: '#6fc795', // jade — alive
-  ruins: '#d99a52', // copper — dead
-  wild: '#79a8d8', // sapphire — untouched
+  inhabited: '#5fe0a0', // jade — alive
+  ruins: '#f0a24e', // amber — dead
+  wild: '#74c4f2', // sky-blue — untouched
 };
 
-// amethyst — hand-crafted easter-egg systems (#13/#19/#20), marked distinctly
-const SPECIAL_COLOR = '#c08fd0';
+// magenta — hand-crafted easter-egg systems (#13/#19/#20), marked distinctly
+const SPECIAL_COLOR = '#d98ae8';
 
-// uncharted marker tint — a faint ivory hairline ring, no status colour leaked,
-// until the system is discovered (then it "inks in" to its status colour).
-const UNCHARTED_COLOR = '#e2d9be';
+// uncharted marker tint — a cool, bright hairline reticle (NOT the old yellowish
+// ivory, which washed out); inks into a solid charted marker on discovery.
+const UNCHARTED_COLOR = '#dfe6f5';
 
 const _v = new THREE.Vector3();
 
@@ -95,9 +96,10 @@ export class Systems {
       const visited = this._visitedSet.has(i);
       const statusColor = STATUS_COLOR[data.status] || UNCHARTED_COLOR;
       const mat = new THREE.SpriteMaterial({
-        map: tex,
-        // colourless ivory until charted, then inked into its status colour
-        color: new THREE.Color(visited ? statusColor : UNCHARTED_COLOR),
+        // uncharted → hollow reticle (tinted); charted → a solid colour diamond
+        // with a dark outline (a DIFFERENT icon, not just a recolour)
+        map: visited ? getChartedTexture(statusColor) : tex,
+        color: new THREE.Color(visited ? '#ffffff' : UNCHARTED_COLOR),
         transparent: true,
         depthWrite: false,
         depthTest: false,
@@ -247,8 +249,8 @@ export class Systems {
     const idx = this.list.length;
     const visited = this._visitedSet ? this._visitedSet.has(idx) : false;
     const mat = new THREE.SpriteMaterial({
-      map: getMarkerTexture(),
-      color: new THREE.Color(visited ? color : UNCHARTED_COLOR),
+      map: visited ? getChartedTexture(color) : getMarkerTexture(),
+      color: new THREE.Color(visited ? '#ffffff' : UNCHARTED_COLOR),
       transparent: true,
       depthWrite: false,
       depthTest: false,
@@ -331,11 +333,14 @@ export class Systems {
       return new Set();
     }
   }
-  /** Chart a system: persist it + "ink" its marker from ivory to its status colour. */
+  /** Chart a system: persist it + swap its marker from the hollow reticle to the
+   *  solid status diamond (a different icon, not just a recolour). */
   markVisited(entry) {
     entry.visited = true;
     if (entry.sprite && entry.statusColor) {
-      entry.sprite.material.color.set(entry.statusColor);
+      entry.sprite.material.map = getChartedTexture(entry.statusColor);
+      entry.sprite.material.color.set('#ffffff');
+      entry.sprite.material.needsUpdate = true;
     }
     if (!this._visitedSet) this._visitedSet = new Set();
     this._visitedSet.add(entry.index);
@@ -353,7 +358,11 @@ export class Systems {
     for (const s of this.list) {
       if (s.noFade) continue; // the galactic-core void isn't a chartable system
       s.visited = true;
-      if (s.sprite && s.statusColor) s.sprite.material.color.set(s.statusColor);
+      if (s.sprite && s.statusColor) {
+        s.sprite.material.map = getChartedTexture(s.statusColor);
+        s.sprite.material.color.set('#ffffff');
+        s.sprite.material.needsUpdate = true;
+      }
       this._visitedSet.add(s.index);
     }
     try {
@@ -435,6 +444,58 @@ function getMarkerTexture() {
   _markerTex = new THREE.CanvasTexture(canvas);
   _markerTex.colorSpace = THREE.SRGBColorSpace;
   return _markerTex;
+}
+
+// Charted marker — a DIFFERENT icon from the uncharted reticle: a solid colour
+// diamond with a dark outline + a soft dark halo, so a discovered system reads at
+// a glance and pops against the bright disk. The colour is baked in (one cached
+// texture per status colour), so the sprite is drawn with a white tint.
+const _chartedCache = {};
+function getChartedTexture(color) {
+  if (_chartedCache[color]) return _chartedCache[color];
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.3;
+
+  // soft dark halo → separates the marker from any background it sits on
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.08, cx, cy, size * 0.46);
+  halo.addColorStop(0, 'rgba(6,7,14,0.62)');
+  halo.addColorStop(1, 'rgba(6,7,14,0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, size, size);
+
+  const diamond = () => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r, cy);
+    ctx.closePath();
+  };
+  // solid status-colour fill
+  diamond();
+  ctx.fillStyle = color;
+  ctx.fill();
+  // crisp dark outline for contrast
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = size * 0.05;
+  ctx.strokeStyle = 'rgba(9,11,20,0.9)';
+  diamond();
+  ctx.stroke();
+  // bright inner highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.058, 0, Math.PI * 2);
+  ctx.fill();
+
+  const t = new THREE.CanvasTexture(canvas);
+  t.colorSpace = THREE.SRGBColorSpace;
+  _chartedCache[color] = t;
+  return t;
 }
 
 // Marker for black-hole objects: a dark core punched out + a bright ring.
