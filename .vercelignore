@@ -1,0 +1,7 @@
+# Not part of the deployed site — dev docs, QA screenshots, render scripts.
+docs
+shots
+scripts
+*.md
+*.py
+.gitignore

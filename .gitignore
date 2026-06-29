@@ -3,3 +3,6 @@ node_modules/
 *.log
 .playwright-*/
 scratchpad/
+
+# Vercel link (machine-specific project/org ids)
+.vercel
