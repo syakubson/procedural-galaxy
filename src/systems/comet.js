@@ -112,22 +112,28 @@ export class Comet {
     this._spawn();
   }
 
-  /** Place the comet far out and aim it on a straight crossing of the system. */
+  /** Place the comet far out and aim it on a chord that sails PAST the star —
+   *  never through the system centre. We pick the closest-approach point
+   *  (perihelion) at a safe distance, then fly perpendicular to it so that point
+   *  IS the nearest the comet ever gets to the star. */
   _spawn() {
     const rng = this._rng;
     const reach = this.reach;
-    const dir = new THREE.Vector3(rng.gauss(), rng.gauss() * 0.5, rng.gauss());
-    if (dir.lengthSq() < 1e-4) dir.set(1, 0, 0);
-    dir.normalize();
-    this._pos.copy(dir).multiplyScalar(reach * 1.6);
-    // #5: aim at an ARBITRARY point across the system (not the centre), so the
-    // comet drifts past on a random chord instead of always diving at the star.
-    const aim = new THREE.Vector3(
-      (rng.next() - 0.5) * 2.0,
-      (rng.next() - 0.5) * 1.2,
-      (rng.next() - 0.5) * 2.0,
-    ).multiplyScalar(reach * 0.9);
-    this._vel.copy(aim).sub(this._pos).normalize().multiplyScalar(this.speed);
+    const minMiss = Math.max(reach * 0.4, 4.5); // never closer to the star than this
+
+    // perihelion: a random point at a safe distance, mostly in the disk plane
+    const peri = new THREE.Vector3(rng.gauss(), rng.gauss() * 0.35, rng.gauss());
+    if (peri.lengthSq() < 1e-4) peri.set(1, 0, 0);
+    peri.normalize().multiplyScalar(minMiss + rng.next() * reach * 0.4);
+
+    // velocity ⊥ to the perihelion radius → perihelion is the closest approach
+    const vdir = new THREE.Vector3(rng.gauss(), rng.gauss() * 0.35, rng.gauss());
+    vdir.addScaledVector(peri, -vdir.dot(peri) / peri.lengthSq()); // strip radial part
+    if (vdir.lengthSq() < 1e-4) vdir.set(-peri.z, 0, peri.x); // fallback perpendicular
+    vdir.normalize();
+
+    this._pos.copy(peri).addScaledVector(vdir, -reach * 1.6); // start far out, before perihelion
+    this._vel.copy(vdir).multiplyScalar(this.speed);
     this.group.position.copy(this._pos);
   }
 
