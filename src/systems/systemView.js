@@ -11,6 +11,7 @@ import { Planet } from './planet.js';
 import { BlackHole } from './blackHole.js';
 import { Endurance } from './endurance.js';
 import { DeathStar } from './deathStar.js';
+import { Ishimura } from './ishimura.js';
 import { ROLES, buildShip, getFaction } from './ships.js';
 import { Comet } from './comet.js';
 
@@ -155,6 +156,12 @@ export class SystemView {
         else type = pick(transport);
         this.ships.push(this._spawnShip(type));
       }
+      // #H: attach this system's named flagship + its unique story to the ship
+      const flag = this.ships.find((s) => s.type && s.type.cat === 'flagship');
+      if (flag && data.flagship) {
+        flag.name = data.flagship.name;
+        flag.lore = data.flagship.lore;
+      }
     }
 
     // --- comets on long eccentric orbits (#13) ---
@@ -173,7 +180,77 @@ export class SystemView {
       }
     }
 
+    // #10: an in-system battle station (the Death Star, beside a destroyed world)
+    if (data.deathStar) {
+      const placed = this._buildDeathStarObject(data);
+      maxOrbit = Math.max(maxOrbit, placed + data.deathStar.radius);
+    }
+
+    // #5: the USG Ishimura hovers over a planet, cracking its crust
+    const ishIdx = data.planets.findIndex((p) => p.ishimura);
+    if (ishIdx >= 0) this._buildIshimura(ishIdx);
+
     this._frame(maxOrbit, starR);
+  }
+
+  /** Build the USG Ishimura hovering over a planet, holding a torn-off crust
+   *  chunk in its tether beam (#5). It follows the planet on its orbit. */
+  _buildIshimura(planetIdx) {
+    // MeshStandard hull needs lights (reuse the same slots the Death Star uses;
+    // only one special object exists per system, and clear() disposes both).
+    this._dsLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    this._dsLight.position.set(5, 8, 4);
+    this._dsAmbient = new THREE.AmbientLight(0x40383a, 1.1);
+    this.scene.add(this._dsLight, this._dsAmbient);
+
+    const planet = this.planets[planetIdx];
+    const pr = planet.data.radius;
+    const ish = new Ishimura(pr * 0.5); // a small ship next to the planet
+    ish.addTo(this.scene);
+    this.ishimura = ish;
+    this._ishFollow = { idx: planetIdx, offset: new THREE.Vector3(pr * 1.4, pr * 1.7, 0) };
+    ish.group.userData.pickKind = 'ishimura';
+    ish.group.userData.pickRef = planet;
+    this._planetPos(planetIdx, ish.group.position);
+    ish.group.position.add(this._ishFollow.offset);
+  }
+
+  /** Build the Death Star inside a star system (#10): a small moon-sized station
+   *  (smaller than the planets) that ORBITS the star, near the destroyed
+   *  Alderaan. Returns its orbit radius so load() can widen the framing. */
+  _buildDeathStarObject(data) {
+    // the MeshStandard hull needs real lights (planets use custom shaders, so the
+    // system view has none) — add a key + ambient, as the standalone view did.
+    this._dsLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    this._dsLight.position.set(6, 7, 8);
+    this._dsAmbient = new THREE.AmbientLight(0x484c56, 1.0);
+    this.scene.add(this._dsLight, this._dsAmbient);
+
+    const R = data.deathStar.radius || 0.6;
+    const ds = new DeathStar(R); // keeps its slow ominous spin (no beam now)
+    ds.addTo(this.scene);
+    this.deathStar = ds;
+    ds.group.userData.pickKind = 'deathstar';
+    ds.group.userData.pickRef = data;
+
+    // orbit the star alongside the obliterated Alderaan (same orbit, slight lead)
+    const a = data.planets.find((p) => p.obliterated) || data.planets[0] || { orbit: 12, phase: 0, angularSpeed: 0.1 };
+    this._dsOrbit = {
+      radius: a.orbit + R * 2.2,
+      angle: (a.phase || 0) + 0.32,
+      speed: a.angularSpeed || 0.08,
+      y: a.orbit * 0.05,
+    };
+    this._stepDeathStarOrbit(0);
+    return this._dsOrbit.radius;
+  }
+
+  /** Advance the Death Star along its orbit and place it (#10). */
+  _stepDeathStarOrbit(dt) {
+    const o = this._dsOrbit;
+    if (!o || !this.deathStar) return;
+    o.angle += o.speed * dt;
+    this.deathStar.group.position.set(Math.cos(o.angle) * o.radius, o.y, Math.sin(o.angle) * o.radius);
   }
 
   _buildStar(sd, R, offsetX) {
@@ -285,16 +362,47 @@ export class SystemView {
     this.controls.minDistance = this._frameMin;
     this.controls.maxDistance = this._frameMax;
     this.controls.update();
+    // Nudge the whole view a touch to the RIGHT (cinematic composition: lore
+    // panel on the left, the star + planets on the right). A projection-space
+    // shift, NOT a world pan — so we still orbit AROUND the star, and the
+    // leftmost planets clear the panel and stay clickable. The info box is wide
+    // and on the left, so push fairly far right (#11). Cinematic mode sets this
+    // to 0 (object centred) via setBaseShift().
+    if (this.baseShift == null) this.baseShift = 0.12;
+    this._applyViewShift(this.baseShift);
     this._zoom = null;
     this._focus = null;
     this._wantControls = false;
   }
 
-  /** Raycast planets + ships; returns {kind:'planet'|'ship', ref} or null (#6/#7). */
+  /** Shift the principal point so on-screen content moves right by `frac` of the
+   *  width. `project()` and the post-FX use this matrix too, so the diegetic
+   *  planet labels track and bloom stays aligned. Re-applied on resize. */
+  _applyViewShift(frac) {
+    this._viewShiftFrac = frac;
+    const w = this._vw || window.innerWidth;
+    const h = this._vh || window.innerHeight;
+    if (frac) this.camera.setViewOffset(w, h, -w * frac, 0, w, h);
+    else this.camera.clearViewOffset();
+  }
+
+  /** Cinematic toggle (#view-mode): 0 centres the object, 0.12 makes room for
+   *  the left panel. Applied live and remembered for the next _frame(). */
+  setBaseShift(frac) {
+    this.baseShift = frac;
+    this._applyViewShift(frac);
+  }
+
+  /** Raycast planets + ships + structures; returns {kind, ref} or null (#6/#7). */
   pickObject(raycaster) {
     const targets = [];
-    for (const p of this.planets) if (p.body) targets.push(p.body);
+    for (const p of this.planets) {
+      if (p.body) targets.push(p.body);
+      if (p.station) targets.push(p.station); // orbital structures are clickable too (#6)
+    }
     for (const s of this.ships) if (s.mesh) targets.push(s.mesh);
+    if (this.deathStar) targets.push(this.deathStar.group); // the battle station (#10)
+    if (this.ishimura) targets.push(this.ishimura.group); // the Ishimura (#5)
     if (!targets.length) return null;
     const hits = raycaster.intersectObjects(targets, true);
     if (!hits.length) return null;
@@ -308,15 +416,21 @@ export class SystemView {
 
   /** Dolly the camera in to a clicked planet and then follow it on its orbit (#6). */
   focusPlanet(planet) {
-    planet.body.getWorldPosition(_fp);
-    this.controls.minDistance = Math.max(0.3, planet.data.radius * 1.4);
-    this.controls.maxDistance = planet.data.radius * 40 + 12;
+    this.focusObject(planet.body, planet.data.radius);
+  }
+
+  /** Generalised focus (#6): dolly-in + follow ANY moving object — a planet, a
+   *  ship (flagship) or an orbital structure. `radius` sizes the approach. */
+  focusObject(obj, radius) {
+    obj.getWorldPosition(_fp);
+    this.controls.minDistance = Math.max(0.3, radius * 1.4);
+    this.controls.maxDistance = radius * 40 + 12;
     this._focus = {
-      planet,
+      obj,
       entering: true,
       t: 0,
       dur: 0.95, // a touch slower → more cinematic approach
-      dist: planet.data.radius * 5 + 2,
+      dist: radius * 5 + 2,
       fromPos: this.camera.position.clone(),
       fromTarget: this.controls.target.clone(),
       lastPos: _fp.clone(),
@@ -338,7 +452,7 @@ export class SystemView {
 
   _updateFocus(dt) {
     const f = this._focus;
-    f.planet.body.getWorldPosition(_fp);
+    f.obj.getWorldPosition(_fp);
     if (f.entering) {
       f.t = Math.min(f.t + dt / f.dur, 1);
       const e = 1 - Math.pow(1 - f.t, 3); // easeOutCubic
@@ -432,7 +546,18 @@ export class SystemView {
     for (const m of this._starMats) if (m.uniforms) m.uniforms.uTime.value = time; // skip the glow sprite
     if (this._binary) this.starGroup.rotation.y += dt * 0.15; // the pair revolves
     if (this.blackHole) this.blackHole.update(time);
-    if (this.deathStar) this.deathStar.update(dt);
+    if (this.deathStar) {
+      this._stepDeathStarOrbit(dt); // orbit the star (#10)
+      this.deathStar.update(dt, time);
+    }
+    if (this.ishimura) {
+      // hover over the planet it's cracking (follow it on its orbit)
+      if (this._ishFollow) {
+        this._planetPos(this._ishFollow.idx, this.ishimura.group.position);
+        this.ishimura.group.position.add(this._ishFollow.offset);
+      }
+      this.ishimura.update(dt, time);
+    }
     if (this.endurance) {
       this.endurance.update(dt);
       this._endAngle += dt * 0.12;
@@ -464,7 +589,9 @@ export class SystemView {
   }
 
   _planetPos(idx, out) {
-    const m = this.planets[idx].mesh;
+    // `.body` exists for every planet (a destroyed world has a debris group, not
+    // a `.mesh`), so ships can still commute past an obliterated planet.
+    const m = this.planets[idx].body;
     m.updateWorldMatrix(true, false);
     const e = m.matrixWorld.elements;
     out.set(e[12], e[13], e[14]);
@@ -550,8 +677,11 @@ export class SystemView {
   }
 
   setSize(w, h) {
+    this._vw = w;
+    this._vh = h;
     this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    if (this._viewShiftFrac) this._applyViewShift(this._viewShiftFrac); // re-derive offset for the new size
+    else this.camera.updateProjectionMatrix();
   }
 
   clear() {
@@ -594,6 +724,17 @@ export class SystemView {
       this.scene.remove(this.deathStar.group);
       this.deathStar.dispose();
       this.deathStar = null;
+    }
+    if (this._dsBeam) {
+      this._dsBeam.geo.dispose();
+      this._dsBeam.mat.dispose();
+      this._dsBeam = null;
+    }
+    if (this.ishimura) {
+      this.scene.remove(this.ishimura.group);
+      this.ishimura.dispose();
+      this.ishimura = null;
+      this._ishFollow = null;
     }
     if (this._dsLight) {
       this.scene.remove(this._dsLight);

@@ -245,6 +245,11 @@ export class Planet {
         this.station.position.x = planet.radius * 2.7;
         this._stationPivot.add(this.station);
         this._stationSpin = this.station.userData.spin || null; // the habitat wheel
+        // make the structure clickable → focus + its own info card (#6)
+        this.stationKind = stype;
+        this.stationScale = sscale;
+        this.station.userData.pickKind = 'structure';
+        this.station.userData.pickRef = this;
       }
     }
 

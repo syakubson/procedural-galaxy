@@ -186,15 +186,19 @@ export const planetFragmentShader = /* glsl */ `
       surf *= 1.0 - 0.45 * smoothstep(0.68, 1.0, lat); // pole darkening
     }
 
-    // catastrophe crater (#11): a charred bowl that matches the vertex dent —
-    // a real depression with a dark floor, NO glowing painted ring.
+    // catastrophe crater (#11/#14): a real bowl that matches the vertex dent.
+    // The floor is scorched rust (reads as a BURN, not just shadow) and the core
+    // still glows molten from the blast — a clearly-coloured scar, added after
+    // the grey-out below so it stays vivid.
+    float craterGlow = 0.0;
     if (uDestroyed > 0.5) {
       float cd = distance(dir, CRATER_DIR);
       float crater = smoothstep(0.55, 0.12, cd);
-      surf = mix(surf, vec3(0.05, 0.045, 0.04), crater);     // charred floor
-      surf *= 1.0 - 0.32 * smoothstep(0.52, 0.2, cd);        // darker toward centre
-      // faint scorched ejecta blanket fading outward (matte, not emissive)
-      surf = mix(surf, vec3(0.12, 0.10, 0.09), smoothstep(0.62, 0.5, cd) * (1.0 - crater) * 0.5);
+      surf = mix(surf, vec3(0.20, 0.08, 0.05), crater);      // scorched rust floor
+      surf *= 1.0 - 0.28 * smoothstep(0.52, 0.2, cd);        // darker toward centre
+      // scorched ejecta blanket fading outward
+      surf = mix(surf, vec3(0.22, 0.13, 0.10), smoothstep(0.62, 0.5, cd) * (1.0 - crater) * 0.5);
+      craterGlow = smoothstep(0.30, 0.0, cd); // hot molten core
     }
 
     // --- lighting (shaped day/night terminator) ---
@@ -247,6 +251,14 @@ export const planetFragmentShader = /* glsl */ `
     if (uRuined > 0.5) {
       float g = dot(color, vec3(0.33));
       color = mix(color, vec3(g), 0.55) * 0.78;
+    }
+
+    // #14: the catastrophe crater still glows from the blast — a molten core that
+    // stays hot-coloured even after the grey-out (so it never looks like plain
+    // surface). Brightest at the very centre, fading to scorched orange.
+    if (craterGlow > 0.001) {
+      color = mix(color, vec3(0.95, 0.34, 0.12), craterGlow * 0.85);
+      color += vec3(1.0, 0.55, 0.2) * pow(craterGlow, 2.0) * 0.9; // white-hot pit
     }
 
     gl_FragColor = vec4(color, 1.0);
