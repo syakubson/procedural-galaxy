@@ -1,4 +1,41 @@
-# Galaxy Explorer
+<div align="center">
+
+<h1>🌌 Galaxy Explorer</h1>
+
+<p><em>A spiral galaxy you can fall into — spin the star disk, dive into any sun,<br>and explore the worlds and civilisations generated around it.</em></p>
+
+<p>
+  <a href="https://galaxy-lyart-one.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/%E2%96%B6_live_demo-galaxy-c8a657?style=for-the-badge&labelColor=0b0e14"></a>
+  <img alt="Three.js" src="https://img.shields.io/badge/three.js-000000?style=for-the-badge&logo=threedotjs&logoColor=white">
+  <img alt="No build step" src="https://img.shields.io/badge/build-none-2ea043?style=for-the-badge&labelColor=0b0e14">
+  <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-c8a657?style=for-the-badge&labelColor=0b0e14">
+  <a href="https://galaxy-lyart-one.vercel.app"><img alt="Deployed on Vercel" src="https://img.shields.io/badge/deployed_on-vercel-000000?style=for-the-badge&logo=vercel"></a>
+</p>
+
+<sub>Runs in your browser · no build step · no dependencies · tuned for weak PCs</sub>
+
+</div>
+
+<!--
+  ▶ DEMO VIDEO (real inline player, 60 fps).
+  GitHub only plays video hosted on its own asset store. To enable the player:
+    1. open https://github.com/syakubson/procedural-galaxy/issues/new
+    2. drag media/demo_hero.mp4 into the comment box, wait for the upload
+    3. copy the generated https://github.com/user-attachments/assets/<uuid> URL
+    4. replace the poster block below with that URL on its own line (or a <video src> tag)
+       — you can close the issue without submitting; the asset stays on GitHub's CDN.
+  Until then, the clickable poster below links straight to the live demo.
+-->
+
+<div align="center">
+  <a href="https://galaxy-lyart-one.vercel.app"><img alt="Galaxy Explorer — click to open the live galaxy" src="media/hero_poster.jpg" width="860"></a>
+  <br>
+  <sub>▶ <b><a href="https://galaxy-lyart-one.vercel.app">Open the live galaxy</a></b> — it's interactive; the clip is just a taste.</sub>
+</div>
+
+---
+
+## What it is
 
 An interactive procedural spiral galaxy in the browser, in the spirit of the **Spore**
 intro: a turning star disk, a glowing core, a gas nebula, and hundreds of coloured
@@ -11,13 +48,45 @@ entire star disk is drawn in a single draw call, and rotation, twinkle, and star
 computed on the GPU. Each frame the CPU updates exactly one number; it never iterates over
 tens of thousands of stars.
 
-<p align="center"><strong>▶ Live demo — <a href="https://galaxy-lyart-one.vercel.app">galaxy-lyart-one.vercel.app</a></strong></p>
+<div align="center">
+  <a href="https://galaxy-lyart-one.vercel.app"><img alt="Sagittarius A* — the supermassive black hole at the galactic core" src="media/gallery/blackhole.jpg" width="860"></a>
+  <br>
+  <sub><b>Sagittarius A*</b> — dive into the supermassive black hole at the galactic core: an accretion disk with Doppler boosting and a photon ring, wrapped in the brass cartographer HUD.</sub>
+</div>
 
-<p align="center">
-  <img src="media/demo.gif" alt="Galaxy Explorer demo" width="80%">
-</p>
+## Screenshots
 
-<p align="center"><sub>Looping preview (plays inline on GitHub). Full quality (1280p, 30 fps) — <a href="media/demo.mp4">watch the MP4</a>.</sub></p>
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="media/gallery/galaxy-uncharted.jpg" width="100%" alt="The galaxy, uncharted"><br>
+      <sub><b>Uncharted</b> · every explorable system is a hollow survey ring</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="media/gallery/galaxy-charted.jpg" width="100%" alt="The galaxy, fully charted"><br>
+      <sub><b>Charted</b> · visited systems become filled, status-coloured discs</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="media/gallery/planet.jpg" width="100%" alt="A habitable world with generated lore"><br>
+      <sub><b>A living world</b> · biomes, civilisation stage, and its own generated lore</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="media/gallery/endurance.jpg" width="100%" alt="The Endurance ring station at the black hole's edge"><br>
+      <sub><b>Endurance</b> · the ring station orbiting a Gargantua-style black hole</sub>
+    </td>
+  </tr>
+</table>
+
+## Highlights
+
+- 🌀 **One turning galaxy** — a procedural spiral disk, glowing bulge, and gas nebula, drawn in a single GPU draw call.
+- 🪐 **Hundreds of explorable systems** — click a marker to warp inside: a star of its class, 2–7 planets on Keplerian orbits, moons, rings, and lore.
+- 🧬 **Worlds with a story** — biomes, day/night cities, fleets, ruins, and a generated civilisation on each inhabited planet.
+- 🎲 **Deterministic from a seed** — the same seed rebuilds the same galaxy, down to the last planet.
+- 🛰️ **Hidden scenes** — Sagittarius A\*, Interstellar's Gargantua + Endurance, our Solar System, a Death Star, and more.
+- ⚡ **Runs on weak PCs** — no build step, no dependencies, no internet; rotation/twinkle/size live on the GPU.
 
 ---
 
@@ -39,8 +108,6 @@ python3 .nocache_server.py   # http://localhost:8124
 ```
 
 > Three.js and lil-gui are vendored locally in `vendor/` — **no internet needed, no build step.**
-
----
 
 System markers on the map are colour-coded: **green** — inhabited, **blue** — wild, **amber**
 — ruins, **magenta** — special. Two icon shapes encode discovery: an **uncharted** system is a
@@ -308,7 +375,7 @@ galaxy/
 ├── .nocache_server.py      # no-cache static server (port 8124)
 ├── gallery.html            # gallery of every ship and station
 ├── vercel.json             # static-deploy headers (always revalidate)
-├── media/                  # README demo video + poster
+├── media/                  # README demo video, poster, screenshot gallery
 ├── vendor/                 # vendored Three.js core/addons + lil-gui
 ├── audio/tracks/           # ambient (CC-BY / CC0) + CREDITS.txt
 └── src/
@@ -371,6 +438,24 @@ galaxyApp.applyLive();          // apply "live" parameters without a rebuild
 galaxyApp.config.seed = 'orion';
 galaxyApp.rebuild();            // full geometry rebuild for the new seed
 ```
+
+</details>
+
+<details>
+<summary><b>Maintainer — refreshing the demo clip</b></summary>
+
+<br>
+
+The hero is a real, inline-playing video. GitHub renders a `<video>` player **only** for files on
+its own asset store, so the clip is not committed — it's uploaded as a GitHub attachment:
+
+1. Capture / re-encode a ≤10 MB H.264 clip to `media/demo_hero.mp4` (`-movflags +faststart`).
+2. Open a [new issue](https://github.com/syakubson/procedural-galaxy/issues/new) and **drag the
+   file into the comment box**; wait for the upload to finish.
+3. Copy the generated `https://github.com/user-attachments/assets/<uuid>` URL (you can close the
+   issue without submitting — the asset persists on GitHub's CDN).
+4. In the README hero, replace the poster block with that URL on its own line, or:
+   `<video src="…assets/<uuid>" controls width="860"></video>`.
 
 </details>
 
