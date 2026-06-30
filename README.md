@@ -17,19 +17,15 @@
 </div>
 
 <!--
-  ▶ DEMO VIDEO (real inline player, 60 fps).
-  GitHub only plays video hosted on its own asset store. To enable the player:
-    1. open https://github.com/syakubson/procedural-galaxy/issues/new
-    2. drag media/demo_hero.mp4 into the comment box, wait for the upload
-    3. copy the generated https://github.com/user-attachments/assets/<uuid> URL
-    4. replace the poster block below with that URL on its own line (or a <video src> tag)
-       — you can close the issue without submitting; the asset stays on GitHub's CDN.
-  Until then, the clickable poster below links straight to the live demo.
+  ▶ DEMO VIDEO — real inline player (GitHub user-attachments, 60 fps).
+  The clip is hosted on GitHub's asset store (uploaded via an issue drag-drop), so the
+  bare URL below renders a native HTML5 player. To refresh it: re-encode a ≤10 MB clip
+  to media/demo_hero.mp4, drag it into a new issue, and swap the URL below.
 -->
 
+https://github.com/user-attachments/assets/17c410d2-0553-4579-9012-27650fd0f966
+
 <div align="center">
-  <a href="https://galaxy-lyart-one.vercel.app"><img alt="Galaxy Explorer — click to open the live galaxy" src="media/hero_poster.jpg" width="860"></a>
-  <br>
   <sub>▶ <b><a href="https://galaxy-lyart-one.vercel.app">Open the live galaxy</a></b> — it's interactive; the clip is just a taste.</sub>
 </div>
 
