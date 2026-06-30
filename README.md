@@ -11,11 +11,13 @@ entire star disk is drawn in a single draw call, and rotation, twinkle, and star
 computed on the GPU. Each frame the CPU updates exactly one number; it never iterates over
 tens of thousands of stars.
 
-**▶ Live demo — https://galaxy-lyart-one.vercel.app**
+<p align="center"><strong>▶ Live demo — <a href="https://galaxy-lyart-one.vercel.app">galaxy-lyart-one.vercel.app</a></strong></p>
 
-![Galaxy Explorer demo](media/demo.gif)
+<p align="center">
+  <img src="media/demo.gif" alt="Galaxy Explorer demo" width="80%">
+</p>
 
-> The looping preview above plays inline on GitHub. For full quality (1280p) **▶ [watch the MP4](media/demo.mp4)**, or open the [live demo](https://galaxy-lyart-one.vercel.app).
+<p align="center"><sub>Looping preview (plays inline on GitHub). Full quality (1280p, 30 fps) — <a href="media/demo.mp4">watch the MP4</a>.</sub></p>
 
 ---
 
