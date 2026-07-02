@@ -12,8 +12,9 @@ import {
 import { NebulaClouds } from './nebulaClouds.js';
 
 export class Background {
-  constructor(config) {
+  constructor(config, assetLoader) {
     this.config = config;
+    this._assetLoader = assetLoader;
     this.group = new THREE.Group();
     this._buildStarfield();
     this._buildNebula();
@@ -21,10 +22,12 @@ export class Background {
     this._buildSkybox();
   }
 
-  // Optional deep-space nebula SKYBOX for the galaxy view (#4). Drop an
-  // equirectangular image at `textures/galaxy_skybox.jpg` and it appears as the
-  // backdrop (and the procedural nebula clouds hide to avoid doubling). No file
-  // → nothing happens, the procedural background stays.
+  // Optional deep-space nebula SKYBOX for the galaxy view (#4). Only the mesh
+  // + fallback material are built here — the actual ~1.5 MB equirectangular
+  // image is fetched later by loadSkybox() (called off an idle timer in
+  // main.js), so it never sits on the critical boot path. Until that resolves
+  // (or if it never does) the sphere stays hidden and the procedural nebula
+  // is the backdrop — nothing here depends on the texture existing.
   _buildSkybox() {
     const geo = new THREE.SphereGeometry(this.config.radius * 12, 48, 32);
     const mat = new THREE.MeshBasicMaterial({
@@ -40,18 +43,26 @@ export class Background {
     this.group.add(sky);
     this._skyGeo = geo;
     this._skyMat = mat;
-    new THREE.TextureLoader().load(
-      'textures/galaxy_skybox.jpg',
-      (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        mat.map = tex;
-        mat.needsUpdate = true;
-        sky.visible = true;
-        if (this.nebulaClouds) this.nebulaClouds.group.visible = false;
-      },
-      undefined,
-      () => {}, // no file: keep the procedural background
-    );
+    this._sky = sky;
+  }
+
+  /** Fetch + apply the galaxy skybox texture through the shared AssetLoader.
+   *  Idempotent: a repeat call — while the first is still in flight, or after
+   *  it already applied the texture — is a cheap no-op (the loader dedupes by
+   *  url; the `mat.map` check skips re-applying it). A rejected fetch (no
+   *  file, network error) propagates to the caller; the scene already renders
+   *  fine without a skybox, so the caller is expected to just log and move on. */
+  async loadSkybox() {
+    if (this._skyMat.map) return;
+    const tex = await this._assetLoader.load('textures/galaxy_skybox.jpg', {
+      type: 'texture',
+      tag: 'galaxy-skybox',
+    });
+    tex.colorSpace = THREE.SRGBColorSpace;
+    this._skyMat.map = tex;
+    this._skyMat.needsUpdate = true;
+    this._sky.visible = true;
+    if (this.nebulaClouds) this.nebulaClouds.group.visible = false;
   }
 
   _buildNebulaClouds() {
@@ -184,9 +195,9 @@ export class Background {
     this.nebulaMat.dispose();
     if (this.nebulaClouds) this.nebulaClouds.dispose();
     if (this._skyGeo) this._skyGeo.dispose();
-    if (this._skyMat) {
-      if (this._skyMat.map) this._skyMat.map.dispose();
-      this._skyMat.dispose();
-    }
+    // The sky texture is owned by the AssetLoader (shared via its url cache —
+    // a rebuilt Background gets the same instance back), so it is NOT disposed
+    // here; releasing it is assetLoader.dispose('galaxy-skybox')'s job.
+    if (this._skyMat) this._skyMat.dispose();
   }
 }

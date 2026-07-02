@@ -29,8 +29,9 @@ const _fd = new THREE.Vector3(); // focus: view/approach direction
 const _ftmp = new THREE.Vector3();
 
 export class SystemView {
-  constructor(renderer) {
+  constructor(renderer, assetLoader) {
     this.renderer = renderer;
+    this._assetLoader = assetLoader;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#03030a');
 
@@ -47,7 +48,7 @@ export class SystemView {
     this.controls.enablePan = false;
     this.controls.enabled = false;
 
-    this._loadSkybox();
+    this._buildSkybox();
 
     this.starGroup = new THREE.Group();
     this.scene.add(this.starGroup);
@@ -67,9 +68,11 @@ export class SystemView {
   }
 
   // Equirectangular nebula skybox — an inward-facing sphere with a baked 4K
-  // starfield+nebula. Built once (persistent), but its ORIENTATION is randomised
-  // per system in load() so the same backdrop reads differently each time.
-  _loadSkybox() {
+  // starfield+nebula. The mesh is built once here (persistent for the app's
+  // life); its ORIENTATION is randomised per system in load() so the same
+  // backdrop reads differently each time. The texture itself is fetched
+  // separately by loadSkybox() — see below.
+  _buildSkybox() {
     const geo = new THREE.SphereGeometry(4000, 48, 32);
     const mat = new THREE.MeshBasicMaterial({
       side: THREE.BackSide,
@@ -83,11 +86,24 @@ export class SystemView {
     this.scene.add(sky);
     this._sky = sky;
     this._skyMat = mat;
-    new THREE.TextureLoader().load('textures/skybox_space.jpg', (tex) => {
-      tex.colorSpace = THREE.SRGBColorSpace;
-      mat.map = tex;
-      mat.needsUpdate = true;
+  }
+
+  /** Fetch + apply the system-view skybox texture through the shared
+   *  AssetLoader. This view isn't even visible until the player dives into a
+   *  system, so main.js defers this behind the galaxy's own skybox load (see
+   *  _warmUpSystemShaders). Idempotent, same as Background.loadSkybox(): the
+   *  loader dedupes by url, and the `mat.map` check skips a redundant apply.
+   *  A rejected fetch propagates — the system view already renders fine with
+   *  just the flat fallback colour, so the caller just logs and moves on. */
+  async loadSkybox() {
+    if (this._skyMat.map) return;
+    const tex = await this._assetLoader.load('textures/skybox_space.jpg', {
+      type: 'texture',
+      tag: 'system-skybox',
     });
+    tex.colorSpace = THREE.SRGBColorSpace;
+    this._skyMat.map = tex;
+    this._skyMat.needsUpdate = true;
   }
 
   /** Build the star + planets for a given system data object. */

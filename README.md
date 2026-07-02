@@ -433,6 +433,9 @@ galaxyApp.applyLive();          // apply "live" parameters without a rebuild
 
 galaxyApp.config.seed = 'orion';
 galaxyApp.rebuild();            // full geometry rebuild for the new seed
+
+galaxyApp.getPerfSnapshot();    // fps/draw-calls/triangles/etc. checked against PERF_BUDGETS
+galaxyApp.debugJumpTo((e) => e.data.seed === 'death-star'); // warp straight into a system by predicate
 ```
 
 </details>
@@ -462,3 +465,12 @@ its own asset store, so the clip is not committed — it's uploaded as a GitHub 
 Static site, no build step — deployable to any static host. It runs live on **Vercel**
 (<https://galaxy-lyart-one.vercel.app>); `vercel.json` sets always-revalidate cache headers so a
 redeploy is picked up immediately, and `.vercelignore` keeps dev-only files out of the bundle.
+
+---
+
+## Housekeeping
+
+- Binaries over 10 MB don't get committed — they go on a CDN/Blob instead, with a procedural
+  fallback mandatory for whatever loads them, so the scene still works if that fetch fails.
+- `scripts/perf_bench.py` drives the app headless and checks draw calls / triangles per scene
+  against the budgets in `src/config.js`, catching perf regressions before they ship.

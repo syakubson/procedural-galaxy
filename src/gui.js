@@ -100,5 +100,11 @@ export function buildGUI(app) {
   // --- readout ---
   gui.add(app.stats, 'fps').name('FPS').disable().listen();
 
+  // --- perf budget (stage-0 surface; see config.js PERF_BUDGETS) ---
+  const fBudget = gui.addFolder('Бюджет');
+  fBudget.add(app.stats, 'drawCalls').name('Вызовы отрисовки').disable().listen();
+  fBudget.add(app.stats, 'triangles').name('Треугольники').disable().listen();
+  fBudget.close();
+
   return gui;
 }

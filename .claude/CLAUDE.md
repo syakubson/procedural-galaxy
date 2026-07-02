@@ -42,6 +42,10 @@ first. `docs/GENERATION.md` documents the generation parameters in depth.
 - **Design system.** Cartographer theme — CSS tokens in `styles.css` `:root` (ink / vellum / ivory
   / brass / status colours; serif EB Garamond + mono IBM Plex Mono, vendored woff2). Reuse the
   tokens; don't hardcode hex values for chrome.
+- **GalaxyApp init order.** `main.js`'s constructor wires things in a fixed sequence — keep new
+  steps in it: `assetLoader` → `_buildWorld()` (`Background` takes the loader) → `PostFX` →
+  `_buildSystems()` → `SystemView` (also takes the loader) → HUD → GUI → the render loop →
+  `_warmUpSystemShaders()` (idle-timer, ~1.5s — also where deferred skybox loads fire).
 
 ## Verify before claiming done
 

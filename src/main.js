@@ -4,7 +4,8 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createDefaultConfig, applyQuality } from './config.js';
+import { createDefaultConfig, applyQuality, PERF_BUDGETS, checkBudget, resolveBudgetProfile } from './config.js';
+import { AssetLoader } from './assetLoader.js';
 import { getPalette } from './palettes.js';
 import { Galaxy } from './galaxy.js';
 import { Suns } from './suns.js';
@@ -44,7 +45,7 @@ class GalaxyApp {
   constructor(canvas) {
     this.canvas = canvas;
     this.config = createDefaultConfig('medium');
-    this.stats = { fps: 0 };
+    this.stats = { fps: 0, drawCalls: 0, triangles: 0 };
 
     this._time = 0; // accumulated animation time (seconds)
     this._galaxyRotTime = 0; // galaxy-spin clock — only advances while idle (frozen on interaction)
@@ -58,13 +59,18 @@ class GalaxyApp {
 
     this.mode = 'galaxy'; // 'galaxy' | 'system' | 'transition'
 
+    // Created before _buildWorld(): Background takes it in its constructor so
+    // it can defer its own texture fetch; SystemView gets the same instance
+    // further down, once the renderer it needs exists.
+    this.assetLoader = new AssetLoader();
+
     this._initRenderer();
     this._initScene();
     this._initControls();
     this._buildWorld();
     this.postfx = new PostFX(this.renderer, this.scene, this.camera, this.config.antialias ? 4 : 0);
     this._buildSystems();
-    this.systemView = new SystemView(this.renderer);
+    this.systemView = new SystemView(this.renderer, this.assetLoader);
     this._initHud();
     this._syncPixelRatio();
 
@@ -517,18 +523,36 @@ class GalaxyApp {
    *  never clears a system they entered while we were compiling. */
   _warmUpSystemShaders() {
     setTimeout(async () => {
-      if (this._warmed || this.mode !== 'galaxy') return;
-      const sample = this.systems.list.find(
-        (s) => s.data && s.data.kind === 'star' && (s.data.planets || []).length >= 2,
-      );
-      if (!sample) return;
+      if (!this._warmed && this.mode === 'galaxy') {
+        const sample = this.systems.list.find(
+          (s) => s.data && s.data.kind === 'star' && (s.data.planets || []).length >= 2,
+        );
+        if (sample) {
+          try {
+            this.systemView.load(sample.data);
+            await this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
+            if (this.mode === 'galaxy') this.systemView.clear(); // don't nuke a system dived into meanwhile
+            this._warmed = true;
+          } catch {
+            // a failed warmup just means the first real dive compiles normally
+          }
+        }
+      }
+      // Deferred skybox fetches share this same idle window, off the critical
+      // boot path. Galaxy first — it's the backdrop the player is looking at
+      // right now; system second — that view isn't even visible until they
+      // dive in. Either can fail (missing file, network hiccup) without
+      // consequence: both scenes already render fine with their procedural /
+      // flat-colour fallback, so a failure is just logged, not surfaced.
       try {
-        this.systemView.load(sample.data);
-        await this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
-        if (this.mode === 'galaxy') this.systemView.clear(); // don't nuke a system dived into meanwhile
-        this._warmed = true;
-      } catch {
-        // a failed warmup just means the first real dive compiles normally
+        await this.background.loadSkybox?.();
+      } catch (e) {
+        console.warn('[galaxy] galaxy skybox failed to load', e);
+      }
+      try {
+        await this.systemView.loadSkybox?.();
+      } catch (e) {
+        console.warn('[galaxy] system skybox failed to load', e);
       }
     }, 1500);
   }
@@ -554,6 +578,14 @@ class GalaxyApp {
     // clamp to it so big suns don't hit the driver's silent point-size cliff.
     const gl = this.renderer.getContext();
     this.maxPointSize = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 1024;
+
+    // postfx does TWO renderer.render() calls per frame (the scene RenderPass,
+    // then the OutputPass's fullscreen quad) — with autoReset left on, each one
+    // wipes info.render before the next, so by the time the frame is done all
+    // that's left is the OutputPass's own ~1 draw call / 2 triangles, not the
+    // scene's real cost. We reset it ourselves once per frame in _loop() so the
+    // totals accumulate across both passes instead.
+    this.renderer.info.autoReset = false;
   }
 
   _initScene() {
@@ -598,7 +630,7 @@ class GalaxyApp {
   _buildWorld() {
     this.galaxy = new Galaxy(this.config);
     this.suns = new Suns(this.config);
-    this.background = new Background(this.config);
+    this.background = new Background(this.config, this.assetLoader);
     // clamp shader point sizes to the device's hardware ceiling
     const cap = Math.min(this.maxPointSize, 1024);
     this.galaxy.material.uniforms.uMaxPointSize.value = cap;
@@ -1198,6 +1230,11 @@ class GalaxyApp {
     this._buildWorld();
     this.rebuildSystems();
     this.controls.autoRotate = this.config.cameraAutoRotate;
+    // The idle-timer skybox load in _warmUpSystemShaders() only ever fires
+    // once, but _buildWorld() just replaced Background with a textureless
+    // instance — re-request the sky here. The AssetLoader dedupes by url, so
+    // after the first fetch this resolves instantly from cache.
+    this.background.loadSkybox().catch(() => {});
   }
 
   /** Regenerate the explorable systems (seed / count / fraction change). */
@@ -1295,16 +1332,25 @@ class GalaxyApp {
       }
     }
 
+    // autoReset is off (see _initRenderer) — reset once, then postfx's two
+    // internal renderer.render() calls both add into the same totals so the
+    // numbers we read below cover the whole frame, not just the last pass.
+    this.renderer.info.reset();
     this.postfx.render();
-    this._trackPerf(rawDelta);
+    this._trackPerf(rawDelta, this.renderer.info.render.calls, this.renderer.info.render.triangles);
   }
 
-  _trackPerf(delta) {
+  _trackPerf(delta, drawCalls, triangles) {
     if (delta > 0) {
       const fps = 1 / delta;
       this._fpsEma = this._fpsEma * 0.9 + fps * 0.1;
       this.stats.fps = Math.round(this._fpsEma);
     }
+    // Cheap passthrough — renderer.info already did the counting, so this is
+    // just two property writes, not a new measurement (perf invariant: the
+    // CPU updates ~one number per frame here, no allocations/iteration).
+    this.stats.drawCalls = drawCalls;
+    this.stats.triangles = triangles;
     // One-shot graceful auto-downgrade if the machine clearly can't keep up.
     if (!this._autoDowngraded && this._fpsEma < 38) {
       if (++this._lowPerfFrames > 40) {
@@ -1321,6 +1367,90 @@ class GalaxyApp {
     this._syncPixelRatio();
     // eslint-disable-next-line no-console
     console.info('[galaxy] low FPS detected — pixel ratio capped to 1.0 for smoother motion.');
+  }
+
+  // ---- perf reporting (on-demand, not per-frame) -----------------------------
+
+  /** Cold-load time + shipped-bundle weight via Navigation/Resource Timing.
+   *  Both are fixed for the life of the page (nothing re-navigates or re-fetches
+   *  the bundle), so this runs once and the result is cached on first call. */
+  _measureColdLoad() {
+    let coldLoadMs = 0;
+    let bundleKB = 0;
+    let valid = false;
+    try {
+      const [nav] = performance.getEntriesByType('navigation');
+      // loadEventEnd stays 0 until the load event actually finishes — a
+      // snapshot taken before that would freeze coldLoadMs=0 (and a partial
+      // resource list) forever, so the measurement only counts as cacheable
+      // once the page has genuinely finished loading.
+      valid = !!nav && nav.loadEventEnd > 0;
+      if (nav) coldLoadMs = Math.round(nav.loadEventEnd - nav.startTime);
+      let bytes = 0;
+      for (const r of performance.getEntriesByType('resource')) {
+        if (r.initiatorType === 'script' || r.initiatorType === 'link' || /\.(js|css)(\?|$)/.test(r.name)) {
+          bytes += r.transferSize || r.encodedBodySize || 0;
+        }
+      }
+      bundleKB = Math.round(bytes / 1024);
+    } catch {
+      // Navigation/Resource Timing unavailable — leave the zeros, don't throw.
+    }
+    return { coldLoadMs, bundleKB, valid };
+  }
+
+  /** On-demand perf report for the dev panel / scripts/perf_bench.py — deliberately
+   *  NOT called per frame (unlike _trackPerf, this walks Performance API entries
+   *  and is fine to be a little more expensive). Checks the current numbers
+   *  against PERF_BUDGETS[profile] via checkBudget(). */
+  getPerfSnapshot(profile = this.config.quality) {
+    // Cache the cold-load measurement only once it's valid (page load event
+    // finished) — an early console/script call gets a fresh best-effort read
+    // without freezing zeros into every later snapshot.
+    const cold = this._coldLoad ?? this._measureColdLoad();
+    if (cold.valid) this._coldLoad = cold;
+    const appliedProfile = resolveBudgetProfile(profile);
+    const metrics = {
+      // Context for checkBudget, not a judged metric: picks the galaxy- vs
+      // system-view draw-call/triangle ceilings ('transition' frames render
+      // both worlds — judge those leniently as galaxy).
+      view: this.mode === 'system' ? 'system' : 'galaxy',
+      fps: this.stats.fps,
+      drawCalls: this.stats.drawCalls,
+      triangles: this.stats.triangles,
+      // Skyboxes load lazily off the idle timer in _warmUpSystemShaders, so
+      // this can legitimately read 0 right after boot and pick up the real
+      // total once those fetches land.
+      systemAssetMB: (this.assetLoader?.bytesLoadedTotal?.() ?? 0) / (1024 * 1024),
+      // Hero textures are a later roadmap stage — nothing loads under the
+      // 'hero' tag yet, so this stays 0 (which the low-profile budget of 0 MB
+      // happens to already satisfy).
+      heroTextureMB: (this.assetLoader?.bytesLoaded?.('hero') ?? 0) / (1024 * 1024),
+      // Omitted (undefined) until the load event has finished, so checkBudget
+      // skips them instead of judging a half-measured page.
+      coldLoadMs: cold.valid ? cold.coldLoadMs : undefined,
+      bundleKB: cold.valid ? cold.bundleKB : undefined,
+    };
+    const budget = PERF_BUDGETS[appliedProfile];
+    const { ok, violations } = checkBudget(appliedProfile, metrics);
+    return { profile: appliedProfile, metrics, budget, violations, ok };
+  }
+
+  /** Dev helper for the perf bench and (later) the codex viewer: jump straight
+   *  into the first catalog entry matching `predicate(entry)`, bypassing marker
+   *  picking entirely — lets a script warp to e.g. the Death Star or a black
+   *  hole by id without hunting for it on screen. Returns the target's stable
+   *  id (`entry.data.seed`) so a caller can log what it landed on, or null if
+   *  nothing matched. Not wired into any in-game UI. */
+  debugJumpTo(predicate) {
+    // enterSystem() silently no-ops outside galaxy mode (mid-transition, or
+    // already inside a system) — returning the seed anyway would tell the
+    // caller "jumped" when nothing happened, so report the refusal instead.
+    if (this.mode !== 'galaxy') return null;
+    const entry = this.systems.list.find(predicate);
+    if (!entry) return null;
+    this.enterSystem(entry);
+    return entry.data.seed || null;
   }
 }
 
