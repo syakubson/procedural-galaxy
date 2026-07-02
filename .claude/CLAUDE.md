@@ -19,7 +19,7 @@ lore. The whole universe is generated deterministically from a seed. Design cons
   are vendored in `vendor/`. Don't add a bundler, a framework, or an `npm install` requirement.
 
 The `README.md` has the full feature tour, generation rules, and a project-structure map — read it
-first. `docs/GENERATION.md` documents the generation parameters in depth.
+first. `GENERATION.md` (repo root) documents the generation parameters in depth.
 
 ## Conventions
 
@@ -36,7 +36,9 @@ first. `docs/GENERATION.md` documents the generation parameters in depth.
   onto the always-on clock or vice-versa.
 - **Markers / fog-of-war.** `src/systems/markers.js`: uncharted = hollow "survey ring", charted =
   filled status disc, both baked WHITE and tinted via `material.color` (so hover can lerp toward
-  brass). Discovery persists in `localStorage` under `galaxy.charted.<seed>`.
+  brass). Discovery persists via the party overlay (`src/state/`) under
+  `galaxy.party.v1.patches::<GEN_VERSION>::<seed>`; legacy `galaxy.charted.<seed>` keys are
+  only detected for the one-time migration notice, never written.
 - **Camera framing.** Per-object-type focus distances live in `src/systems/focusConfig.js` — tune
   framing there, not by scattering magic numbers in `main.js`.
 - **Design system.** Cartographer theme — CSS tokens in `styles.css` `:root` (ink / vellum / ivory

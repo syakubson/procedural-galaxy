@@ -232,18 +232,23 @@ there are no random "timer" events. So "events" come in two kinds:
 All probabilities live in one place — `src/systems/genParams.js` (the `GEN` object); the share of
 explorable systems and the quality presets are in `src/config.js`. Tune the balance there.
 
-> Before the first status roll the generator does **two throwaway `rng.next()` calls**: the first
-> mulberry32 roll on a string seed is biased, and without a "warm-up" the status mix skewed.
+> Before the first roll the generator does **two throwaway `rng.next()` calls**: the first
+> mulberry32 roll on a string seed is biased, and without a "warm-up" the outcome mix skewed.
 
 ### A. Generation outcomes and their frequency
 
-**System status** (roll `0..1`) — target ≈ 2/1/1:
+**System status** is no longer an independent roll — it's a consequence ("life as a
+consequence", see `GENERATION.md` for the full causal chain): the star is rolled first,
+its class defines climate bands across the orbits, bands restrict which planet archetypes
+can exist where, and a temperate-band terran/ocean world is a *life candidate*. A system
+with no candidates is wild, full stop (O/B-class stars have no temperate band at all);
+otherwise a calibrated chance decides whether life happened and whether it already ended:
 
-| Outcome | Condition | Share |
+| Outcome | How it happens | Share (calibrated) |
 | --- | --- | --- |
-| inhabited | `< 0.50` | ~50% |
-| wild | `0.50…0.75` | ~25% |
-| ruins (dead) | `≥ 0.75` | ~25% |
+| inhabited | candidates exist, life happened, still alive | ~49% |
+| wild | no candidates (~20%) or life never sparked (~5%) | ~25% |
+| ruins (dead) | life happened and already ended | ~26% |
 
 **Civilisation stage** (inhabited only, roll `0..1`):
 
@@ -251,7 +256,7 @@ explorable systems and the quality presets are in `src/config.js`. Tune the bala
 | --- | --- | --- |
 | Tribal | `< 0.38` | dark night |
 | Industrial | `0.38…0.72` | lights + satellites |
-| Spacefaring | `≥ 0.72` | megacities, ring station, colonies, ships |
+| Spacefaring | `≥ 0.72` | megacities, ring station, ships, colonies — settlements on liveable worlds, pressurised dome bases on hostile ones, the odd terraformed rock |
 
 **Nature of ruins** (dead worlds only, roll `0..1`):
 
