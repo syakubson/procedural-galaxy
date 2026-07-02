@@ -96,3 +96,104 @@ export function applyQuality(config, quality) {
   config.maxPixelRatio = q.maxPixelRatio;
   return config;
 }
+
+// Per-profile performance budgets, keyed the same as QUALITY_PRESETS. These
+// numbers are a stage-0 starting hypothesis, not measured ceilings — they get
+// calibrated against a real headed perf run (see scripts/perf_bench.py) once
+// there's hero content and a reference machine to compare against. Low is the
+// only tier that hard-gates hero textures (maxHeroTextureMB: 0): weak PCs get
+// the procedural fallback material, never a network request for one.
+// maxBundleKB is judged against the UNCOMPRESSED transfer weight (what the
+// local dev server actually serves — vendored three.module.js alone is
+// ~1.24 MB of it); a CDN's gzip/brotli ships the same page 3-4x smaller, so
+// these ceilings track "did the bundle grow", not "what does prod download".
+// Galaxy view has its own draw-call/triangle ceilings: it's a different scene
+// (point cloud + marker sprites) that sits nowhere near the system-view
+// numbers, and judging it by the system budget made every measurement flap
+// within 1-2 calls of the limit.
+export const PERF_BUDGETS = {
+  low: {
+    targetFps: 60,
+    maxDrawCallsGalaxyView: 90,
+    maxTrianglesGalaxyView: 20000,
+    maxDrawCallsSystemView: 60,
+    maxTrianglesSystemView: 250000,
+    maxHeroTextureMB: 0,
+    maxSystemAssetMB: 6,
+    maxColdLoadMs: 3500,
+    maxBundleKB: 2200,
+  },
+  medium: {
+    targetFps: 60,
+    maxDrawCallsGalaxyView: 140,
+    maxTrianglesGalaxyView: 30000,
+    maxDrawCallsSystemView: 90,
+    maxTrianglesSystemView: 450000,
+    maxHeroTextureMB: 8,
+    maxSystemAssetMB: 12,
+    maxColdLoadMs: 4500,
+    maxBundleKB: 2400,
+  },
+  high: {
+    targetFps: 60,
+    maxDrawCallsGalaxyView: 200,
+    maxTrianglesGalaxyView: 50000,
+    maxDrawCallsSystemView: 140,
+    maxTrianglesSystemView: 800000,
+    maxHeroTextureMB: 16,
+    maxSystemAssetMB: 24,
+    maxColdLoadMs: 6000,
+    maxBundleKB: 2800,
+  },
+};
+
+// Housekeeping ceilings for offline tooling (check_assets.py et al.) — never
+// read at runtime, so they stay out of the shipped bundle either way.
+export const ASSET_LIMITS = {
+  maxCommittedBinaryMB: 10, // a single binary above this belongs on CDN/Blob, not in git
+  maxRepoBinariesMB: 150, // total committed binary weight across the repo
+};
+
+// Maps each metrics.* key to the PERF_BUDGETS field that judges it. The
+// budget key can depend on the metrics bag itself: drawCalls/triangles pick
+// the galaxy- or system-view ceiling by `metrics.view` (galaxy is the default
+// — it's the boot scene, and a caller that never set `view` is looking at it).
+// `dir` is the direction of failure, carried into each violation so printers
+// can render "fps=15<60" instead of the lying "fps=15>60" — fps is the one
+// metric where *lower* than target is the violation.
+const BUDGET_CHECKS = [
+  ['fps', () => 'targetFps', '<', (value, budget) => value < budget],
+  ['drawCalls', (m) => (m.view === 'system' ? 'maxDrawCallsSystemView' : 'maxDrawCallsGalaxyView'), '>', (value, budget) => value > budget],
+  ['triangles', (m) => (m.view === 'system' ? 'maxTrianglesSystemView' : 'maxTrianglesGalaxyView'), '>', (value, budget) => value > budget],
+  ['heroTextureMB', () => 'maxHeroTextureMB', '>', (value, budget) => value > budget],
+  ['systemAssetMB', () => 'maxSystemAssetMB', '>', (value, budget) => value > budget],
+  ['coldLoadMs', () => 'maxColdLoadMs', '>', (value, budget) => value > budget],
+  ['bundleKB', () => 'maxBundleKB', '>', (value, budget) => value > budget],
+];
+
+/** An unknown profile falls back to medium; callers that report the profile
+ *  back to a human should echo the *applied* key, not the raw input. */
+export function resolveBudgetProfile(profile) {
+  return PERF_BUDGETS[profile] ? profile : 'medium';
+}
+
+/** Pure comparison: a `profile` (low/medium/high) against a `metrics` bag.
+ *  Only metrics that are actually present get judged — a caller that hasn't
+ *  measured e.g. coldLoadMs yet just omits it, rather than passing 0 and
+ *  tripping a false violation. `metrics.view` ('galaxy' | 'system') selects
+ *  which draw-call/triangle ceiling applies; it is context, not a judged
+ *  metric. No DOM/console access, so it's safe to call from perf_bench.py's
+ *  page.evaluate() as well as from the browser. */
+export function checkBudget(profile, metrics) {
+  const budget = PERF_BUDGETS[resolveBudgetProfile(profile)];
+  const violations = [];
+  for (const [metricKey, budgetKeyFor, dir, isViolation] of BUDGET_CHECKS) {
+    const value = metrics[metricKey];
+    if (value === undefined) continue;
+    const budgetValue = budget[budgetKeyFor(metrics)];
+    if (isViolation(value, budgetValue)) {
+      violations.push({ metric: metricKey, value, budget: budgetValue, dir });
+    }
+  }
+  return { ok: violations.length === 0, violations };
+}
