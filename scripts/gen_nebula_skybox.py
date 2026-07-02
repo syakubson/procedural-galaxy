@@ -10,8 +10,8 @@ bright foreground stars with soft glow. Looks like a real game skybox.
 Two seeds → two different skies: `galaxy_skybox.jpg` (galaxy view) and
 `skybox_space.jpg` (system view, additionally rotated at random per system).
 
-Run with the `mentoring` conda env:
-    conda run -n mentoring python scripts/gen_nebula_skybox.py
+Run with a Python env that has numpy + Pillow:
+    python3 scripts/gen_nebula_skybox.py
 """
 import numpy as np
 from PIL import Image
