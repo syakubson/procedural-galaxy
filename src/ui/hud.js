@@ -46,11 +46,26 @@ export function planetLabel(p) {
   return TYPE_LABEL[p.type] || p.type;
 }
 
+// Subtitle for the focused-planet card. Biome names must beat the generic
+// archetype description: applyBiome() re-types every living/ruined homeworld
+// as terran, so TYPE_DESC[p.type] alone would call each of them
+// «Землеподобный мир» no matter how icy or scorched the biome actually is.
+function planetSubtitle(p) {
+  if (p.biomeLabel && (p.inhabited || p.ruined)) return p.biomeLabel;
+  return TYPE_DESC[p.type] || planetLabel(p);
+}
+
 // --- a very short status hook for the in-scene diegetic labels (#5). Plain
 // wild worlds return null (the biome line already says enough). ---------------
 export function planetMiniDesc(p) {
   if (p.inhabited) return 'дом цивилизации';
-  if (p.colony) return 'колония-поселение';
+  if (p.colony) {
+    // colonyKind (systemData.js): settlements on liveable bands, pressurised
+    // domes on hostile ones, the odd terraformed temperate rock.
+    if (p.colonyKind === 'dome') return 'купольная база';
+    if (p.colonyKind === 'terraformed') return 'терраформированная колония';
+    return 'колония-поселение';
+  }
   if (p.obliterated) return 'обломки мира';
   if (p.destroyed) return 'мёртвый мир, кратер';
   if (p.robotic) return 'мёртвый мир машин';
@@ -399,7 +414,7 @@ export class InfoPanel {
     r.status.style.color = color;
     r.status.style.borderColor = color;
     r.name.textContent = name || planetLabel(p);
-    r.star.textContent = TYPE_DESC[p.type] || planetLabel(p);
+    r.star.textContent = planetSubtitle(p);
     // label + description + characteristics + resources all live in the side
     // callout by the reticle now; the left panel keeps status/name + civilisation.
     r.desc.textContent = '';
@@ -411,7 +426,7 @@ export class InfoPanel {
       (moonN ? `<span><b>Луны:</b> ${moonN}</span>` : '');
     const res = p.obliterated ? [] : PLANET_RES[p.type] || [];
     const resHtml = res.map((x) => `<span class="chip">${x}</span>`).join('');
-    this._setFocusCallout(name || planetLabel(p), TYPE_DESC[p.type] || planetLabel(p), stripUniverseTag(p.ref || planetDesc(p)), metaHtml, resHtml);
+    this._setFocusCallout(name || planetLabel(p), planetSubtitle(p), stripUniverseTag(p.ref || planetDesc(p)), metaHtml, resHtml);
     r.history.textContent = '';
     r.about.style.display = 'none'; // characteristics + resources moved to the callout
 
