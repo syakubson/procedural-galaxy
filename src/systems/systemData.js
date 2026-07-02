@@ -5,16 +5,22 @@
 //     planets move much slower than inner ones);
 //   - gas giants are clearly larger than terrestrials but always smaller than
 //     the star; moons are small and slow;
-//   - only terrestrial worlds in the habitable zone can be inhabited, and only
-//     around long-lived stars (F/G/K/M) — hot short-lived O/B never host life.
+//   - habitability is a CONSEQUENCE of the star, not an independent roll: the
+//     star is picked first and unconditionally, its class sets four climate
+//     bands across the orbital slots (GEN.world.bands), and only a terran/
+//     ocean world landing in the temperate band is a "life candidate". O/B
+//     stars carry a zero-width temperate band, so their systems are lifeless
+//     by construction — no separate "can this be inhabited" flag needed.
 //
-// Inhabited worlds get a biome (earthlike / ocean / jungle / tundra / desert /
-// city) and a civilisation stage (tribal / industrial / spacefaring) that drives
-// city-light brightness, orbital satellites/stations, colonies on sister worlds,
-// and interplanetary ships. No meshes here — systemView/planet build those.
+// Inhabited/ruined worlds get a natural biome from where they sit in the
+// temperate band (GEN.world.biomes) plus their star class, then — only for a
+// spacefaring civilisation — a city may pave over it. Civilisation stage
+// (tribal / industrial / spacefaring) drives city-light brightness, orbital
+// satellites/stations, colonies on sister worlds, and interplanetary ships.
+// No meshes here — systemView/planet build those.
 
 import { createRng } from '../rng.js';
-import { GEN } from './genParams.js';
+import { GEN, GEN_VERSION } from './genParams.js';
 import {
   generateName,
   generateLore,
@@ -39,7 +45,9 @@ const TAU = Math.PI * 2;
 export const FLEET_FACTIONS = ['alliance', 'imperial', 'swarm', 'syndicate', 'cartel', 'precursor'];
 
 // Star spectral classes. `radius` is visual (kept well above any planet so the
-// star always dominates). `habit` = can host life (long-lived enough).
+// star always dominates). `habit` = long-lived enough to gate an age-matched
+// binary companion (see the binary roll below); it no longer filters the
+// primary star roll itself — the primary is unconditional (see generateSystem).
 const STAR_TYPES = [
   { key: 'O', label: 'Голубой сверхгигант (O)', desc: 'горячий, яркий и недолговечный', color: '#aac0ff', radius: 7.0, weight: 1, habit: false, activity: 0.35, solarMass: 22 },
   { key: 'B', label: 'Бело-голубая звезда (B)', desc: 'массивная и очень горячая', color: '#cdddff', radius: 5.6, weight: 2, habit: false, activity: 0.3, solarMass: 7 },
@@ -86,14 +94,8 @@ const CIV = {
   spacefaring: { label: 'Космическая цивилизация', light: 1.5, sats: [3, 7], station: true, colonies: 2, ships: 4 },
 };
 
-const ZONES = {
-  inner: ['lava', 'rocky', 'desert'],
-  mid: ['terran', 'ocean', 'rocky', 'desert'],
-  outer: ['gas', 'ice', 'gas'],
-};
-
-function weightedStar(rng, habitableOnly) {
-  const pool = habitableOnly ? STAR_TYPES.filter((t) => t.habit) : STAR_TYPES;
+/** Weighted spectral-class pick from an optional pool (defaults to all seven). */
+function weightedStar(rng, pool = STAR_TYPES) {
   const total = pool.reduce((s, t) => s + t.weight, 0);
   let x = rng.next() * total;
   for (const t of pool) {
@@ -103,26 +105,75 @@ function weightedStar(rng, habitableOnly) {
   return pool[pool.length - 1];
 }
 
-function zoneForIndex(i, n) {
-  const f = n <= 1 ? 0 : i / (n - 1);
-  if (f < 0.34) return 'inner';
-  if (f < 0.67) return 'mid';
-  return 'outer';
+/** Weighted pick of an object-key from `{key: weight}`, with an optional
+ *  per-key multiplier map layered on top (missing keys default to ×1). Used
+ *  for both the band→archetype roll and the insolation→biome roll — the
+ *  "absence = banned" contract lives in the caller's weight table, not here. */
+function weightedKey(rng, weights, mul) {
+  const keys = Object.keys(weights);
+  const w = keys.map((k) => weights[k] * (mul && mul[k] != null ? mul[k] : 1));
+  const total = w.reduce((s, x) => s + x, 0);
+  let x = rng.next() * total;
+  for (let i = 0; i < keys.length; i++) {
+    x -= w[i];
+    if (x <= 0) return keys[i];
+  }
+  return keys[keys.length - 1];
+}
+
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+/** Climate band for every orbital slot of a star (GEN.world.bands, R2), plus
+ *  the deterministic snap-promotion of one slot to `temperate` when the
+ *  discrete index grid misses the band entirely (R3). Zero rng draws — a
+ *  pure function of the star's class and how many planets the system has. */
+function computeBands(starKey, n) {
+  const edges = GEN.world.bands[starKey];
+  const fracs = [];
+  const bands = [];
+  for (let i = 0; i < n; i++) {
+    const f = n <= 1 ? 0 : i / (n - 1);
+    fracs.push(f);
+    bands.push(f < edges[0] ? 'scorch' : f < edges[1] ? 'temperate' : f < edges[2] ? 'cold' : 'frigid');
+  }
+  let snapIndex = -1;
+  // edges[0] < edges[1] excludes O/B (zero-width temperate edge) automatically —
+  // no separate per-class check needed.
+  if (GEN.world.bandSnap && edges[0] < edges[1] && !bands.includes('temperate')) {
+    const mid = (edges[0] + edges[1]) / 2;
+    let bestI = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < n; i++) {
+      const d = Math.abs(fracs[i] - mid);
+      if (d < bestD) {
+        bestD = d;
+        bestI = i;
+      }
+    }
+    bands[bestI] = 'temperate';
+    snapIndex = bestI;
+  }
+  return { bands, fracs, snapIndex };
+}
+
+/** A candidate's relative position inside the temperate band (0 = inner edge,
+ *  1 = outer edge), used to pick its insolation tercile for the biome table. */
+function tercileFromInsol(insol) {
+  return insol < 1 / 3 ? 'hot' : insol < 2 / 3 ? 'mild' : 'cool';
 }
 
 /** Build a full system description from any seed value. */
 export function generateSystem(seed) {
   const rng = createRng(seed);
 
-  // status first, so an inhabited system can be constrained to a long-lived star.
-  // Warm the generator a couple of steps — mulberry32's first draws off a string
-  // seed are mildly biased, which skewed the status mix across systems.
+  // Warm the generator a couple of steps — mulberry32's first draws off a
+  // string seed are mildly biased, which skewed shares across systems.
   rng.next();
   rng.next();
-  const sRoll = rng.next();
-  // #1: roughly a 2/1/1 split — inhabited / wild (untouched) / dead (ruins).
-  const status = sRoll < GEN.statusInhabited ? 'inhabited' : sRoll < GEN.statusWild ? 'wild' : 'ruins';
-  const star = weightedStar(rng, status === 'inhabited');
+
+  // The star is rolled FIRST and unconditionally (no status to satisfy yet —
+  // status is now a downstream consequence of the star + planets, see below).
+  const star = weightedStar(rng);
 
   // system age (Gyr): hot massive stars are necessarily young
   const ageMax = star.key === 'O' ? 0.04 : star.key === 'B' ? 2 : star.key === 'A' ? 4 : 13.2;
@@ -133,13 +184,18 @@ export function generateSystem(seed) {
   // short-lived O/B companion, so gate the companion's class by age.
   let binary = null;
   if (rng.next() < GEN.binaryChance) {
-    const star2 = weightedStar(rng, ageGyr > 3);
+    const star2 = weightedStar(rng, ageGyr > 3 ? STAR_TYPES.filter((t) => t.habit) : STAR_TYPES);
     const separation = (star.radius + star2.radius) * 1.3;
     binary = { star2, separation };
   }
 
   const planetCount = rng.int(GEN.planetCount[0], GEN.planetCount[1]);
   const planets = [];
+
+  // Climate bands for every slot follow from the star class + slot count
+  // alone — a pure lookup, zero rng draws (R2/R3 in GENERATION.md).
+  const { bands, fracs, snapIndex } = computeBands(star.key, planetCount);
+  const starEdges = GEN.world.bands[star.key];
 
   // --- spacing model (#7/#11): every body owns an in-plane "half-extent" — its
   // radius plus any ring or moon reach. No two bodies' disks may come within
@@ -154,8 +210,10 @@ export function generateSystem(seed) {
   if (binary) prevHalf = Math.max(prevHalf, binary.separation * 0.5 + binary.star2.radius);
 
   for (let i = 0; i < planetCount; i++) {
-    const zone = zoneForIndex(i, planetCount);
-    const type = rng.pick(ZONES[zone]);
+    const band = bands[i];
+    // R4: the band's archetype table IS the compatibility rule — an absent
+    // key is a ban (lava can't sit in `cold`, ice/gas can't sit in `scorch`).
+    const type = weightedKey(rng, GEN.world.archetypes[band]);
     const def = PLANET_DEFS[type];
     const radius = rng.range(def.rMin, def.rMax);
     const hasRings = type === 'gas' ? rng.next() < 0.55 : type === 'ice' ? rng.next() < 0.12 : false;
@@ -189,6 +247,19 @@ export function generateSystem(seed) {
     // circumbinary stability: keep the nearest planet well outside the pair
     if (binary && i === 0) orbit = Math.max(orbit, binary.separation * 2.8 + half);
 
+    // R5: "candidate for life" is a lookup, not a roll — a terran/ocean world
+    // that happens to land in the temperate band. The snap slot has no real
+    // position inside the band, so it's pinned to the band's midpoint (mild).
+    const lifeCandidate = band === 'temperate' && GEN.world.lifeArchetypes.includes(type);
+    const insol =
+      band !== 'temperate'
+        ? null
+        : i === snapIndex
+          ? 0.5
+          : starEdges[1] > starEdges[0]
+            ? clamp01((fracs[i] - starEdges[0]) / (starEdges[1] - starEdges[0]))
+            : 0.5;
+
     const planet = {
       type,
       def,
@@ -206,6 +277,9 @@ export function generateSystem(seed) {
       ruined: false,
       colony: false,
       biome: type === 'ocean' ? 1 : 0,
+      band, // 'scorch' | 'temperate' | 'cold' | 'frigid' — this slot's climate
+      insol, // 0..1 position inside the temperate band, else null
+      lifeCandidate,
       moons,
     };
 
@@ -214,124 +288,152 @@ export function generateSystem(seed) {
     prevHalf = half;
   }
 
-  // --- home world for inhabited / ruins systems ---
-  let home = null;
+  // --- status as a consequence of the star + planets already rolled ---
+  const candidates = planets.filter((p) => p.lifeCandidate);
+
+  // R6: exactly three rolls happen here, ALWAYS — even with zero candidates —
+  // so that adding/removing candidates never shifts every later rng draw.
+  const lifeRoll = rng.next();
+  const fateRoll = rng.next();
+  const homeRoll = rng.next();
+
+  let status = 'wild'; // no candidates ⇒ wild, unconditionally (O/B always land here)
+  if (candidates.length > 0) {
+    const ageFactor = Math.min(1, ageGyr / GEN.life.rampGyr);
+    const lifeMul = GEN.life.starLifeMul[star.key] != null ? GEN.life.starLifeMul[star.key] : 1;
+    const pLife = clamp01(GEN.life.given * lifeMul * ageFactor);
+    if (lifeRoll < pLife) {
+      const extinctMul = GEN.life.starExtinctMul[star.key] != null ? GEN.life.starExtinctMul[star.key] : 1;
+      const pExtinct = clamp01(GEN.life.extinctShare * extinctMul);
+      status = fateRoll < pExtinct ? 'ruins' : 'inhabited';
+    }
+    // else: conditions were there, the spark never happened — still wild.
+  }
+  const home = status !== 'wild' ? candidates[Math.min(candidates.length - 1, Math.floor(homeRoll * candidates.length))] : null;
+
   let civLevel = null;
   let roboticTraffic = false; // #8: machines keep cargo moving in a dead world
   let fleetDwelling = false; // #10: survivors live aboard a roaming flagship
-  if (status === 'inhabited' || status === 'ruins') {
-    let candidates = planets.filter((p) => p.type === 'terran' || p.type === 'ocean');
-    if (candidates.length === 0) {
-      const mid = planets[Math.min(planets.length - 1, Math.floor(planets.length / 2))];
-      mid.type = 'terran';
-      mid.def = PLANET_DEFS.terran;
-      mid.radius = Math.min(mid.radius, PLANET_DEFS.terran.rMax);
-      mid.hasRings = false; // a terran home world shouldn't keep gas-giant rings
-      mid.moons = mid.moons.slice(0, 2);
-      candidates = [mid];
-    }
-    home = rng.pick(candidates);
+  if (status === 'inhabited') {
+    // civilisation stage
+    const cRoll = rng.next();
+    civLevel = cRoll < GEN.civTribal ? 'tribal' : cRoll < GEN.civIndustrial ? 'industrial' : 'spacefaring';
+    const civ = CIV[civLevel];
 
-    if (status === 'inhabited') {
-      // civilisation stage
-      const cRoll = rng.next();
-      civLevel = cRoll < GEN.civTribal ? 'tribal' : cRoll < GEN.civIndustrial ? 'industrial' : 'spacefaring';
-      const civ = CIV[civLevel];
+    // R8/R9: the natural biome ALWAYS gets rolled from insolation × archetype ×
+    // star class, then (R10) a spacefaring civ MAY pave a city over it — city
+    // is a civilisation overlay, never a substitute for the natural roll.
+    const tercile = tercileFromInsol(home.insol);
+    const natureBiome = weightedKey(rng, GEN.world.biomes[tercile][home.type], GEN.world.biomeStarMul[star.key]);
+    const biomeName = civLevel === 'spacefaring' && rng.next() < GEN.world.cityOverlayChance ? 'city' : natureBiome;
+    applyBiome(home, biomeName);
+    home.natureBiome = natureBiome; // what the city (if any) was built over
 
-      // biome — spacefaring leans toward city worlds; others natural variety
-      const biomeName =
-        civLevel === 'spacefaring' && rng.next() < 0.5
-          ? 'city'
-          : rng.pick(['earthlike', 'earthlike', 'ocean', 'jungle', 'tundra', 'desert']);
-      applyBiome(home, biomeName);
+    home.inhabited = true;
+    home.civLevel = civLevel;
+    home.civLabel = civ.label;
+    home.lightBoost = civ.light;
+    home.civObjects = {
+      satellites: rng.int(civ.sats[0], civ.sats[1]),
+      station: civ.station,
+    };
+    home.race = generateRace(rng, { civLevel, biome: biomeName });
 
-      home.inhabited = true;
-      home.civLevel = civLevel;
-      home.civLabel = civ.label;
-      home.lightBoost = civ.light;
-      home.civObjects = {
-        satellites: rng.int(civ.sats[0], civ.sats[1]),
-        station: civ.station,
-      };
-      home.race = generateRace(rng, { civLevel, biome: biomeName });
-
-      // colonies on other worlds (spacefaring only, #16) — placed on surfaces
-      // whose shader renders settlement lights. We GUARANTEE at least one (so a
-      // spacefaring system always reads as colonised) and give some colonies an
-      // orbital outpost station, so the colony is unmistakable from space.
-      if (civ.colonies > 0) {
-        const others = shuffled(
-          planets.filter(
-            (p) => p !== home && (p.type === 'terran' || p.type === 'ocean' || p.type === 'rocky' || p.type === 'desert'),
-          ),
-          rng,
-        );
-        const want = Math.min(civ.colonies, others.length);
-        for (let k = 0; k < want; k++) {
-          const p = others[k];
-          p.colony = true;
+    // colonies on other worlds (spacefaring only, #16). Colonisability is NOT
+    // tied to a life-friendly climate (owner decision, 2026-07-03): a
+    // spacefaring civilisation plants ordinary settlements where the band
+    // allows, and pressurised dome bases everywhere with a solid surface —
+    // only gas giants stay colony-free (they get skimmer stations instead).
+    // Comfortable worlds are still taken first, so a settlement beats a dome
+    // whenever the system offers the choice, and a temperate rocky/desert
+    // colony may turn out terraformed (flavour only, no shader change yet).
+    if (civ.colonies > 0) {
+      const comfy = (p) =>
+        (p.band === 'temperate' || p.band === 'cold') &&
+        (p.type === 'terran' || p.type === 'ocean' || p.type === 'rocky' || p.type === 'desert');
+      const pool = [
+        ...shuffled(planets.filter((p) => p !== home && comfy(p)), rng),
+        ...shuffled(planets.filter((p) => p !== home && !comfy(p) && p.type !== 'gas'), rng),
+      ];
+      const want = Math.min(civ.colonies, pool.length);
+      for (let k = 0; k < want; k++) {
+        const p = pool[k];
+        p.colony = true;
+        p.colonyStation = true; // #2: every colony gets its own little orbital hub
+        if (comfy(p)) {
           p.colonyLight = 0.6; // clearly visible settlement glow on the night side
-          p.colonyStation = true; // #2: every colony gets its own little orbital hub
-        }
-      }
-
-      // gas-giant skimmer stations (#11) — spacefaring civs harvest the giants
-      if (civLevel === 'spacefaring') {
-        for (const gp of planets.filter((p) => p.type === 'gas')) {
-          if (rng.next() < 0.6) gp.gasStation = true;
-        }
-      }
-    } else {
-      // ruins: a former earthlike-ish world, greyed out. More worlds are now
-      // actually wrecked (#9), and the catastrophe leaves survivors (#8/#10):
-      //   robotic     — everyone died, machines keep the depot running
-      //   destroyed   — a catastrophe crater scars the surface
-      //   obliterated — blown to pieces by an alien race: a debris field
-      //   (else)      — a plain, lifeless greyed-out ruin
-      const ruinBiome = rng.pick(['earthlike', 'ocean', 'desert', 'tundra']);
-      applyBiome(home, ruinBiome);
-      home.ruined = true;
-      const rRoll = rng.next();
-      let ruinType = 'plain';
-      if (rRoll < GEN.ruinRobotic) {
-        home.robotic = true;
-        ruinType = 'robotic';
-      } else if (rRoll < GEN.ruinDestroyed) {
-        home.destroyed = true;
-        ruinType = 'destroyed';
-      } else if (rRoll < GEN.ruinObliterated) {
-        home.obliterated = true;
-        ruinType = 'obliterated';
-      }
-      // #7: who lived here and HOW they died (the cause matches the ruin type)
-      home.race = generateExtinctRace(rng, ruinBiome, ruinType);
-
-      if (home.robotic) {
-        // #8: machines still run the place — a maintained depot station + a few
-        // cargo haulers, but nothing alive.
-        home.colonyStation = true;
-        roboticTraffic = true;
-      } else if (home.destroyed || home.obliterated) {
-        // #9/#10: the inhabitants wrecked their own world. Survivors either fled
-        // to a colony on a sister world (with an orbital hub right beside the
-        // dead planet), or — if nothing else is habitable — now live aboard a
-        // roaming flagship.
-        const refuge = shuffled(
-          planets.filter(
-            (p) =>
-              p !== home &&
-              (p.type === 'rocky' || p.type === 'desert' || p.type === 'ice' || p.type === 'terran' || p.type === 'ocean'),
-          ),
-          rng,
-        );
-        if (refuge.length && rng.next() < GEN.ruinRefugeChance) {
-          const r0 = refuge[0];
-          r0.colony = true;
-          r0.colonyLight = 0.55;
-          r0.colonyStation = true; // survivors' hub right by the dead world (#9)
+          const canTerraform = p.band === 'temperate' && (p.type === 'rocky' || p.type === 'desert');
+          p.colonyKind =
+            canTerraform && rng.next() < GEN.world.terraformChance ? 'terraformed' : 'settlement';
         } else {
-          fleetDwelling = true; // no refuge → they live on the flagship (#10)
+          p.colonyKind = 'dome'; // scorch/frigid surface — life under pressurised domes
+          p.colonyLight = 0.45; // dimmer: a handful of domes, not open cities
         }
+      }
+    }
+
+    // gas-giant skimmer stations (#11) — spacefaring civs harvest the giants
+    if (civLevel === 'spacefaring') {
+      for (const gp of planets.filter((p) => p.type === 'gas')) {
+        if (rng.next() < 0.6) gp.gasStation = true;
+      }
+    }
+  } else if (status === 'ruins') {
+    // ruins: a former living world, greyed out. The ruin flavour is rolled
+    // BEFORE the biome (R11 — reversed from the old order) because the
+    // flavour reshapes the biome odds (robotic ruins lean toward "city"):
+    //   robotic     — everyone died, machines keep the depot running
+    //   destroyed   — a catastrophe crater scars the surface
+    //   obliterated — blown to pieces by an alien race: a debris field
+    //   (else)      — a plain, lifeless greyed-out ruin
+    const rRoll = rng.next();
+    let ruinType = 'plain';
+    if (rRoll < GEN.ruinRobotic) ruinType = 'robotic';
+    else if (rRoll < GEN.ruinDestroyed) ruinType = 'destroyed';
+    else if (rRoll < GEN.ruinObliterated) ruinType = 'obliterated';
+
+    // R11: same insolation table a living world would use (this WAS a living
+    // climate), plus a "was it a whole planet-city?" baseline that robotic
+    // ruins lean into hard.
+    const tercile = tercileFromInsol(home.insol);
+    const ruinWeights = { ...GEN.world.biomes[tercile][home.type], city: 1 };
+    const ruinMul = GEN.world.ruinBiomeMul[ruinType];
+    if (ruinMul) for (const k in ruinMul) if (ruinWeights[k] != null) ruinWeights[k] *= ruinMul[k];
+    const ruinBiome = weightedKey(rng, ruinWeights, GEN.world.biomeStarMul[star.key]);
+    applyBiome(home, ruinBiome);
+    home.ruined = true;
+    if (ruinType === 'robotic') home.robotic = true;
+    else if (ruinType === 'destroyed') home.destroyed = true;
+    else if (ruinType === 'obliterated') home.obliterated = true;
+    // #7: who lived here and HOW they died (the cause matches the ruin type)
+    home.race = generateExtinctRace(rng, ruinBiome, ruinType);
+
+    if (home.robotic) {
+      // #8: machines still run the place — a maintained depot station + a few
+      // cargo haulers, but nothing alive.
+      home.colonyStation = true;
+      roboticTraffic = true;
+    } else if (home.destroyed || home.obliterated) {
+      // #9/#10: the inhabitants wrecked their own world. Survivors either fled
+      // to a colony on a sister world (with an orbital hub right beside the
+      // dead planet, same band gate as living colonies — R13), or — if
+      // nothing else is habitable — now live aboard a roaming flagship.
+      const refuge = shuffled(
+        planets.filter(
+          (p) =>
+            p !== home &&
+            (p.band === 'temperate' || p.band === 'cold') &&
+            (p.type === 'rocky' || p.type === 'desert' || p.type === 'ice' || p.type === 'terran' || p.type === 'ocean'),
+        ),
+        rng,
+      );
+      if (refuge.length && rng.next() < GEN.ruinRefugeChance) {
+        const r0 = refuge[0];
+        r0.colony = true;
+        r0.colonyLight = 0.55;
+        r0.colonyStation = true; // survivors' hub right by the dead world (#9)
+      } else {
+        fleetDwelling = true; // no refuge → they live on the flagship (#10)
       }
     }
   }
@@ -385,6 +487,7 @@ export function generateSystem(seed) {
   return {
     seed: String(seed),
     kind: 'star',
+    genVersion: GEN_VERSION, // rule set this system was generated under
     name,
     status,
     statusLabel,
