@@ -18,6 +18,8 @@ import { framingFor } from './systems/focusConfig.js';
 import { InfoPanel, Tooltip, Overlay, Legend, structureCard } from './ui/hud.js';
 import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
+import { WorldOverlay } from './state/overlay.js';
+import { currentPartyId, ensureParty, hasLegacyCharted } from './state/party.js';
 
 // Russian planet-type labels for the in-system hover card (#6).
 const SYS_TYPE_RU = {
@@ -69,6 +71,15 @@ class GalaxyApp {
     this._initControls();
     this._buildWorld();
     this.postfx = new PostFX(this.renderer, this.scene, this.camera, this.config.antialias ? 4 : 0);
+
+    // The party this browser is playing: `ensureParty` also reports whether
+    // GEN_VERSION moved since last boot (or this is a pre-overlay save's first
+    // run), which drives the one-time notice below. The world overlay itself
+    // MUST exist before _buildSystems() — Systems reads visited-state from it
+    // while placing markers.
+    this._partyStatus = ensureParty(this.config);
+    this.worldOverlay = new WorldOverlay(currentPartyId(this.config));
+
     this._buildSystems();
     this.systemView = new SystemView(this.renderer, this.assetLoader);
     this._initHud();
@@ -84,11 +95,42 @@ class GalaxyApp {
     this._initRotateToggle();
     this._initCinematic();
     this._initControlsHelp();
+    this._maybeShowGenVersionBanner();
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
 
     this._warmUpSystemShaders(); // pre-compile system shaders so the first dive is instant
+  }
+
+  /** One-time notice: the generation rules moved (GEN_VERSION bumped) since
+   *  this browser last played, or this is a returning pre-overlay save seeing
+   *  the new party format for the first time — either way the charted-systems
+   *  map necessarily starts over. Self-dismisses on click or after a timeout,
+   *  same pattern as the #cine-hint / #hint floating notices. */
+  _maybeShowGenVersionBanner() {
+    const { versionChanged, fromVersion } = this._partyStatus;
+    const firstRunOnNewSaveFormat = fromVersion === null && hasLegacyCharted();
+    if (!versionChanged && !firstRunOnNewSaveFormat) return;
+
+    const el = document.createElement('div');
+    el.id = 'genversion-banner';
+    el.textContent =
+      'Правила генерации миров обновились — вселенная пересобрана заново, карта исследований начата с чистого листа.';
+    document.body.appendChild(el);
+
+    const dismiss = () => {
+      el.classList.remove('visible');
+      clearTimeout(timer);
+      this._genBannerDismiss = null;
+      setTimeout(() => el.remove(), 400); // matches the CSS fade duration below
+    };
+    el.addEventListener('click', dismiss);
+    const timer = setTimeout(dismiss, 9000);
+    // enterSystem() calls this so the pill never lingers over the warp fade
+    // or collides with the cinematic hint (both live in the same screen spot).
+    this._genBannerDismiss = dismiss;
+    requestAnimationFrame(() => el.classList.add('visible'));
   }
 
   /** Wire the ⚙ button that opens/closes the generator panel (hidden by default
@@ -641,9 +683,26 @@ class GalaxyApp {
   }
 
   _buildSystems() {
-    this.systems = new Systems(this.config);
+    this.systems = new Systems(this.config, { overlay: this.worldOverlay });
     this.systems.setVisible(this.config.showMarkers);
     this.scene.add(this.systems.group);
+  }
+
+  /** Recreate the world overlay when the current seed no longer matches the
+   *  party it was built for — a new seed IS a new party (see party.js). Called
+   *  from rebuildSystems() so both a full rebuild() (seed change) and a
+   *  systems-only rebuild (count/fraction change, same seed) go through one
+   *  check instead of duplicating it at each call site. */
+  _ensureWorldOverlayForCurrentParty() {
+    const partyId = currentPartyId(this.config);
+    if (!this.worldOverlay || this.worldOverlay.partyId !== partyId) {
+      // A new seed is a new party: register its metadata record too, or the
+      // overlay would write orphan patches that no future party picker /
+      // archive stage could attribute (ensureParty is idempotent). The
+      // migration banner stays a boot-only affair — no re-show here.
+      this._partyStatus = ensureParty(this.config);
+      this.worldOverlay = new WorldOverlay(partyId);
+    }
   }
 
   _initHud() {
@@ -1072,6 +1131,7 @@ class GalaxyApp {
   async enterSystem(entry) {
     if (this.mode !== 'galaxy') return;
     this.mode = 'transition';
+    this._genBannerDismiss?.(); // don't let the migration pill sit over the warp fade
     this.systems.markVisited(entry); // chart it: persist + ink the marker its status colour
     this._updateProgress();
     this.controls.enabled = false; // lock galaxy input immediately
@@ -1239,6 +1299,7 @@ class GalaxyApp {
 
   /** Regenerate the explorable systems (seed / count / fraction change). */
   rebuildSystems() {
+    this._ensureWorldOverlayForCurrentParty(); // a seed change is a new party
     this.scene.remove(this.systems.group);
     this.systems.dispose();
     this._buildSystems();

@@ -478,6 +478,40 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* one-time "generation rules updated" notice (see main.js's
+   _maybeShowGenVersionBanner) — a centred top pill, dismissible by click or
+   timeout, same shape as #cine-hint. enterSystem() dismisses it explicitly,
+   and z-index stays below #warp-overlay (30) so even a missed dismiss can't
+   float above the warp fade. Width capped at 72vw so it clears the top-right
+   header buttons on narrow viewports (~420px). */
+#genversion-banner {
+  position: fixed;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 20;
+  max-width: min(72vw, 520px);
+  padding: 11px 20px;
+  border-radius: 2px;
+  border: 1px solid var(--brass);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.86), rgba(8, 10, 22, 0.86));
+  backdrop-filter: blur(8px);
+  color: var(--ivory);
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+#genversion-banner.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
 /* «Кинопоказ» filmic chrome-off: hide ALL the HUD except the left dossier panel,
    the reticle + its callout and the exit indicator (#4). Each element fades via
    its own opacity transition. */
