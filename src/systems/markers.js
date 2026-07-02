@@ -8,16 +8,7 @@
 
 import * as THREE from 'three';
 import { createRng } from '../rng.js';
-import {
-  generateSystem,
-  generateGalacticCore,
-  generateInterstellar,
-  generateSolarSystem,
-  generateDeadSpace,
-  generateFilmWorlds,
-  generateDeathStar,
-  FLEET_FACTIONS,
-} from './systemData.js';
+import { buildSystemCatalog } from './systemCatalog.js';
 
 const TAU = Math.PI * 2;
 
@@ -45,8 +36,12 @@ const _hoverCol = new THREE.Color(HOVER_COLOR);
 const _col = new THREE.Color();
 
 export class Systems {
-  constructor(config) {
+  /** `overlay` is the party's WorldOverlay (src/state/overlay.js) — the sole
+   *  source of "is this system visited" now that markers.js no longer reads
+   *  or writes localStorage itself. */
+  constructor(config, { overlay } = {}) {
     this.config = config;
+    this._overlay = overlay || null;
     this.group = new THREE.Group();
     this.sprites = [];
     this.list = [];
@@ -54,11 +49,18 @@ export class Systems {
     this._build();
   }
 
+  /** Whether `systemId` has been charted, per the party's overlay. Falls back
+   *  to "not visited" if this instance was built without one (defensive only —
+   *  every real call site passes one). */
+  _isVisited(systemId) {
+    const p = this._overlay && this._overlay.get(systemId);
+    return !!(p && p.visited);
+  }
+
   _build() {
     const c = this.config;
     const rng = createRng(c.seed + '::systems');
     const radius = c.radius;
-    const count = Math.max(1, Math.round(c.sunCount * c.realSystemFraction));
     const ringTex = getRingTexture(); // uncharted: hollow survey ring
     const discTex = getDiscTexture(); // charted: filled status disc (tinted)
 
@@ -69,9 +71,17 @@ export class Systems {
     const minSep = radius * 0.12; // wider gap so systems never crowd on screen (#3)
     this._placed = placed;
     this._minSep = minSep;
-    this._visitedSet = this._loadVisited(); // charted systems persist across reloads
-    let inhabIdx = 0; // round-robins factions across inhabited systems (#24)
-    for (let i = 0; i < count; i++) {
+
+    // Data comes from the shared catalog (no THREE/DOM in there); this loop
+    // only handles placement + visuals. The catalog's procedural systems come
+    // first, followed by the hand-crafted specials, in the same fixed order
+    // the inline generation used to run in — see systemCatalog.js.
+    const catalog = buildSystemCatalog(c);
+    const firstSpecial = catalog.findIndex((e) => e.kind === 'special');
+    const regular = firstSpecial === -1 ? catalog : catalog.slice(0, firstSpecial);
+    const specials = firstSpecial === -1 ? [] : catalog.slice(firstSpecial);
+
+    for (let i = 0; i < regular.length; i++) {
       let base;
       let tries = 0;
       do {
@@ -96,15 +106,8 @@ export class Systems {
       );
       placed.push({ x: base.x, z: base.z });
 
-      const data = generateSystem(c.seed + '::sys' + i);
-      // #24: guarantee all 6 fleet factions appear across inhabited systems so
-      // every ship kit is used. Dead/robotic worlds keep their random faction.
-      if (data.status === 'inhabited') {
-        data.faction = FLEET_FACTIONS[inhabIdx % FLEET_FACTIONS.length];
-        inhabIdx++;
-      }
-
-      const visited = this._visitedSet.has(i);
+      const data = regular[i].data;
+      const visited = this._isVisited(data.seed);
       const statusColor = STATUS_COLOR[data.status] || UNCHARTED_COLOR;
       // both icons are baked WHITE and tinted by material.color, so the hover
       // highlight can blend the resting colour → brass with a single lerp (#1).
@@ -143,16 +146,18 @@ export class Systems {
       this.sprites.push(sprite);
     }
 
-    // --- special objects ---
+    // --- special objects (catalog order: core, interstellar, sol, deadspace,
+    // 4x film worlds, death star — see systemCatalog.js's addSpecial() calls) ---
+    let s = 0;
     // supermassive black hole, fixed at the galactic centre — a real black void
-    this._addGalacticBlackHole();
+    this._addGalacticBlackHole(specials[s++].data);
     // the "Interstellar" system, sitting on an arm — a "special" encounter,
     // marked magenta like the other special systems (special)
     const ir = 0.6 * radius;
     const ia = (1 / c.arms) * TAU + (ir / radius) * c.spin;
     this._addSpecialSystem(
       new THREE.Vector3(Math.cos(ia) * ir, 0, Math.sin(ia) * ir),
-      generateInterstellar(),
+      specials[s++].data,
       SPECIAL_COLOR,
       4.2,
     );
@@ -165,29 +170,28 @@ export class Systems {
     };
     // one distinct colour for ALL easter-egg systems so they read as "special"
     const SPECIAL = SPECIAL_COLOR;
-    this._addSpecialSystem(eggPos(2, 0.5), generateSolarSystem(), SPECIAL, 4.1);
-    this._addSpecialSystem(eggPos(4, 0.72), generateDeadSpace(), SPECIAL, 4.0);
+    this._addSpecialSystem(eggPos(2, 0.5), specials[s++].data, SPECIAL, 4.1);
+    this._addSpecialSystem(eggPos(4, 0.72), specials[s++].data, SPECIAL, 4.0);
     const filmSpots = [
       [0, 0.46],
       [1, 0.62],
       [3, 0.56],
       [2, 0.78],
     ];
-    generateFilmWorlds().forEach((data, k) => {
-      this._addSpecialSystem(eggPos(filmSpots[k][0], filmSpots[k][1]), data, SPECIAL, 4.0);
-    });
+    for (const [arm, frac] of filmSpots) {
+      this._addSpecialSystem(eggPos(arm, frac), specials[s++].data, SPECIAL, 4.0);
+    }
 
     // the "Death Star" system (#12), pinned on its own arm — a special encounter,
     // marked magenta like the other special systems (special)
-    this._addSpecialSystem(eggPos(5, 0.42), generateDeathStar(), SPECIAL, 4.2);
+    this._addSpecialSystem(eggPos(5, 0.42), specials[s++].data, SPECIAL, 4.2);
   }
 
   // The galactic-centre black hole: a fully-opaque BLACK disk that punches a
   // void in the bright bulge (so nothing shows through it) + a glowing additive
   // accretion ring around it. It sits at the origin, so it never moves under the
   // disk rotation. The black disk is the pickable marker (warps to the BH view).
-  _addGalacticBlackHole() {
-    const data = generateGalacticCore();
+  _addGalacticBlackHole(data) {
     const scale = 7; // a bit smaller (#21)
 
     const horizonMat = new THREE.SpriteMaterial({
@@ -264,7 +268,7 @@ export class Systems {
   _addSpecialSystem(base, data, color, scale) {
     const idx = this.list.length;
     const pos = this._avoidOverlap(base.clone()); // keep clear of other markers (#3)
-    const visited = this._visitedSet ? this._visitedSet.has(idx) : false;
+    const visited = this._isVisited(data.seed);
     const restColor = visited ? color : UNCHARTED_COLOR;
     const mat = new THREE.SpriteMaterial({
       map: visited ? getDiscTexture() : getRingTexture(),
@@ -374,19 +378,9 @@ export class Systems {
     return base;
   }
 
-  _visitedKey() {
-    return 'galaxy.charted.' + this.config.seed;
-  }
-  _loadVisited() {
-    try {
-      const raw = localStorage.getItem(this._visitedKey());
-      return new Set(raw ? JSON.parse(raw) : []);
-    } catch (e) {
-      return new Set();
-    }
-  }
-  /** Chart a system: persist it + swap its marker from the hollow reticle to the
-   *  solid status diamond (a different icon, not just a recolour). */
+  /** Chart a system: persist it via the party overlay + swap its marker from
+   *  the hollow reticle to the solid status diamond (a different icon, not
+   *  just a recolour). */
   markVisited(entry) {
     entry.visited = true;
     if (entry.sprite && entry.statusColor) {
@@ -395,19 +389,14 @@ export class Systems {
       entry.sprite.material.needsUpdate = true;
       if (entry._restCol) entry._restCol.set(entry.statusColor);
     }
-    if (!this._visitedSet) this._visitedSet = new Set();
-    this._visitedSet.add(entry.index);
-    try {
-      localStorage.setItem(this._visitedKey(), JSON.stringify([...this._visitedSet]));
-    } catch (e) {
-      /* storage unavailable — discovery just won't persist this session */
-    }
+    if (this._overlay) this._overlay.patch(entry.data.seed, { visited: true, visitedAt: Date.now() });
   }
 
   /** Chart EVERY system at once (#13) — inks all markers to their status colour
-   *  and persists. Skips the central black-hole void (it has no status). */
+   *  and persists in a SINGLE overlay write. Skips the central black-hole void
+   *  (it has no status). */
   markAllVisited() {
-    if (!this._visitedSet) this._visitedSet = new Set();
+    const ids = [];
     for (const s of this.list) {
       if (s.noFade) continue; // the galactic-core void isn't a chartable system
       s.visited = true;
@@ -417,13 +406,9 @@ export class Systems {
         s.sprite.material.needsUpdate = true;
         if (s._restCol) s._restCol.set(s.statusColor);
       }
-      this._visitedSet.add(s.index);
+      ids.push(s.data.seed);
     }
-    try {
-      localStorage.setItem(this._visitedKey(), JSON.stringify([...this._visitedSet]));
-    } catch (e) {
-      /* storage unavailable — reveal just won't persist this session */
-    }
+    if (this._overlay && ids.length) this._overlay.patchMany(ids, { visited: true, visitedAt: Date.now() });
   }
 
   setVisible(v) {
