@@ -32,12 +32,11 @@ export class Ishimura {
     };
 
     // ship points along +Z (nose forward). Spine is the structural axis.
-    const spine = add(new THREE.BoxGeometry(0.22 * S, 0.3 * S, 3.0 * S), hull, 0, 0, 0);
-    spine; // central beam
+    add(new THREE.BoxGeometry(0.22 * S, 0.3 * S, 3.0 * S), hull, 0, 0, 0); // central beam
 
     // twin cylindrical habitation pods flanking the spine (mid-section)
     for (const sx of [-1, 1]) {
-      const pod = add(
+      add(
         new THREE.CylinderGeometry(0.34 * S, 0.34 * S, 1.5 * S, 18),
         hull,
         sx * 0.5 * S,
@@ -48,7 +47,6 @@ export class Ishimura {
       // pod end caps (darker)
       add(new THREE.CylinderGeometry(0.36 * S, 0.36 * S, 0.12 * S, 18), dark, sx * 0.5 * S, 0, 0.55 * S, [Math.PI / 2, 0, 0]);
       add(new THREE.CylinderGeometry(0.36 * S, 0.36 * S, 0.12 * S, 18), dark, sx * 0.5 * S, 0, -0.95 * S, [Math.PI / 2, 0, 0]);
-      pod;
     }
 
     // mining deck (rust/orange) on the underside, mid-ship

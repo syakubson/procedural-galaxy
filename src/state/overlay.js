@@ -24,10 +24,10 @@ export function applyOverlay(base, patch) {
   const merged = { ...base, ...patch };
   if (patch.planets) {
     const basePlanets = base.planets || [];
-    merged.planets = basePlanets.map((p, i) => (patch.planets[i] ? { ...p, ...patch.planets[i] } : p));
+    merged.planets = basePlanets.map((p, i) => (patch.planets[i] ? Object.assign({}, p, patch.planets[i]) : p));
   }
   if (patch.flags) {
-    merged.flags = { ...(base.flags || {}), ...patch.flags };
+    merged.flags = { ...base.flags, ...patch.flags };
   }
   return merged;
 }

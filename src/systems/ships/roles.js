@@ -5,7 +5,7 @@
 // shown in the gallery and (later) the system panel.
 
 import * as THREE from 'three';
-import { C, ACC, g, box, cyl, sph, cone, part, addRot, engineGlow, navLight, runningLights, antenna, wedge } from './style.js';
+import { C, ACC, g, box, cyl, sph, cone, part, addRot, engineGlow, runningLights, antenna, wedge } from './style.js';
 
 // 1. Scout/courier — XS, fastest: a slim pod, canopy, stub wings, antenna.
 function makeScout(s) {

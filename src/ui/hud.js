@@ -32,14 +32,6 @@ const TYPE_LABEL = {
   gas: 'Газовый гигант',
 };
 
-/** A CSS "mini planet": a lit sphere (highlight + terminator shadow) + a ring. */
-function planetIcon(p) {
-  const base = p.type === 'lava' ? '#ff7a2e' : p.def && p.def.c2 ? p.def.c2 : '#8a8a90';
-  const grad = `radial-gradient(circle at 33% 30%, rgba(255,255,255,0.9), ${base} 42%, rgba(0,0,0,0.6) 100%)`;
-  const ring = p.hasRings ? '<span class="pi-ring"></span>' : '';
-  return `<span class="pi">${ring}<span class="pi-ball" style="background:${grad}"></span></span>`;
-}
-
 export function planetLabel(p) {
   if (p.label) return p.label; // hand-named special-system planets (#13/#19/#20)
   if (p.biomeLabel && (p.inhabited || p.ruined)) return p.biomeLabel;

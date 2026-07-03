@@ -562,7 +562,6 @@ body.cine-show #music-track {
 #view-mode:hover {
   background: linear-gradient(180deg, rgba(20, 24, 44, 0.78), rgba(14, 17, 33, 0.78));
   border-color: var(--vellum-strong);
-  border-color: rgba(125, 200, 255, 0.5);
 }
 #view-mode:active {
   transform: scale(0.94);

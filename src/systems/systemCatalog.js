@@ -43,6 +43,7 @@ import {
  *   every generate*() call below still runs with no arguments.
  * @returns {CatalogEntry[]}
  */
+// eslint-disable-next-line no-unused-vars -- `opts` is a reserved param for a later stage (see JSDoc above), not consumed yet
 export function buildSystemCatalog(config, opts = {}) {
   const c = config;
   const entries = [];

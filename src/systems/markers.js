@@ -310,7 +310,7 @@ export class Systems {
   /** `rotTime` is the freezable galaxy-spin clock (markers rotate with the disk
    *  and FREEZE on interaction); `pulseTime` is the always-running clock, so the
    *  "uncharted" markers keep breathing even when the disk is held still (#10). */
-  update(rotTime, pulseTime, camera) {
+  update(rotTime, pulseTime, _camera) {
     if (!this.group.visible) return; // markers hidden -> skip the CPU work
     for (const s of this.list) {
       const a = this._omega(s.r) * rotTime;

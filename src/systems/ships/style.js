@@ -74,11 +74,11 @@ export function antenna(grp, style, x, y, z, len) {
 // a detailed ship costs ~2 draw calls instead of ~25, so a whole fleet stays
 // cheap. Shared source geometries are never mutated (we clone/expand); the
 // per-bake clones are disposed after merging.
-export function bake(group) {
-  group.updateMatrixWorld(true);
+export function bake(grp) {
+  grp.updateMatrixWorld(true);
   const opaque = [];
   const additive = [];
-  group.traverse((o) => {
+  grp.traverse((o) => {
     if (!o.isMesh) return;
     const src = o.geometry;
     const geo = src.index ? src.toNonIndexed() : src.clone();
