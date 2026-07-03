@@ -83,6 +83,7 @@ tens of thousands of stars.
 - 🎲 **Deterministic from a seed** — the same seed rebuilds the same galaxy, down to the last planet.
 - 🛰️ **Hidden scenes** — Sagittarius A\*, Interstellar's Gargantua + Endurance, our Solar System, a Death Star, and more.
 - 📔 **A codex of finds** — every world, race, ruin, ship and phenomenon you discover joins a permanent collection with honest "N of M" counters and a 3D showcase viewer; it survives seed changes.
+- 🧭 **A first-flight tour** — a short skippable tutorial walks a new player through the Solar System: rotate, zoom, fly home, meet Earth, find it in the codex. Advances on your own actions, shows once.
 - ⚡ **Runs on weak PCs** — no build step, no dependencies, no internet; rotation/twinkle/size live on the GPU.
 
 ---
@@ -394,6 +395,7 @@ galaxy/
     ├── audio/ambient.js    # ambient player (tracks + switching)
     ├── state/              # persistence: storage envelope, world overlay, party lifecycle
     ├── codex/              # the discovery codex: catalogs, log, panel, find rebuilder
+    ├── onboarding/         # first-flight tour: declarative steps + the FSM coachmark
     ├── systems/            # explorable systems
     │   ├── genParams.js    # ALL generation probabilities / shares (GEN)
     │   ├── systemData.js   # build a system from a seed + the special systems
