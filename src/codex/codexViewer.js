@@ -13,6 +13,7 @@ import { buildShip, getFaction } from '../systems/ships.js';
 import { createStation } from '../systems/stations.js';
 import { Planet } from '../systems/planet.js';
 import { hashStr } from '../systems/systemView.js';
+import { specialViewKey } from './codexData.js';
 import { BlackHole } from '../systems/blackHole.js';
 import { Endurance } from '../systems/endurance.js';
 import { DeathStar } from '../systems/deathStar.js';
@@ -98,15 +99,15 @@ function buildShipFind(entry) {
 
 function buildStationFind(entry, overlay) {
   const ref = entry.sourceRef || {};
+  // archetypeKey is `${factionId}:${stationType}` — the faction is baked into
+  // the key now, so it drives the skin directly (sourceRef.faction is a
+  // fallback for older records; the seed only as a last resort).
+  const [keyFaction, keyType] = String(entry.archetypeKey || '').split(':');
+  const stationType = keyType || entry.archetypeKey;
   return (scene) => {
-    // The faction skin this station was ACTUALLY seen in. sourceRef.faction is
-    // authoritative: an inhabited system's faction comes from the catalog's
-    // round-robin over inhabited systems (an index, not derivable from the
-    // seed), so re-generating from the seed alone can land on the wrong fleet.
-    // Regeneration remains only as the fallback for entries without the field.
-    const data = ref.faction ? null : ref.seed ? resolveSystemData(ref.seed, overlay) : null;
-    const style = getFaction(ref.faction || (data && data.faction));
-    const group = createStation(entry.archetypeKey, 1, style);
+    const data = keyFaction || ref.faction ? null : ref.seed ? resolveSystemData(ref.seed, overlay) : null;
+    const style = getFaction(keyFaction || ref.faction || (data && data.faction));
+    const group = createStation(stationType, 1, style);
     scene.add(group);
     return { dispose: () => disposeBaked(group) };
   };
@@ -210,9 +211,16 @@ const PHENOMENON_BUILDERS = {
   },
 };
 
-function buildPhenomenonFind(entry) {
-  const id = (entry.sourceRef && entry.sourceRef.phenomenonId) || entry.archetypeKey;
-  return PHENOMENON_BUILDERS[id] || (() => null);
+// A 'special' entry rebuilds one of three ways: a one-off object / black hole
+// via its builder key (specialViewKey), a signature planet via the shared
+// planet builder (its recorded sourceRef carries seed+planetIndex), or nothing
+// (a plain special SYSTEM like Солнечная — no single object to show).
+function buildSpecialFind(entry, overlay) {
+  const view = specialViewKey(entry.archetypeKey);
+  if (view && PHENOMENON_BUILDERS[view]) return PHENOMENON_BUILDERS[view];
+  const ref = entry.sourceRef;
+  if (ref && ref.seed != null && ref.planetIndex != null) return buildPlanetFind(entry, overlay);
+  return () => null;
 }
 
 /**
@@ -234,16 +242,15 @@ export function buildFor(entry, ctx = {}) {
     case 'station':
       return buildStationFind(entry, overlay);
     case 'planet':
-    case 'race':
     case 'ruin':
       // a ruined world IS a planet — its sourceRef carries the same
       // {seed, planetIndex}, and generateSystem rebuilds it with its ruin state.
       return buildPlanetFind(entry, overlay);
-    case 'phenomenon':
-      return buildPhenomenonFind(entry);
+    case 'special':
+      return buildSpecialFind(entry, overlay);
     default:
-      // 'system' (and anything else) has no standalone find to rebuild —
-      // codexUI.js should not offer «Рассмотреть» for it.
+      // 'system' and 'race' have no standalone object to rebuild —
+      // codexUI.js should not offer «Рассмотреть» for them.
       return () => null;
   }
 }
