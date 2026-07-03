@@ -9,6 +9,7 @@ import { PLANET_KINDS, RUIN_TYPES } from '../systems/systemData.js';
 import { FACTIONS, FACTION_BY_ID } from '../systems/ships/factions.js';
 import { ROLES } from '../systems/ships/roles.js';
 import { STATION_TYPES } from '../systems/stations.js';
+import { FLAGSHIP_LORE, STATION_LORE } from './fleetLore.js';
 
 const ROLE_BY_ID = Object.fromEntries(ROLES.map((r) => [r.id, r]));
 
@@ -92,6 +93,11 @@ const RACE_CATALOG = [
     group: 'Виды',
     planetRef: { seed: 'deadspace', label: 'Тау-Волантис' },
   },
+  // the faction homeworld races (#stage6) — unlocked by visiting their capital
+  { archetypeKey: 'aelari', label: 'Аэлары', group: 'Виды', planetRef: { seed: 'capital-alliance', label: 'Аэла' } },
+  { archetypeKey: 'hesht', label: 'Хешты', group: 'Виды', planetRef: { seed: 'capital-imperial', label: 'Наковальня' } },
+  { archetypeKey: 'porosl', label: 'Поросль', group: 'Виды', planetRef: { seed: 'capital-swarm', label: 'Прародина' } },
+  { archetypeKey: 'precursors', label: 'Предтечи', group: 'Виды', planetRef: { seed: 'capital-precursor', label: 'Скрижаль' } },
   { archetypeKey: 'necromorphs', label: 'Некроморфы', group: 'Скоро', future: true },
   { archetypeKey: 'generative-1', label: 'Неизвестный вид', group: 'Скоро', future: true },
   { archetypeKey: 'generative-2', label: 'Неизвестный вид', group: 'Скоро', future: true },
@@ -113,6 +119,13 @@ const SPECIAL_CATALOG = [
   { archetypeKey: 'sys-spice', label: 'Пряный Предел', group: 'Системы', seed: 'film-spice' },
   { archetypeKey: 'sys-jungle', label: 'Спутник Бурь', group: 'Системы', seed: 'film-jungle' },
   { archetypeKey: 'sys-hoth', label: 'Хот', group: 'Системы', seed: 'film-ice' },
+  // --- столицы фракций (#stage6) ---
+  { archetypeKey: 'sys-cap-alliance', label: 'Первая Верфь', group: 'Системы', seed: 'capital-alliance' },
+  { archetypeKey: 'sys-cap-imperial', label: 'Зольный Престол', group: 'Системы', seed: 'capital-imperial' },
+  { archetypeKey: 'sys-cap-swarm', label: 'Первый Сад', group: 'Системы', seed: 'capital-swarm' },
+  { archetypeKey: 'sys-cap-syndicate', label: 'Меридиан-Ноль', group: 'Системы', seed: 'capital-syndicate' },
+  { archetypeKey: 'sys-cap-cartel', label: 'Вольная Гавань', group: 'Системы', seed: 'capital-cartel' },
+  { archetypeKey: 'sys-cap-precursor', label: 'Чертог Молчания', group: 'Системы', seed: 'capital-precursor' },
   // --- объекты ---
   { archetypeKey: 'endurance', label: 'Станция «Эндюранс»', group: 'Объекты', view: 'endurance', seed: 'interstellar' },
   { archetypeKey: 'ishimura', label: 'USG Ishimura', group: 'Объекты', view: 'ishimura', seed: 'deadspace' },
@@ -128,6 +141,14 @@ const SPECIAL_CATALOG = [
   { archetypeKey: 'pl-arrakis', label: 'Арракис', group: 'Планеты', seed: 'film-spice', planetLabel: 'Арракис', race: 'fremen' },
   { archetypeKey: 'pl-pandora', label: 'Пандора', group: 'Планеты', seed: 'film-jungle', planetLabel: 'Пандора', race: 'navi' },
   { archetypeKey: 'pl-hoth', label: 'Хот', group: 'Планеты', seed: 'film-ice', planetLabel: 'Хот' },
+  // --- миры столиц фракций (#stage6) ---
+  { archetypeKey: 'pl-aela', label: 'Аэла', group: 'Планеты', seed: 'capital-alliance', planetLabel: 'Аэла', race: 'aelari' },
+  { archetypeKey: 'pl-hesht', label: 'Хешт', group: 'Планеты', seed: 'capital-imperial', planetLabel: 'Хешт' },
+  { archetypeKey: 'pl-anvil', label: 'Наковальня', group: 'Планеты', seed: 'capital-imperial', planetLabel: 'Наковальня', race: 'hesht' },
+  { archetypeKey: 'pl-firstgarden', label: 'Прародина', group: 'Планеты', seed: 'capital-swarm', planetLabel: 'Прародина', race: 'porosl' },
+  { archetypeKey: 'pl-prime', label: 'Прайм', group: 'Планеты', seed: 'capital-syndicate', planetLabel: 'Прайм' },
+  { archetypeKey: 'pl-fatman', label: 'Толстяк', group: 'Планеты', seed: 'capital-cartel', planetLabel: 'Толстяк' },
+  { archetypeKey: 'pl-tablet', label: 'Скрижаль', group: 'Планеты', seed: 'capital-precursor', planetLabel: 'Скрижаль', race: 'precursors' },
 ];
 const SPECIAL_BY_KEY = Object.fromEntries(SPECIAL_CATALOG.map((s) => [s.archetypeKey, s]));
 const SPECIAL_SYSTEM_BY_SEED = Object.fromEntries(
@@ -307,6 +328,10 @@ const RACE_INFO = {
   fremen: 'Суровый народ пустынь, живущий по воде и оседлавший песчаных исполинов родного мира.',
   navi: 'Рослый народ, вросший в живую сеть своей луны-джунглей и защищающий её всем племенем.',
   signbuilders: 'Давно исчезнувшая раса зодчих, оставившая на промёрзшем мире загадочные Знаки.',
+  aelari: 'Негромкий народ верфей — лучшие сварщики и навигаторы Альянса, одна из рас-основательниц Договора.',
+  hesht: 'Народ расколотого мира, превративший траур в дисциплину, а клятву — в государство.',
+  porosl: 'Монораса-коллектив Роя; лес, научившийся расти между звёзд. Имя дали чужие картографы.',
+  precursors: 'Высокие тихие силуэты старшей расы; их видят редко, издалека и всегда за работой.',
 };
 
 // Special-content flavour + facts, by archetypeKey.
@@ -333,6 +358,20 @@ const SPECIAL_INFO = {
   'pl-arrakis': { desc: 'Пустынный мир пряности и песчаных исполинов, дом Фрименов.', facts: [['Биом', 'пустыня'], ['Раса', 'Фримены']] },
   'pl-pandora': { desc: 'Живая луна-джунгли газового гиганта, дом народа На’ви.', facts: [['Биом', 'джунгли'], ['Раса', 'На’ви']] },
   'pl-hoth': { desc: 'Планета вечных снегов и ледяных бурь.', facts: [['Биом', 'лёд']] },
+  // --- столицы фракций (#stage6) ---
+  'sys-cap-alliance': { desc: 'Первая общая верфь галактики над родным миром аэларов: здесь сваркой подписали Договор.', facts: [['Фракция', 'Альянс'], ['Флагман', '«Тихая Гавань»']] },
+  'sys-cap-imperial': { desc: 'Поле обломков расколотого Хешта и тронная Наковальня — рана, вокруг которой построена Империя.', facts: [['Фракция', 'Империя Пепла'], ['Флагман', '«Тризна»']] },
+  'sys-cap-swarm': { desc: 'Прародина-сад, океан-питомник и пастбища полипов; все имена здесь дали чужие картографы.', facts: [['Фракция', 'Рой'], ['Флагман', '«Идущий лес»']] },
+  'sys-cap-syndicate': { desc: 'Нулевой меридиан всех маршрутов галактики: эталонные часы Прайма заверяют сделки половины флотов.', facts: [['Фракция', 'Синдикат'], ['Флагман', '«Контрольный пакет»']] },
+  'sys-cap-cartel': { desc: 'Старейший вольный порт галактики: толчея бортов у Толстяка и доки, где плиты не гаснут.', facts: [['Фракция', 'Картель'], ['Флагман', '«Мамаша»']] },
+  'sys-cap-precursor': { desc: 'Система, которую все карты помечают одинаково: не мешать. Города выметены, сад поливают — хозяев не видно.', facts: [['Фракция', 'Предтечи'], ['Флагман', '«Тот, Кто Остался»']] },
+  'pl-aela': { desc: 'Родной мир аэларов: города вдоль побережий, кольцевой хаб-верфь над экватором и старые песни в ритме работы.', facts: [['Биом', 'земной'], ['Раса', 'Аэлары']] },
+  'pl-hesht': { desc: 'Расколотый родной мир хештов — святыня и рана; сюда приходят молчать, заглушив двигатель.', facts: [['Статус', 'уничтожен'], ['Память', 'осколки в килях кораблей']] },
+  'pl-anvil': { desc: 'Тронный мир Империи: чёрные города-арсеналы и небо, в котором всегда виден расколотый Хешт.', facts: [['Биом', 'скальный'], ['Раса', 'Хешты']] },
+  'pl-firstgarden': { desc: 'Мир-сад без единого огня городов: города здесь не строят, здесь растут.', facts: [['Биом', 'джунгли'], ['Раса', 'Поросль']] },
+  'pl-prime': { desc: 'Мир-штаб под стеклом: от его нулевого меридиана отсчитываются маршруты и время половины галактики.', facts: [['Биом', 'город'], ['Владелец', 'Синдикат «Меридиан»']] },
+  'pl-fatman': { desc: 'Полосатый гигант, кормящий половину Картеля: газосборщики, доки и очередь, которую уважают больше законов.', facts: [['Тип', 'газовый гигант'], ['Роль', 'главный порт']] },
+  'pl-tablet': { desc: 'Древний мир, чьи города с орбиты читаются как строки текста; единственный сад поливают до сих пор.', facts: [['Биом', 'пустыня'], ['Раса', 'Предтечи']] },
 };
 
 /**
@@ -365,17 +404,26 @@ export function describeEntry(entry) {
         facts.push(['Флот', faction.name]);
         if (faction.lore) desc += (desc ? ' ' : '') + faction.lore;
       }
+      // the flagship of each fleet is a NAMED legend (#stage6) — its story
+      // replaces the generic role blurb (the visual style line stays).
+      const fl = roleId === 'flagship' && FLAGSHIP_LORE[factionId];
+      if (fl) {
+        desc = `${fl.desc} ${fl.history}`;
+        facts.unshift(['Имя', fl.name]);
+      }
       break;
     }
     case 'station': {
       const [factionId, type] = key.split(':');
       const faction = FACTION_BY_ID[factionId];
+      // per-faction station lore (#stage6) — what a hub/outpost/collector IS
+      // to that culture; falls back to the neutral type blurb.
       const STATION_DESC = {
         ring: 'Кольцевой хаб над родным миром цивилизации — её орбитальная столица.',
         outpost: 'Колониальный аванпост: скромная орбитальная станция над колонией.',
         collector: 'Газосборщик — скиммер, черпающий топливо из атмосферы газового гиганта.',
       };
-      desc = STATION_DESC[type] || '';
+      desc = (STATION_LORE[factionId] && STATION_LORE[factionId][type]) || STATION_DESC[type] || '';
       if (faction) facts.push(['Фракция', faction.name]);
       break;
     }
