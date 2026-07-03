@@ -41,14 +41,36 @@ diry = np.broadcast_to(slat, (H, W)).astype("float32")
 dirz = (clat * np.sin(lon)).astype("float32")
 
 
-def octave(rng, cx, cy):
-    """One octave of value noise, bilinearly upscaled to full size."""
+def octave(rng: np.random.Generator, cx: int, cy: int) -> np.ndarray:
+    """Generate one octave of value noise, bilinearly upscaled to full size.
+
+    Args:
+        rng: Seeded random number generator to sample the coarse grid from.
+        cx: Width of the coarse noise grid, in cells.
+        cy: Height of the coarse noise grid, in cells.
+
+    Returns:
+        An ``(H, W)`` float32 array in ``[0, 1]``, upscaled from the coarse grid.
+    """
     a = rng.random((cy, cx)).astype("float32")
-    im = Image.fromarray((a * 255).astype("uint8")).resize((W, H), Image.BICUBIC)
+    im = Image.fromarray((a * 255).astype("uint8")).resize((W, H), Image.Resampling.BICUBIC)
     return np.asarray(im, "float32") / 255.0
 
 
-def fbm(rng, base=4, octaves=6):
+def fbm(rng: np.random.Generator, base: int = 4, octaves: int = 6) -> np.ndarray:
+    """Sum multiple octaves of value noise into fractal Brownian motion.
+
+    Each successive octave doubles the coarse-grid resolution and halves its
+    amplitude, then the weighted sum is normalised back to ``[0, 1]``.
+
+    Args:
+        rng: Seeded random number generator, forwarded to :func:`octave`.
+        base: Coarse-grid cell count for the first (lowest-frequency) octave.
+        octaves: Number of octaves to sum.
+
+    Returns:
+        An ``(H, W)`` float32 array in ``[0, 1]``.
+    """
     out = np.zeros((H, W), "float32")
     amp, tot = 1.0, 0.0
     for k in range(octaves):
@@ -60,13 +82,30 @@ def fbm(rng, base=4, octaves=6):
     return out / tot
 
 
-def great_circle(clon, clat_c):
-    """Angular distance (rad) from every pixel to a sphere point (clon,clat_c)."""
+def great_circle(clon: float, clat_c: float) -> np.ndarray:
+    """Compute the angular distance from every pixel to a sphere point.
+
+    Args:
+        clon: Longitude of the reference point, in radians.
+        clat_c: Latitude of the reference point, in radians.
+
+    Returns:
+        An ``(H, W)`` float32 array of angular distances, in radians.
+    """
     cd = slat * np.sin(clat_c) + clat * np.cos(clat_c) * np.cos(lon - clon)
     return np.arccos(np.clip(cd, -1.0, 1.0))
 
 
-def build_sky(seed):
+def build_sky(seed: int) -> Image.Image:
+    """Render one full equirectangular nebula skybox.
+
+    Args:
+        seed: Seed for the sky's random number generator; a different seed
+            yields a visually distinct sky.
+
+    Returns:
+        The rendered ``4096x2048`` RGB image.
+    """
     rng = np.random.default_rng(seed)
 
     # fine + coarse noise fields reused for wisps and dust
@@ -109,7 +148,16 @@ def build_sky(seed):
 
     # --- starfield ------------------------------------------------------------
     # uniform-on-sphere placement: lon uniform, lat via arccos so density is even
-    def stars(n, bmin, bmax, smax_size, warm_bias=0.0):
+    def stars(n: int, bmin: float, bmax: float, smax_size: int, warm_bias: float = 0.0) -> None:
+        """Splat ``n`` single-pixel stars onto ``col`` (closure) at random sky positions.
+
+        Args:
+            n: Number of stars to place.
+            bmin: Minimum star brightness (cubed-random-weighted toward the low end).
+            bmax: Maximum star brightness.
+            smax_size: Unused; kept for call-site symmetry across star layers.
+            warm_bias: Extra red bias added to every star's colour temperature.
+        """
         sx = rng.integers(0, W, n)
         sy = (np.arccos(1 - 2 * rng.random(n)) / np.pi * H).astype(int).clip(0, H - 1)
         bri = (bmin + (bmax - bmin) * rng.random(n) ** 3)

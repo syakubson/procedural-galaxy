@@ -36,8 +36,9 @@ import urllib.request
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Page, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PORT = 8124
@@ -69,11 +70,21 @@ SCENARIOS = {
 }
 
 
-def start_server(port):
-    """Launch the project's no-cache dev server as a subprocess — but only for
-    the default port. `.nocache_server.py` hardcodes its bind to 8124, so a
-    non-default `--port` means "I'm already running my own server there";
-    spawning ours anyway would either bind-fail or serve nothing useful."""
+def start_server(port: int) -> subprocess.Popen[str] | None:
+    """Launch the project's no-cache dev server as a subprocess.
+
+    Only spawned for the default port. `.nocache_server.py` hardcodes its bind
+    to 8124, so a non-default `--port` means "I'm already running my own
+    server there"; spawning ours anyway would either bind-fail or serve
+    nothing useful.
+
+    Args:
+        port: Port the caller wants the dev server reachable on.
+
+    Returns:
+        The spawned subprocess, or ``None`` if ``port`` isn't the default
+        (in which case the caller is expected to already have a server up).
+    """
     if port != DEFAULT_PORT:
         return None
     return subprocess.Popen(
@@ -85,7 +96,13 @@ def start_server(port):
     )
 
 
-def stop_server(proc):
+def stop_server(proc: subprocess.Popen[str] | None) -> None:
+    """Terminate the dev server subprocess, killing it if it won't stop.
+
+    Args:
+        proc: The subprocess to stop, or ``None`` (no-op) if no server was
+            spawned by this run.
+    """
     if proc is None:
         return
     proc.terminate()
@@ -96,7 +113,20 @@ def stop_server(proc):
         proc.wait()
 
 
-def wait_for_server(port, proc=None, timeout=15.0):
+def wait_for_server(port: int, proc: subprocess.Popen[str] | None = None, timeout: float = 15.0) -> None:
+    """Block until the dev server answers on ``port``, or raise.
+
+    Args:
+        port: Port to poll.
+        proc: The dev server subprocess, if this run spawned one — used to
+            detect an early exit (a bind failure) and surface its stderr
+            instead of polling until the timeout.
+        timeout: How long to poll before giving up, in seconds.
+
+    Raises:
+        RuntimeError: If the server subprocess exited before answering, or if
+            nothing answers within ``timeout`` seconds.
+    """
     url = f'http://127.0.0.1:{port}/'
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -105,7 +135,11 @@ def wait_for_server(port, proc=None, timeout=15.0):
         # beats the silent alternative: benchmarking whatever (possibly
         # stale) process happens to answer on that port.
         if proc is not None and proc.poll() is not None:
-            err = (proc.stderr.read() or '').strip()
+            # `start_server()` always redirects stderr to a pipe, so this is
+            # never actually None at runtime — the check just satisfies the
+            # type checker's static view of `Popen.stderr`.
+            stderr_text = proc.stderr.read() if proc.stderr is not None else ''
+            err = (stderr_text or '').strip()
             raise RuntimeError(
                 f'dev server exited on startup (port {port} already taken?):\n{err}')
         try:
@@ -116,14 +150,35 @@ def wait_for_server(port, proc=None, timeout=15.0):
     raise RuntimeError(f'dev server never answered at {url} within {timeout:.0f}s')
 
 
-def settle(page, ms):
-    """Wall-clock wait plus two animation frames — lets a rebuild/dolly's
-    last frame actually land before the next renderer.info read."""
+def settle(page: Page, ms: int) -> None:
+    """Wait out the wall clock, then two animation frames.
+
+    Lets a rebuild/dolly's last frame actually land before the next
+    `renderer.info` read.
+
+    Args:
+        page: The Playwright page to settle.
+        ms: Wall-clock milliseconds to wait before the two-frame settle.
+    """
     page.wait_for_timeout(ms)
     page.evaluate('() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))')
 
 
-def run_scenarios(args, scenario_names):
+def run_scenarios(
+    args: argparse.Namespace, scenario_names: list[str]
+) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
+    """Drive the app through each named scenario and collect a perf snapshot per scenario.
+
+    Args:
+        args: Parsed CLI arguments (`profile`, `port`, `headed` are used here).
+        scenario_names: Names of the scenarios to run, in order (see `SCENARIOS`).
+
+    Returns:
+        A tuple of `(results, console_log)`: `results` is one dict per scenario
+        (either a perf snapshot or an `{'error': ...}` entry for a failed jump);
+        `console_log` maps each scenario name (plus `'boot'`) to the browser
+        console errors observed during it.
+    """
     profile = args.profile
     results = []
     console_log = defaultdict(list)
@@ -197,9 +252,16 @@ def run_scenarios(args, scenario_names):
     return results, dict(console_log)
 
 
-def print_report(results):
-    """Print the scenario table to stdout; return True if any scenario has a
-    fail-worthy (drawCalls/triangles) violation."""
+def print_report(results: list[dict[str, Any]]) -> bool:
+    """Print the scenario table to stdout.
+
+    Args:
+        results: Per-scenario results, as returned by `run_scenarios()`.
+
+    Returns:
+        True if any scenario has a fail-worthy (drawCalls/triangles) violation
+        (or errored outright), signalling the caller should exit non-zero.
+    """
     rows = []
     any_fail = False
     for r in results:
@@ -229,11 +291,11 @@ def print_report(results):
 
     headers = ('SCENARIO', 'PROFILE', 'DRAW CALLS', 'TRIANGLES', 'FPS', 'STATUS', 'VIOLATIONS')
     widths = [max(len(h), *(len(row[i]) for row in rows)) if rows else len(h) for i, h in enumerate(headers)]
-    line = '  '.join(h.ljust(w) for h, w in zip(headers, widths))
+    line = '  '.join(h.ljust(w) for h, w in zip(headers, widths, strict=False))
     print(line)
     print('-' * len(line))
     for row in rows:
-        print('  '.join(cell.ljust(w) for cell, w in zip(row, widths)))
+        print('  '.join(cell.ljust(w) for cell, w in zip(row, widths, strict=False)))
 
     for r in results:
         if r['consoleErrors']:
@@ -242,7 +304,17 @@ def print_report(results):
     return any_fail
 
 
-def write_json_report(results, args, boot_errors):
+def write_json_report(results: list[dict[str, Any]], args: argparse.Namespace, boot_errors: list[str]) -> Path:
+    """Write the full scenario report to `docs/perf/report_<timestamp>.json`.
+
+    Args:
+        results: Per-scenario results, as returned by `run_scenarios()`.
+        args: Parsed CLI arguments (only `headed` is used here).
+        boot_errors: Console errors observed while the app was still booting.
+
+    Returns:
+        Path of the written report file.
+    """
     out_dir = ROOT / 'docs' / 'perf'
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -250,7 +322,8 @@ def write_json_report(results, args, boot_errors):
     report = {
         'generatedAt': datetime.now().isoformat(),
         'headed': args.headed,
-        'note': 'FPS is headless SwiftShader software rendering unless headed=true — treat it as relative, not absolute.',
+        'note': 'FPS is headless SwiftShader software rendering unless headed=true — treat it as relative, '
+                'not absolute.',
         'bootErrors': boot_errors,
         'scenarios': results,
     }
@@ -259,17 +332,21 @@ def write_json_report(results, args, boot_errors):
     return out_path
 
 
-def main():
+def main() -> None:
+    """Parse CLI args, run the scenarios, print + write the report, and set the exit code."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--profile', choices=PROFILES, default='medium',
-                         help='quality preset to switch to before each scenario (matches src/config.js QUALITY_PRESETS); default: medium')
+                         help='quality preset to switch to before each scenario '
+                              '(matches src/config.js QUALITY_PRESETS); default: medium')
     parser.add_argument('--scenario', nargs='+', choices=list(SCENARIOS), default=None,
                          help='which scenarios to run (default: all of them, in the order above)')
     parser.add_argument('--headed', action='store_true',
-                         help='show the browser window instead of running headless — needed for a meaningful FPS number')
+                         help='show the browser window instead of running headless — '
+                              'needed for a meaningful FPS number')
     parser.add_argument('--port', type=int, default=DEFAULT_PORT,
                          help=f'port the dev server is reachable on (default {DEFAULT_PORT}); '
-                              f'.nocache_server.py always binds {DEFAULT_PORT}, so only change this if you run your own server elsewhere')
+                              f'.nocache_server.py always binds {DEFAULT_PORT}, so only change '
+                              'this if you run your own server elsewhere')
     args = parser.parse_args()
     scenario_names = args.scenario or list(SCENARIOS)
 
