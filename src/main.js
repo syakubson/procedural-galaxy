@@ -20,9 +20,22 @@ import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
 import { WorldOverlay } from './state/overlay.js';
 import { currentPartyId, ensureParty, hasLegacyCharted } from './state/party.js';
-import { record as codexRecord } from './codex/codex.js';
+import { record as codexRecord, flush as codexFlush } from './codex/codex.js';
 import { CodexUI } from './codex/codexUI.js';
 import { ObjectViewer } from './ui/objectViewer.js';
+import { ROLES } from './systems/ships.js';
+import { STATION_TYPES } from './systems/stations.js';
+
+// Which special system each phenomenon lives in — so «Перейти к объекту» can
+// warp to it (a phenomenon's sourceRef holds only its id, not a system seed).
+const PHENOMENON_SYSTEM_SEED = {
+  'blackhole-galactic': 'galactic-core',
+  'blackhole-gargantua': 'interstellar',
+  endurance: 'interstellar',
+  ishimura: 'deadspace',
+  deathstar: 'death-star',
+  dragon: 'sol-system',
+};
 
 // Russian planet-type labels for the in-system hover card (#6).
 const SYS_TYPE_RU = {
@@ -760,6 +773,7 @@ class GalaxyApp {
       // CURRENT party's chartable system count, same filter _updateProgress() uses.
       getSystemTotal: () => this.systems.list.filter((s) => !s.special).length,
       getPartyId: () => currentPartyId(this.config), // scopes 'system' progress to this galaxy
+      onNavigate: (entry) => this.navigateToEntry(entry), // «Перейти к объекту» → warp there
     });
     this._codexBtn = document.getElementById('codex-toggle');
     if (this._codexBtn) this._codexBtn.addEventListener('click', () => this.codexUI.open());
@@ -848,7 +862,7 @@ class GalaxyApp {
         if (this._objectViewerOpen) {
           this.objectViewer.close();
         } else if (this.codexUI && this.codexUI.isOpen) {
-          this.codexUI.close();
+          this.codexUI.escape(); // detail dialog first (if up), then the panel
         } else if (this.mode === 'system') {
           if (this.systemView._focus) this._backToOverview();
           else this.exitSystem();
@@ -1059,10 +1073,108 @@ class GalaxyApp {
     this.legend.setProgress(n, list.length);
   }
 
-  /** Chart every system at once (#13) — fog-of-war off; refreshes the counter. */
+  /** Chart every system at once (#13) — fog-of-war off; refreshes the counter.
+   *  Revealing the whole galaxy is equivalent to having been everywhere, so it
+   *  also fills the codex with everything those systems hold (this is the ONE
+   *  bulk path allowed to record — the cinematic tour still doesn't). */
   revealAllSystems() {
     this.systems.markAllVisited();
     this._updateProgress();
+    this._recordEverythingDiscoverable();
+    if (this.codexUI) this.codexUI.refresh();
+  }
+
+  /** Record every archetype reachable in the CURRENT galaxy, for revealAll.
+   *  Systems/planets/races/ruins/phenomena come from real generated data (so
+   *  each entry keeps a valid sourceRef the viewer can rebuild + navigate to);
+   *  ships and stations are anchored per present faction (their in-system
+   *  composition is drawn fresh each visit, so "every fleet type this galaxy
+   *  fields" is the honest set). */
+  _recordEverythingDiscoverable() {
+    const batchId = currentPartyId(this.config);
+    const factionSeed = {}; // faction -> a representative inhabited-system seed
+    // defer every write and persist ONCE at the end (rec): hundreds of systems
+    // would otherwise each trigger a full-map serialize + setItem.
+    const rec = (category, key, meta) => codexRecord(category, key, meta, { defer: true });
+    for (const s of this.systems.list) {
+      const data = s.data;
+      if (!data) continue;
+      if (!s.special) {
+        rec('system', data.seed, { batchId, sourceRef: { seed: data.seed }, label: data.name });
+      }
+      if (data.faction && data.status === 'inhabited' && !factionSeed[data.faction]) factionSeed[data.faction] = data.seed;
+      (data.planets || []).forEach((p, planetIndex) => {
+        const sourceRef = { seed: data.seed, planetIndex, faction: data.faction };
+        rec('planet', p.type, { batchId, sourceRef, colonyKind: p.colonyKind });
+        if (p.inhabited && p.biomeName && p.civLevel) {
+          rec('race', `${p.biomeName}:${p.civLevel}`, { batchId, sourceRef, biome: p.biomeName });
+        } else if (p.ruined && p.biomeName) {
+          const ruinType = p.robotic ? 'robotic' : p.destroyed ? 'destroyed' : p.obliterated ? 'obliterated' : 'plain';
+          rec('ruin', `${p.biomeName}:${ruinType}`, { batchId, sourceRef, ruinType });
+        }
+      });
+      if (data.kind === 'blackhole') {
+        rec('phenomenon', `blackhole-${data.variant}`, { batchId, sourceRef: { phenomenonId: `blackhole-${data.variant}` } });
+        if (data.variant === 'gargantua') rec('phenomenon', 'endurance', { batchId, sourceRef: { phenomenonId: 'endurance' } });
+      }
+      if (data.deathStar) rec('phenomenon', 'deathstar', { batchId, sourceRef: { phenomenonId: 'deathstar' } });
+      if (data.dragonToMars) rec('phenomenon', 'dragon', { batchId, sourceRef: { phenomenonId: 'dragon' } });
+      if ((data.planets || []).some((p) => p.ishimura)) {
+        rec('phenomenon', 'ishimura', { batchId, sourceRef: { phenomenonId: 'ishimura' } });
+      }
+    }
+    // stations: the 3 kinds, anchored to any faction present (createStation
+    // rebuilds any kind in any faction style, so this stays viewable).
+    const anchorFaction = Object.keys(factionSeed)[0] || 'alliance';
+    const anchorSeed = factionSeed[anchorFaction] || (this.systems.list.find((s) => !s.special)?.data?.seed ?? null);
+    for (const st of STATION_TYPES) {
+      rec('station', st.id, { batchId, sourceRef: { seed: anchorSeed, faction: anchorFaction } });
+    }
+    // ships: every role of every faction the galaxy actually fields.
+    for (const [faction, seed] of Object.entries(factionSeed)) {
+      for (const role of ROLES) {
+        rec('ship', `${faction}:${role.id}`, { batchId, sourceRef: { role: role.id, faction, seed } });
+      }
+    }
+    codexFlush(); // single serialize + setItem for the whole reveal
+  }
+
+  /** «Перейти к объекту»: warp to a codex find in the live galaxy and focus it.
+   *  Systems/planets/stations carry a seed; a phenomenon maps to its fixed
+   *  special system. A no-op if the target can't be located (e.g. an old ship
+   *  record with no seed, or a seed from a different galaxy). */
+  async navigateToEntry(entry) {
+    const ref = entry.sourceRef || {};
+    let seed = ref.seed || null;
+    if (entry.category === 'system') seed = ref.seed || entry.archetypeKey;
+    else if (entry.category === 'phenomenon') seed = PHENOMENON_SYSTEM_SEED[entry.archetypeKey] || seed;
+    if (!seed) return;
+    const target = this.systems.list.find((s) => s.data && s.data.seed === seed);
+    if (!target) return;
+
+    if (this.mode === 'system') await this.exitSystem();
+    if (this.mode !== 'galaxy') return; // a transition is mid-flight — bail rather than race it
+    await this.enterSystem(target);
+    if (this.mode !== 'system') return; // enter was interrupted
+
+    if (entry.category === 'planet' || entry.category === 'race' || entry.category === 'ruin') {
+      const p = this.systemView.planets[ref.planetIndex];
+      if (p) this._focusPlanet(p);
+    } else if (entry.category === 'ship') {
+      const ships = this.systemView.ships || [];
+      const ship = ships.find((sh) => sh.type && sh.type.id === ref.role) || ships[0];
+      if (ship) this._focusHit('ship', ship);
+    } else if (entry.category === 'station') {
+      const host = (this.systemView.planets || []).find((p) => p.station);
+      if (host) this._focusHit('structure', host);
+    } else if (entry.category === 'phenomenon') {
+      // map the phenomenon id to the SystemView field holding it (note the
+      // Death Star's field is `deathStar`, capital S) — the _focusHit kind
+      // string stays the lowercase id its branch matches on.
+      const field = { ishimura: 'ishimura', deathstar: 'deathStar', dragon: 'dragon' }[entry.archetypeKey];
+      const obj = field && this.systemView[field];
+      if (obj) this._focusHit(entry.archetypeKey, obj);
+    }
   }
 
   /** Focus a planet + show its card (shared by canvas clicks and label clicks). */
@@ -1118,7 +1230,9 @@ class GalaxyApp {
       this.planetLabels.setVisible(false);
       this._codexRecord('ship', `${this.systemView._faction}:${ref.type.id}`, {
         batchId: codexBatch,
-        sourceRef: { role: ref.type.id, faction: this.systemView._faction },
+        // seed pins the system this fleet type was seen in — lets «Перейти к
+        // объекту» warp back to it (buildShip itself needs only role+faction).
+        sourceRef: { role: ref.type.id, faction: this.systemView._faction, seed: this.systemView.data.seed },
       });
     } else if (kind === 'structure') {
       // #6: orbital structures zoom in + follow + their own info card.
