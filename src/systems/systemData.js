@@ -873,10 +873,13 @@ export function generateSolarSystem() {
         },
       },
       { label: 'Марс', biome: 'desert', radius: 0.4, color: '#c1440e', moonCount: 2 },
-      { label: 'Юпитер', biome: 'gas', radius: 3.2, color: '#d8a06b', hasRings: true, moonCount: 4 },
+      // Only Saturn wears visible rings: the real ring systems of Jupiter, Uranus
+      // and Neptune are far too faint to read at this art scale, and four ringed
+      // giants in a row made the system look wrong (owner report, 2026-07-03).
+      { label: 'Юпитер', biome: 'gas', radius: 3.2, color: '#d8a06b', moonCount: 4 },
       { label: 'Сатурн', biome: 'gas', radius: 2.9, color: '#e3c681', hasRings: true, moonCount: 4 },
-      { label: 'Уран', biome: 'ice', radius: 1.8, color: '#9fe3e0', hasRings: true, moonCount: 4 },
-      { label: 'Нептун', biome: 'ice', radius: 1.75, color: '#2a5ccb', hasRings: true, moonCount: 4 },
+      { label: 'Уран', biome: 'ice', radius: 1.8, color: '#9fe3e0', moonCount: 4 },
+      { label: 'Нептун', biome: 'ice', radius: 1.75, color: '#2a5ccb', moonCount: 4 },
     ],
   });
 }
