@@ -246,7 +246,7 @@ body {
 #help-toggle {
   position: fixed;
   top: 18px;
-  right: 168px; /* gear(18) + 42+8 (gallery) + 42+8 (codex) + 42+8 */
+  right: 118px; /* gear(18) + 42+8 (gear) + 42+8 (codex) */
   z-index: 16;
   width: 42px;
   height: 42px;
@@ -520,7 +520,6 @@ body.cine-show #fact-box,
 body.cine-show #hint,
 body.cine-show #nav-back,
 body.cine-show #settings-toggle,
-body.cine-show #gallery-link,
 body.cine-show #codex-toggle,
 body.cine-show #view-mode,
 body.cine-show #rotate-toggle,
@@ -635,44 +634,13 @@ body.clean-view #fact-box {
   transform: translateY(0);
 }
 
-/* --- gallery link (ships & stations showcase) ---
-   a round icon button sitting just left of the ⚙ settings toggle (both are
-   galaxy-view only), so the two galaxy controls read as one cohesive cluster. */
-#gallery-link {
-  position: fixed;
-  top: 18px;
-  right: 68px; /* 18 (gear right) + 42 (gear width) + 8 (gap) */
-  z-index: 16;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 1px solid var(--vellum);
-  background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
-  backdrop-filter: blur(8px);
-  color: var(--ivory-dim);
-  font-size: 18px;
-  line-height: 1;
-  text-decoration: none;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-}
-#gallery-link:hover {
-  background: linear-gradient(180deg, rgba(20, 24, 44, 0.78), rgba(14, 17, 33, 0.78));
-  border-color: var(--vellum-strong);
-  transform: scale(1.06);
-}
-#gallery-link:active {
-  transform: scale(0.96);
-}
-
-/* --- codex toggle (permanent discovery log) --- a round icon button cloned
-   from #gallery-link, one slot further along the same galaxy-only cluster. */
+/* --- codex toggle (permanent discovery log) --- a round icon button sitting
+   just left of the ⚙ settings toggle (both galaxy-view only), so the two read
+   as one cohesive cluster. */
 #codex-toggle {
   position: fixed;
   top: 18px;
-  right: 118px; /* gear(18) + 42+8 (gear) + 42+8 (gallery) */
+  right: 68px; /* 18 (gear right) + 42 (gear width) + 8 (gap) */
   z-index: 16;
   display: flex;
   align-items: center;

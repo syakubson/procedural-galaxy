@@ -1,11 +1,9 @@
 // Isolated-canvas "codex" object viewer: a full-screen overlay with its OWN
 // renderer/scene/camera/OrbitControls, entirely separate from the main app's
-// renderer and the in-system SystemView. Follows gallery.html's standalone-
-// viewer approach (own renderer + scene + camera + OrbitControls), packaged
-// as a reusable class instead of a one-off page. Renders ONLY while open, at
-// its own requestAnimationFrame loop — main.js pauses ITS OWN loop for the
-// duration via the onOpen/onClose callbacks below, so the two loops never
-// compete for the frame budget.
+// renderer and the in-system SystemView — a standalone find inspector packaged
+// as a reusable class. Renders ONLY while open, at its own requestAnimationFrame
+// loop — main.js pauses ITS OWN loop for the duration via the onOpen/onClose
+// callbacks below, so the two loops never compete for the frame budget.
 //
 // Lazy + fully torn down: the renderer/DOM/controls are built from scratch on
 // EVERY open() and fully disposed on EVERY close() (not just the first/last),
@@ -65,8 +63,8 @@ export class ObjectViewer {
    * `update(dt)` runs once per rendered frame while the viewer stays open;
    * `dispose()` frees anything `build` allocated (see the file header for why
    * this viewer itself doesn't also blindly dispose the scene). Camera
-   * framing is automatic: a bounding-box fit over everything `build` added
-   * (gallery.html's approach) — or, when the handle names a `focus` object,
+   * framing is automatic: a bounding-box fit over everything `build` added —
+   * or, when the handle names a `focus` object,
    * over just that object (a planet's helper geometry — an orbit-scale motion
    * trail — would otherwise dwarf the body itself in the fit).
    *
@@ -142,10 +140,9 @@ export class ObjectViewer {
     this._onResize = onResize;
   }
 
-  /** Frame the camera: a bounding-box fit (the same idea as gallery.html's
-   *  place()) over the handle's `focus` object when one was named, else over
-   *  everything build() added — works whether the find is a small baked ship
-   *  or a planet sitting far from the scene origin on its orbit. */
+  /** Frame the camera: a bounding-box fit over the handle's `focus` object when
+   *  one was named, else over everything build() added — works whether the find
+   *  is a small baked ship or a planet sitting far from the origin on its orbit. */
   _frame() {
     // Nothing has rendered yet, so every world matrix is still stale —
     // without this the box lands wherever the LAST frame's matrices point

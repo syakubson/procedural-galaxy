@@ -151,7 +151,6 @@ class GalaxyApp {
   _initSettingsToggle() {
     const btn = document.getElementById('settings-toggle');
     this._settingsBtn = btn;
-    this._galleryLink = document.getElementById('gallery-link');
     this._settingsOpen = false;
     if (!btn) return;
     btn.addEventListener('click', () => {
@@ -371,7 +370,6 @@ class GalaxyApp {
     // restore the galaxy chrome the tour kept hidden (when we land back in galaxy)
     if (this.mode === 'galaxy') {
       if (this._settingsBtn) this._settingsBtn.style.display = '';
-      if (this._galleryLink) this._galleryLink.style.display = '';
       if (this._codexBtn) this._codexBtn.style.display = '';
       this.legend.setVisible(this.config.showMarkers);
       this.controls.enabled = true;
@@ -1406,11 +1404,9 @@ class GalaxyApp {
     this.tooltip.hide();
     this.legend.setVisible(false);
     this.canvas.style.cursor = 'default';
-    // settings belong to the galaxy view only — hide the ⚙ + close the panel
+    // settings + codex belong to the galaxy view only — hide them inside a
+    // system (the facts box owns that top-right corner there) + close the panel
     if (this._settingsBtn) this._settingsBtn.style.display = 'none';
-    // the "Fleet & stations" link and the codex both live next to the ⚙ — all
-    // galaxy-only, so hide them inside a system (the facts box owns that corner there).
-    if (this._galleryLink) this._galleryLink.style.display = 'none';
     if (this._codexBtn) this._codexBtn.style.display = 'none';
     this.gui.hide();
     this._settingsOpen = false;
@@ -1518,7 +1514,6 @@ class GalaxyApp {
     this._lastInteract = this._time;
     this.legend.setVisible(this.config.showMarkers);
     if (this._settingsBtn) this._settingsBtn.style.display = ''; // ⚙ back in the galaxy view
-    if (this._galleryLink) this._galleryLink.style.display = ''; // gallery link back too
     if (this._codexBtn) this._codexBtn.style.display = ''; // codex button back too
     this.mode = 'galaxy'; // flip after reveal so a stray click can't double-fire
   }

@@ -2,7 +2,7 @@
 // detailed THREE.Group (nose = +Z, engine glow at the tail), sized for its role
 // via ROLES[].scale. The same 9 roles render in any faction's palette, giving
 // the 9 × 6 = 54 matrix. ROLES also carries the in-fiction stats/description
-// shown in the gallery and (later) the system panel.
+// shown in the system ship card and the codex.
 
 import * as THREE from 'three';
 import { C, ACC, g, box, cyl, sph, cone, part, addRot, engineGlow, runningLights, antenna, wedge } from './style.js';

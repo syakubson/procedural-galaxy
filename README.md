@@ -135,8 +135,7 @@ sections below.
 | **Space** | drop a focused planet back to the system overview |
 | **"?" button (top-right)** | open the controls cheat-sheet |
 | **Settings gear (top-right)** | open / close the generator panel |
-| **"Fleet & stations" (top-right)** | gallery of every ship and station (`gallery.html`) |
-| **Codex book (top-right)** | your permanent collection of discoveries, with progress and a 3D viewer |
+| **Codex book (top-right)** | your permanent collection of discoveries — worlds, races, ships and stations (by faction), ruins and special finds — with progress and a 3D viewer |
 | **Play/pause &amp; camera buttons (bottom-left)** | map rotation toggle &amp; cinematic tour |
 | **View-mode button (bottom-right)** | system display mode (see below) |
 | **Sound buttons (bottom-right)** | toggle ambient + next track (music is on by default) |
@@ -297,7 +296,7 @@ For destroyed worlds, **refugees** flee to a colony on a neighbouring planet wit
 | Star twinkle &amp; sun pulse | always, even when rotation is frozen |
 
 **Factions.** On inhabited systems, factions are assigned **round-robin**, so all 6 ship races /
-styles are guaranteed to appear. The full fleet "bestiary" is in `gallery.html`.
+styles are guaranteed to appear. The full fleet + station "bestiary" is the codex (grouped by faction).
 
 </details>
 
@@ -376,7 +375,6 @@ galaxy/
 ├── styles.css
 ├── favicon.svg             # brass cartographer survey-ring favicon
 ├── .nocache_server.py      # no-cache static server (port 8124)
-├── gallery.html            # gallery of every ship and station
 ├── vercel.json             # static-deploy headers (always revalidate)
 ├── media/                  # README demo video, poster, screenshot gallery
 ├── vendor/                 # vendored Three.js core/addons + lil-gui

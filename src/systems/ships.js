@@ -1,7 +1,7 @@
 // Ship fleet barrel (#11, role×faction matrix). A ship = a ROLE silhouette
 // (roles.js) restyled by a FACTION palette (factions.js): 9 roles × 6 factions
 // = 54 mixable ships. This module is the public API used by the in-system
-// traffic (systemView) and the gallery page.
+// traffic (systemView) and the codex (its 3D find viewer + thumbnails).
 
 import { ROLES, ROLE_BY_ID } from './ships/roles.js';
 import { FACTIONS, FACTION_BY_ID, ALLIANCE } from './ships/factions.js';
