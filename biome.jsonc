@@ -1,0 +1,34 @@
+{
+  // NOTE: this file MUST be named `biome.jsonc` (not `.json`) — Biome only
+  // tolerates the "//" comments below with the .jsonc extension; a plain
+  // `.json` silently ignores comment-containing sections and falls back to
+  // recommended defaults (verified empirically against 2.5.2).
+  "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
+  "formatter": { "enabled": false },
+  "assist": { "enabled": false },
+  "files": { "includes": ["styles.css"] },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        // Legacy cascade convention throughout this file: a `body.<state> #id`
+        // override block is declared right before the plain `#id` / `#id:hover`
+        // rule it overrides (see the toggle buttons around #view-mode,
+        // #system-panel, #fact-box). That's the intended reading order, not a
+        // bug — flags ~14/~14 rules in this file (100% noise), so off.
+        "noDescendingSpecificity": "off"
+      },
+      "complexity": {
+        // `!important` here is a deliberate one-way state override (cine-show /
+        // clean-view force chrome invisible+inert regardless of any other rule's
+        // specificity) — removing it would change runtime behavior, which this
+        // lint pass must not do. Biome itself marks the auto-fix "unsafe". All
+        // 8 hits in the file are this same intentional pattern.
+        "noImportantStyles": "off"
+      }
+    }
+  },
+  "javascript": { "linter": { "enabled": false } },
+  "css": { "formatter": { "enabled": false }, "linter": { "enabled": true } }
+}

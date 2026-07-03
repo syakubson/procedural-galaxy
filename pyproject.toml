@@ -1,0 +1,37 @@
+# Lint/type-check config for this repo's Python helper scripts (dev tooling only —
+# the shipped product is pure JS/HTML/CSS; see .claude/CLAUDE.md). Self-contained:
+# this file must not reference anything outside this repo.
+#
+# Tools: ruff (lint) + ty (type checker, Astral). Run via:
+#   ruff check .
+#   ruff format --check .
+#   ty check .
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+# E,F,W   pycodestyle + pyflakes core
+# I       isort (import order)
+# UP      pyupgrade (modern syntax for the target Python)
+# B       flake8-bugbear (likely bugs / footguns)
+# SIM     flake8-simplify
+# C4      flake8-comprehensions
+# RUF     ruff-native checks
+# D       pydocstyle — full docstrings (see convention below)
+# ANN     flake8-annotations — type hints on public function signatures
+#
+# Deliberately NOT selected: T20 (flake8-print) — these are CLI scripts;
+# `print()` is their normal, intended output, not debug leftovers.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "D", "ANN"]
+
+[tool.ruff.lint.pydocstyle]
+# Google-style docstrings. This also resolves the D203/D211 (blank line before
+# a class docstring) and D212/D213 (multi-line summary on first vs second line)
+# pairs automatically — the "google" convention picks D211 + D212 and disables
+# their D203 / D213 counterparts, so no explicit ignore list is needed.
+convention = "google"
+
+[tool.ty.environment]
+python-version = "3.14"

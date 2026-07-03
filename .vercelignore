@@ -1,5 +1,6 @@
 # Not part of the deployed site — dev docs, QA screenshots, render scripts,
-# the README demo media, and the AI-assistant config.
+# the README demo media, the AI-assistant config, and lint configs (dev-only
+# tooling, not read at runtime).
 docs
 shots
 scripts
@@ -7,4 +8,7 @@ media
 .claude
 *.md
 *.py
+pyproject.toml
 .gitignore
+.oxlintrc.json
+biome.jsonc

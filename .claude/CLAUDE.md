@@ -53,6 +53,14 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
 
 - **Syntax:** `node --check <file.js>` on every edited JS file (modules can't be required without a
   server).
+- **Lint JS:** `oxlint .` from the repo root (config: `.oxlintrc.json`; install via `brew install
+  oxlint` or one-off `npx -y oxlint@latest .` — no `node_modules` either way). Zero warnings is the
+  bar; if it isn't, either fix the finding or silence it in `.oxlintrc.json`/`// eslint-disable-*`
+  with a one-line "why" — never reformat to chase style rules.
+- **Lint CSS:** `biome lint styles.css` from the repo root (config: `biome.jsonc` — must keep the
+  `.jsonc` extension, Biome silently drops comment-bearing sections in a plain `.json`; install via
+  `brew install biome` or one-off `npx -y @biomejs/biome@latest lint styles.css`). Formatter stays
+  off (`formatter.enabled: false`) — never run `biome check --write`/`biome format` here.
 - **Run it:** serve the folder over HTTP — `python3 .nocache_server.py` (port 8124, no-cache) or
   `python3 -m http.server 8000`. ES modules need HTTP, not `file://`.
 - **Visual / functional QA:** drive the live page with headless Playwright (Chromium with

@@ -4,6 +4,7 @@ node_modules/
 .playwright-*/
 scratchpad/
 __pycache__/
+.ruff_cache/
 
 # Vercel link (machine-specific project/org ids)
 .vercel
