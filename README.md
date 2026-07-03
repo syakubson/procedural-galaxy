@@ -363,9 +363,10 @@ Ambient — three licensed tracks (`audio/tracks/`): **Kevin MacLeod (CC-BY)** a
 Attribution is shown in the track caption and in `audio/CREDITS.txt`. Toggled with the sound
 buttons in the bottom-right corner (music is on by default, starting on your first interaction).
 
-UI sounds (`audio/sfx/`) — a small public-domain set: a relay click for buttons, a barely-there
-synth tick on marker hover, a designed whoosh pair for the warp in/out (the quieter planet glide
-reuses the warp-in), and a page turn / book close for the codex. The cinematic show stays silent.
+UI sounds (`audio/sfx/`) — a small public-domain set: a soft synth tap for buttons and a
+barely-there synth tick on marker hover (siblings, synthesized in-house), a designed whoosh pair
+for the warp in/out (the quieter planet glide reuses the warp-in), and a page turn / book close
+for the codex. The cinematic show stays silent.
 The ♪ button is the one master switch for ALL audio (music + effects); the two volumes live in
 the settings panel («Звук»), persisted per device. Credits in `audio/CREDITS.txt`.
 
