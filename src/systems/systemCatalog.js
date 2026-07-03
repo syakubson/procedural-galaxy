@@ -12,6 +12,7 @@ import {
   generateDeadSpace,
   generateFilmWorlds,
   generateDeathStar,
+  generateFactionCapitals,
   FLEET_FACTIONS,
 } from './systemData.js';
 
@@ -68,6 +69,9 @@ export function buildSystemCatalog(config, opts = {}) {
   addSpecial(generateDeadSpace());
   generateFilmWorlds().forEach(addSpecial);
   addSpecial(generateDeathStar());
+  // the six faction capitals come LAST (#stage6): appending after every prior
+  // special keeps the marker/entry order — and thus every rng draw — untouched.
+  generateFactionCapitals().forEach(addSpecial);
 
   return entries;
 }
