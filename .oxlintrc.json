@@ -23,5 +23,5 @@
     // and moves the helper away from its single call site.
     "unicorn/consistent-function-scoping": "off"
   },
-  "ignorePatterns": ["vendor/", "docs/", "media/", "textures/", "audio/", "scripts/"]
+  "ignorePatterns": ["vendor/", "docs/", "media/", "textures/", "/audio/", "scripts/"]
 }
