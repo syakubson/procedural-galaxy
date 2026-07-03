@@ -235,6 +235,9 @@ export function buildFor(entry, ctx = {}) {
       return buildStationFind(entry, overlay);
     case 'planet':
     case 'race':
+    case 'ruin':
+      // a ruined world IS a planet — its sourceRef carries the same
+      // {seed, planetIndex}, and generateSystem rebuilds it with its ruin state.
       return buildPlanetFind(entry, overlay);
     case 'phenomenon':
       return buildPhenomenonFind(entry);
