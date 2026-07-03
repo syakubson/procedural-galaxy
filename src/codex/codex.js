@@ -137,8 +137,19 @@ export function curiosities() {
  * @returns {{found: number, total: number}}
  */
 export function progress(category, total) {
-  const found = list(category).length;
-  if (typeof total === 'number') return { found, total };
   const catalog = catalogFor(category);
+  // Count only entries whose archetypeKey is STILL in the catalog. The codex is
+  // permanent and unversioned, so a returning player may hold entries under an
+  // old key scheme (a pre-reorg `biome:type` ruin, a `type`-only station); those
+  // orphans must not inflate the numerator past the catalog total. A category
+  // with no catalog ('system') keeps its raw count.
+  let found;
+  if (catalog) {
+    const keys = new Set(catalog.map((c) => c.archetypeKey));
+    found = list(category).filter((e) => keys.has(e.archetypeKey)).length;
+  } else {
+    found = list(category).length;
+  }
+  if (typeof total === 'number') return { found, total };
   return { found, total: catalog ? catalog.length : 0 };
 }
