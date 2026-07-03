@@ -34,6 +34,8 @@ warp-in.m4a      "Sound Design Elements Whoosh SFX 049"  by AudioPapkin
     https://freesound.org/s/812686/
 warp-out.m4a     "Sound Design Elements Whoosh SFX 048"  by AudioPapkin
     https://freesound.org/s/812685/
+focus.m4a        "Whoosh - 150cm cardboard tube - OS Mono"  by Sadiquecat
+    https://freesound.org/s/855748/
 codex-open.m4a   "Page Turn, Big Book"  by supaluci
     https://freesound.org/s/726518/
 codex-close.m4a  "Book_Page_Close_09"  by Valenspire

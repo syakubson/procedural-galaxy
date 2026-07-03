@@ -97,10 +97,11 @@ export function buildGUI(app) {
   fLight.add(c, 'nebulaIntensity', 0, 1.5, 0.01).name('Плотность газа').onChange(live);
   fLight.close();
 
-  // --- UI sounds (stage 5): master volume + mute, persisted per device ---
+  // --- sound (stage 5): the two volumes, persisted per device. No mute here —
+  // the ♪ button (bottom-right) is the single master on/off for ALL audio. ---
   const fSound = gui.addFolder('Звук');
-  fSound.add(app.sfx, 'volume', 0, 1, 0.05).name('Громкость эффектов').onChange((v) => app.sfx.setVolume(v));
-  fSound.add(app.sfx, 'muted').name('Без эффектов').onChange((m) => app.sfx.setMuted(m)); // music has its own ♪ toggle
+  fSound.add(app.sfx, 'volume', 0, 1, 0.05).name('Интерфейс').onChange((v) => app.sfx.setVolume(v));
+  fSound.add(app.music, 'volume', 0, 1, 0.05).name('Музыка').onChange((v) => app.music.setVolume(v));
   fSound.close();
 
   // --- readout ---

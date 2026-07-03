@@ -99,6 +99,9 @@ class GalaxyApp {
     this._initHud();
     this._initCodex();
     this.sfx = new SfxManager(); // UI sounds — before _bindEvents (listeners) and buildGUI (its «Звук» folder)
+    // the ♪ toggle is the ONE master audio switch (owner, 2026-07-03):
+    // turning the music off silences the UI sounds too, and vice versa.
+    this.music.onStateChange = (on) => this.sfx.setMuted(!on);
     this._syncPixelRatio();
 
     this.clock = new THREE.Clock();
@@ -1275,6 +1278,7 @@ class GalaxyApp {
   }
 
   _focusPlanet(planet) {
+    if (!this._cineActive()) this.sfx.play('planetFocus'); // the glide to/between planets (#sfx)
     this.systemView._planetFocused = true; // hide all planet trails for the close-up (#4)
     this._frameObject(planet.body, 'planet', planet.data.radius);
     const idx = this.systemView.planets.indexOf(planet);

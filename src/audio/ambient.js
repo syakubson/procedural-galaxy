@@ -9,18 +9,26 @@
 //   • "Out There" — yd (OpenGameArt.org), CC0 / public domain
 // The required credit is shown in the on-screen track label and in audio/CREDITS.txt.
 
+import { NAMESPACES, read, write } from '../state/storage.js';
+
 const TRACKS = [
   { name: 'Frozen Star', credit: 'Kevin MacLeod · CC-BY', src: 'audio/tracks/frozen_star.mp3' }, // default (#6)
   { name: 'Echoes of Time', credit: 'Kevin MacLeod · CC-BY', src: 'audio/tracks/echoes_of_time.mp3' },
   { name: 'Out There', credit: 'yd · CC0', src: 'audio/tracks/out_there.ogg' },
 ];
-const VOLUME = 0.5;
+const DEFAULT_VOLUME = 0.5;
+const SCOPE_KEY = 'music'; // NAMESPACES.PLAYER / 'music' → { volume }
 
 export class AmbientMusic {
   constructor() {
     this.trackIndex = 0;
     this.playing = false;
     this._fadeT = 0;
+    const saved = read(NAMESPACES.PLAYER, SCOPE_KEY, null) || {};
+    this.volume = typeof saved.volume === 'number' ? saved.volume : DEFAULT_VOLUME;
+    // the ♪ toggle is the ONE master audio switch: main.js hooks this to also
+    // mute/unmute the UI sounds, so «музыка выключена» means «всё звук выключен».
+    this.onStateChange = null;
 
     this.audio = new Audio();
     this.audio.loop = true;
@@ -106,14 +114,22 @@ export class AmbientMusic {
     if (!this.playing) {
       if (!this.audio.src) this._load(this.trackIndex);
       this.audio.play().catch(() => {});
-      this._fade(VOLUME, 1500);
+      this._fade(this.volume, 1500);
       this._showLabel(this.trackIndex);
       this.playing = true;
     } else {
       this._fade(0, 600, () => this.audio.pause());
       this.playing = false;
     }
+    if (this.onStateChange) this.onStateChange(this.playing); // master switch (#sfx)
     return this.playing;
+  }
+
+  /** Music volume 0..1 — persisted per device; eases to the new level live. */
+  setVolume(volume) {
+    this.volume = Math.min(1, Math.max(0, volume));
+    write(NAMESPACES.PLAYER, SCOPE_KEY, { volume: this.volume });
+    if (this.playing) this._fade(this.volume, 200);
   }
 
   /** Crossfade to the next track (starting playback if it wasn't running). */
@@ -128,7 +144,7 @@ export class AmbientMusic {
     this._fade(0, 500, () => {
       this._load(nextI);
       this.audio.play().catch(() => {});
-      this._fade(VOLUME, 1200);
+      this._fade(this.volume, 1200);
       this._showLabel(nextI);
     });
   }
