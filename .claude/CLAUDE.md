@@ -41,6 +41,9 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   only detected for the one-time migration notice, never written.
 - **Camera framing.** Per-object-type focus distances live in `src/systems/focusConfig.js` — tune
   framing there, not by scattering magic numbers in `main.js`.
+- **Versioning.** `src/version.js` holds `APP_VERSION` (`0.MINOR.PATCH` — MINOR per shipped
+  feature wave, PATCH per refinement round). Bump it in the same commit as the user-visible
+  change; it shows in the «?» panel footer, the boot console line, and `galaxyApp.version`.
 - **Design system.** Cartographer theme — CSS tokens in `styles.css` `:root` (ink / vellum / ivory
   / brass / status colours; serif EB Garamond + mono IBM Plex Mono, vendored woff2). Reuse the
   tokens; don't hardcode hex values for chrome.

@@ -340,6 +340,16 @@ body {
   font-size: 12px;
   color: var(--ivory-dim);
 }
+#help-panel .help-version {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vellum-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--parchment);
+}
 
 /* --- ambient music toggle --- */
 #music-toggle {
