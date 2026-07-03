@@ -82,6 +82,7 @@ tens of thousands of stars.
 - 🧬 **Worlds with a story** — biomes, day/night cities, fleets, ruins, and a generated civilisation on each inhabited planet.
 - 🎲 **Deterministic from a seed** — the same seed rebuilds the same galaxy, down to the last planet.
 - 🛰️ **Hidden scenes** — Sagittarius A\*, Interstellar's Gargantua + Endurance, our Solar System, a Death Star, and more.
+- 📔 **A codex of finds** — every world, race, ruin, ship and phenomenon you discover joins a permanent collection with honest "N of M" counters and a 3D showcase viewer; it survives seed changes.
 - ⚡ **Runs on weak PCs** — no build step, no dependencies, no internet; rotation/twinkle/size live on the GPU.
 
 ---
@@ -130,11 +131,12 @@ sections below.
 | **M** | toggle ambient music |
 | **Hover a marker** | a hint table: star · planets · epoch · people + a teaser |
 | **Click a marker** | warp into the system: star, planets, lore |
-| **Esc** | one step back: focused planet → system overview → galaxy |
+| **Esc** | one step back: codex viewer → codex → focused planet → system overview → galaxy |
 | **Space** | drop a focused planet back to the system overview |
 | **"?" button (top-right)** | open the controls cheat-sheet |
 | **Settings gear (top-right)** | open / close the generator panel |
 | **"Fleet & stations" (top-right)** | gallery of every ship and station (`gallery.html`) |
+| **Codex book (top-right)** | your permanent collection of discoveries, with progress and a 3D viewer |
 | **Play/pause &amp; camera buttons (bottom-left)** | map rotation toggle &amp; cinematic tour |
 | **View-mode button (bottom-right)** | system display mode (see below) |
 | **Sound buttons (bottom-right)** | toggle ambient + next track (music is on by default) |
@@ -382,6 +384,7 @@ galaxy/
 └── src/
     ├── main.js             # renderer, camera, OrbitControls, loop, keyboard, adaptivity
     ├── config.js           # defaults + quality presets (star/sun counts)
+    ├── assetLoader.js      # lazy texture fetches with a per-tag byte ledger
     ├── palettes.js         # colour schemes
     ├── rng.js              # seeded PRNG (mulberry32) for reproducibility
     ├── galaxy.js           # star-disk + bulge generation
@@ -391,6 +394,8 @@ galaxy/
     ├── postfx.js           # HDR pipeline + ACES tonemapping
     ├── gui.js              # the lil-gui panel
     ├── audio/ambient.js    # ambient player (tracks + switching)
+    ├── state/              # persistence: storage envelope, world overlay, party lifecycle
+    ├── codex/              # the discovery codex: catalogs, log, panel, find rebuilder
     ├── systems/            # explorable systems
     │   ├── genParams.js    # ALL generation probabilities / shares (GEN)
     │   ├── systemData.js   # build a system from a seed + the special systems
@@ -411,6 +416,7 @@ galaxy/
     │   └── ships/          # fleet factions, roles, ship styles
     ├── ui/
     │   ├── hud.js          # lore panel, hint table, legend, transition overlay
+    │   ├── objectViewer.js # isolated-canvas 3D viewer (codex «Рассмотреть»)
     │   └── planetLabels.js # diegetic planet/station labels (real-size de-overlap)
     └── shaders/
         ├── starShader.js          # galaxy stars: rotation/twinkle/size (GPU)

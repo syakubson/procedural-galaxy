@@ -46,8 +46,15 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   tokens; don't hardcode hex values for chrome.
 - **GalaxyApp init order.** `main.js`'s constructor wires things in a fixed sequence — keep new
   steps in it: `assetLoader` → `_buildWorld()` (`Background` takes the loader) → `PostFX` →
-  `_buildSystems()` → `SystemView` (also takes the loader) → HUD → GUI → the render loop →
-  `_warmUpSystemShaders()` (idle-timer, ~1.5s — also where deferred skybox loads fire).
+  `_buildSystems()` → `SystemView` (also takes the loader) → HUD → codex (`_initCodex`) → GUI →
+  the render loop → `_warmUpSystemShaders()` (idle-timer, ~1.5s — also where deferred skybox
+  loads fire).
+- **Codex (`src/codex/`).** A PERMANENT cross-party discovery log (storage namespace `CODEX` —
+  no party id / GEN_VERSION in its key). Records fire only on meaningful player actions through
+  `main.js`'s `_codexRecord()` funnel, which stays silent during the cinematic auto-tour; the
+  debug reveal-all records nothing. The «Рассмотреть» viewer re-drives the SAME builders with
+  the SAME seeds (plus `sourceRef.faction`, since inhabited fleet skins are assigned round-robin
+  outside the seed) — never invent a second rendering path for a find.
 
 ## Verify before claiming done
 
