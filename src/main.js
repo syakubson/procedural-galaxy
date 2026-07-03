@@ -893,10 +893,12 @@ class GalaxyApp {
     // --- UI sounds (#sfx): ONE delegated listener voices every button press.
     // Buttons whose press already carries a dedicated voice are exempt: the
     // codex rail speaks with its page-turn, the panel's ✕ with its book-close
-    // (the other close paths — backdrop, Escape — have no click either).
+    // (the other close paths — backdrop, Escape — have no click either), and
+    // «← Назад» with its own warp-out / planet glide.
+    const SILENT_BTNS = new Set(['codex-toggle', 'nav-back']);
     document.addEventListener('click', (e) => {
       const btn = e.target && e.target.closest ? e.target.closest('button') : null;
-      if (btn && btn.id !== 'codex-toggle' && !btn.classList.contains('codex-close')) this.sfx.play('click');
+      if (btn && !SILENT_BTNS.has(btn.id) && !btn.classList.contains('codex-close')) this.sfx.play('click');
     });
   }
 

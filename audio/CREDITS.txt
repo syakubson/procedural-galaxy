@@ -24,14 +24,13 @@ CC0 1.0 Universal (Public Domain) — no attribution required, credited
 with gratitude anyway. Each was peak-normalized to about -3 dB and
 converted offline.
 
-click.m4a        "A relay switch being activated"  by bassmosphere
-    https://freesound.org/s/384698/
-hover.m4a        synthesized in-house (an enveloped sine tick) — public domain
+click.wav        synthesized in-house (an enveloped sine tap) — public domain
+hover.wav        synthesized in-house (an enveloped sine tick) — public domain
 warp-in.m4a      "Sound Design Elements Whoosh SFX 049"  by AudioPapkin
     https://freesound.org/s/812686/  (also voices the planet glide, quieter)
 warp-out.m4a     "Sound Design Elements Whoosh SFX 048"  by AudioPapkin
     https://freesound.org/s/812685/
-codex-open.m4a   "Page Turn, Big Book"  by supaluci
+codex-open.wav   "Page Turn, Big Book"  by supaluci
     https://freesound.org/s/726518/
-codex-close.m4a  "Book_Page_Close_09"  by Valenspire
+codex-close.wav  "Book_Page_Close_09"  by Valenspire
     https://freesound.org/s/699324/
