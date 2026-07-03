@@ -1,47 +1,52 @@
 // Finite archetype catalogs for the codex — the source of truth for its
-// honest "N of M" counters. Every catalog here enumerates a closed, countable
-// set of discoverable ARCHETYPES (not individual finds: two different seeds'
-// scout ships from the same faction are the same archetype, recorded once).
-// Nothing here is copied from another module's value list — ships/stations/
-// planet-kinds/biomes/civ-levels are all imported straight from their real
-// source (ships/roles.js, ships/factions.js, systemData.js) so this catalog
-// can never silently drift out of sync with what the generator can actually
-// produce.
+// honest "N of M" counters and the encyclopedia content behind each find.
+// Ship/planet/biome/civ/station data is imported straight from its real
+// source so the catalogs can never drift from what the generator produces;
+// the hand-crafted special content (easter-egg systems, objects, planets,
+// named races) is enumerated here because there's no generator table for it.
 
-import { GEN } from '../systems/genParams.js';
-import { BIOME_KEYS, CIV_LEVELS, PLANET_KINDS, RUIN_BIOMES, RUIN_TYPES } from '../systems/systemData.js';
+import { PLANET_KINDS, RUIN_TYPES } from '../systems/systemData.js';
 import { FACTIONS, FACTION_BY_ID } from '../systems/ships/factions.js';
 import { ROLES } from '../systems/ships/roles.js';
 import { STATION_TYPES } from '../systems/stations.js';
 
 const ROLE_BY_ID = Object.fromEntries(ROLES.map((r) => [r.id, r]));
 
-// --- ships: 9 roles × 6 factions = 54 --------------------------------------
+// --- ships: 9 roles × 6 factions = 54, grouped by faction ------------------
 // archetypeKey `${factionId}:${roleId}` mirrors buildShip(role, faction)'s own
-// argument order (ships.js) so codexViewer.js can split it straight back out.
+// argument order (ships.js). `group` (the faction name) drives the section
+// headers on the Ships tab.
 const SHIP_CATALOG = [];
 for (const faction of FACTIONS) {
   for (const role of ROLES) {
     SHIP_CATALOG.push({
       archetypeKey: `${faction.id}:${role.id}`,
-      label: `${faction.name} · ${role.name}`,
+      label: role.name,
+      group: faction.name,
       factionId: faction.id,
       roleId: role.id,
     });
   }
 }
 
-// --- stations: 3 (STATION_TYPES already carries an RU name each) ----------
-const STATION_CATALOG = STATION_TYPES.map((t) => ({
-  archetypeKey: t.id,
-  label: t.name,
-  stationType: t.id,
-}));
+// --- stations: 3 types × 6 factions = 18, grouped by faction ---------------
+// Each faction styles the same three station shapes differently (createStation
+// takes a faction style), so a station archetype is faction × type, keyed
+// `${factionId}:${type}` — the same shape as a ship archetype.
+const STATION_CATALOG = [];
+for (const faction of FACTIONS) {
+  for (const st of STATION_TYPES) {
+    STATION_CATALOG.push({
+      archetypeKey: `${faction.id}:${st.id}`,
+      label: st.name,
+      group: faction.name,
+      factionId: faction.id,
+      stationType: st.id,
+    });
+  }
+}
 
-// --- planets: 7 kinds. PLANET_KINDS has no RU label of its own (its fields
-// are shader/colour data) — these mirror ui/hud.js's TYPE_LABEL wording (that
-// module doesn't export it, so it's re-authored here, not imported: keep the
-// two in sync by eye if either changes). -------------------------------------
+// --- planets: the 7 kinds, as an encyclopedia of TYPES (not instances) ------
 const PLANET_KIND_LABELS = {
   lava: 'Лавовая планета',
   rocky: 'Каменистая планета',
@@ -57,151 +62,174 @@ const PLANET_CATALOG = Object.keys(PLANET_KINDS).map((kind) => ({
   kind,
 }));
 
-// --- living races: 16 reachable (GENERATION.md's reachability table) -------
-// {earthlike, ocean, jungle, tundra, desert} × {tribal, industrial,
-// spacefaring} = 15, plus city × spacefaring only = 1. `city` is a
-// civilisation overlay (GEN.world.cityOverlayChance), never a natural climate
-// biome, so it's reachable at the spacefaring level alone — city×tribal and
-// city×industrial are NOT in this catalog because generateSystem() can never
-// produce them.
-const LIVING_BIOMES = Object.keys(BIOME_KEYS).filter((b) => b !== 'city');
-const CIV_LEVEL_KEYS = Object.keys(CIV_LEVELS);
-const RACE_CATALOG = [];
-for (const biome of LIVING_BIOMES) {
-  for (const civLevel of CIV_LEVEL_KEYS) {
-    RACE_CATALOG.push({
-      archetypeKey: `${biome}:${civLevel}`,
-      label: `${BIOME_KEYS[biome].label} · ${CIV_LEVELS[civLevel].label}`,
-      biome,
-      civLevel,
-    });
-  }
-}
-RACE_CATALOG.push({
-  archetypeKey: 'city:spacefaring',
-  label: `${BIOME_KEYS.city.label} · ${CIV_LEVELS.spacefaring.label}`,
-  biome: 'city',
-  civLevel: 'spacefaring',
-});
-
-// --- ruins: RUIN_BIOMES × RUIN_TYPES = 6 × 4 = 24 reachable ----------------
-// The FULL cross product is reachable — GENERATION.md's reachability table is
-// explicit that a ruin can land on any of the six biomes (city included) at
-// any of the four flavours, so no combination is excluded here.
+// --- ruins: the 4 flavours, as a reference of TYPES -------------------------
+// Was a biome×type grid (24), but a single galaxy only holds ~15 ruined worlds,
+// so it could never complete; the honest, stable unit is the flavour itself.
 const RUIN_TYPE_LABELS = {
   plain: 'Безжизненные руины',
   robotic: 'Мир машин',
   destroyed: 'Разрушенный мир',
   obliterated: 'Уничтоженный мир',
 };
-const RUIN_CATALOG = [];
-for (const biome of RUIN_BIOMES) {
-  for (const ruinType of RUIN_TYPES) {
-    RUIN_CATALOG.push({
-      archetypeKey: `${biome}:${ruinType}`,
-      label: `${BIOME_KEYS[biome].label} · ${RUIN_TYPE_LABELS[ruinType]}`,
-      biome,
-      ruinType,
-    });
-  }
+const RUIN_CATALOG = RUIN_TYPES.map((t) => ({
+  archetypeKey: t,
+  label: RUIN_TYPE_LABELS[t] || t,
+  ruinType: t,
+}));
+
+// --- races: NAMED species (not the generic biome×civ inhabitants) -----------
+// Real ones live on a hand-crafted planet and are discovered by visiting it —
+// each carries a planetRef so «Перейти к объекту» warps to its homeworld.
+// `future: true` races are announced but not yet in the game: they show as
+// named-but-locked "coming" cards (grouped under Скоро), never discoverable.
+const RACE_CATALOG = [
+  { archetypeKey: 'humanity', label: 'Человечество', group: 'Виды', planetRef: { seed: 'sol-system', label: 'Земля' } },
+  { archetypeKey: 'fremen', label: 'Фримены', group: 'Виды', planetRef: { seed: 'film-spice', label: 'Арракис' } },
+  { archetypeKey: 'navi', label: 'На’ви', group: 'Виды', planetRef: { seed: 'film-jungle', label: 'Пандора' } },
+  {
+    archetypeKey: 'signbuilders',
+    label: 'Строители Знаков',
+    group: 'Виды',
+    planetRef: { seed: 'deadspace', label: 'Тау-Волантис' },
+  },
+  { archetypeKey: 'necromorphs', label: 'Некроморфы', group: 'Скоро', future: true },
+  { archetypeKey: 'generative-1', label: 'Неизвестный вид', group: 'Скоро', future: true },
+  { archetypeKey: 'generative-2', label: 'Неизвестный вид', group: 'Скоро', future: true },
+];
+const RACE_BY_KEY = Object.fromEntries(RACE_CATALOG.map((r) => [r.archetypeKey, r]));
+
+// --- special: hand-crafted content, grouped системы / объекты / планеты -----
+// `seed` — the system to warp to. `view` — a special-object builder key (see
+// codexViewer) for «Рассмотреть», where one exists. `planetLabel` — a signature
+// planet inside `seed`. `race` — the named race that lives on this planet.
+const SPECIAL_CATALOG = [
+  // --- системы ---
+  { archetypeKey: 'sys-sagittarius', label: 'Стрелец A*', group: 'Системы', seed: 'galactic-core', view: 'blackhole-galactic' },
+  { archetypeKey: 'sys-gargantua', label: 'Гаргантюа', group: 'Системы', seed: 'interstellar', view: 'blackhole-gargantua' },
+  { archetypeKey: 'sys-sol', label: 'Солнечная система', group: 'Системы', seed: 'sol-system' },
+  { archetypeKey: 'sys-quarantine', label: 'Чёрный Карантин', group: 'Системы', seed: 'deadspace' },
+  { archetypeKey: 'sys-alderaan', label: 'Сектор Альдераан', group: 'Системы', seed: 'death-star' },
+  { archetypeKey: 'sys-twinsun', label: 'Двусолнечье', group: 'Системы', seed: 'film-twinsun' },
+  { archetypeKey: 'sys-spice', label: 'Пряный Предел', group: 'Системы', seed: 'film-spice' },
+  { archetypeKey: 'sys-jungle', label: 'Спутник Бурь', group: 'Системы', seed: 'film-jungle' },
+  { archetypeKey: 'sys-hoth', label: 'Хот', group: 'Системы', seed: 'film-ice' },
+  // --- объекты ---
+  { archetypeKey: 'endurance', label: 'Станция «Эндюранс»', group: 'Объекты', view: 'endurance', seed: 'interstellar' },
+  { archetypeKey: 'ishimura', label: 'USG Ishimura', group: 'Объекты', view: 'ishimura', seed: 'deadspace' },
+  { archetypeKey: 'deathstar', label: 'Звезда Смерти «Длань»', group: 'Объекты', view: 'deathstar', seed: 'death-star' },
+  { archetypeKey: 'dragon', label: 'Crew Dragon', group: 'Объекты', view: 'dragon', seed: 'sol-system' },
+  // --- планеты ---
+  { archetypeKey: 'pl-earth', label: 'Земля', group: 'Планеты', seed: 'sol-system', planetLabel: 'Земля', race: 'humanity' },
+  { archetypeKey: 'pl-mars', label: 'Марс', group: 'Планеты', seed: 'sol-system', planetLabel: 'Марс' },
+  { archetypeKey: 'pl-alderaan', label: 'Альдераан', group: 'Планеты', seed: 'death-star', planetLabel: 'Альдераан' },
+  { archetypeKey: 'pl-aegis7', label: 'Эгида VII', group: 'Планеты', seed: 'deadspace', planetLabel: 'Эгида VII' },
+  { archetypeKey: 'pl-tau', label: 'Тау-Волантис', group: 'Планеты', seed: 'deadspace', planetLabel: 'Тау-Волантис', race: 'signbuilders' },
+  { archetypeKey: 'pl-tatooine', label: 'Татуин', group: 'Планеты', seed: 'film-twinsun', planetLabel: 'Татуин' },
+  { archetypeKey: 'pl-arrakis', label: 'Арракис', group: 'Планеты', seed: 'film-spice', planetLabel: 'Арракис', race: 'fremen' },
+  { archetypeKey: 'pl-pandora', label: 'Пандора', group: 'Планеты', seed: 'film-jungle', planetLabel: 'Пандора', race: 'navi' },
+  { archetypeKey: 'pl-hoth', label: 'Хот', group: 'Планеты', seed: 'film-ice', planetLabel: 'Хот' },
+];
+const SPECIAL_BY_KEY = Object.fromEntries(SPECIAL_CATALOG.map((s) => [s.archetypeKey, s]));
+const SPECIAL_SYSTEM_BY_SEED = Object.fromEntries(
+  SPECIAL_CATALOG.filter((s) => s.group === 'Системы').map((s) => [s.seed, s.archetypeKey]),
+);
+const SPECIAL_PLANET_BY_SEED_LABEL = {};
+for (const s of SPECIAL_CATALOG) {
+  if (s.group === 'Планеты') SPECIAL_PLANET_BY_SEED_LABEL[`${s.seed}::${s.planetLabel}`] = s;
 }
 
-// --- phenomena: 6, hand-listed from the special/easter-egg scenes ---------
-// One entry per one-of-a-kind object systemView.js builds its own class for
-// (BlackHole ×2 variants, Endurance, Ishimura, DeathStar, Dragon) — there is
-// no generator table to derive these from, they're inherently a fixed list.
-// Names match the in-fiction names systemData.js/main.js already use.
-const PHENOMENON_CATALOG = [
-  { archetypeKey: 'blackhole-galactic', label: 'Чёрная дыра · Стрелец A*' },
-  { archetypeKey: 'blackhole-gargantua', label: 'Чёрная дыра · Гаргантюа' },
-  { archetypeKey: 'endurance', label: 'Станция «Эндюранс»' },
-  { archetypeKey: 'ishimura', label: 'USG Ishimura' },
-  { archetypeKey: 'deathstar', label: 'Звезда Смерти «Длань»' },
-  { archetypeKey: 'dragon', label: 'Crew Dragon' },
-];
-
 const CATALOGS = {
-  ship: SHIP_CATALOG,
-  station: STATION_CATALOG,
   planet: PLANET_CATALOG,
   race: RACE_CATALOG,
   ruin: RUIN_CATALOG,
-  phenomenon: PHENOMENON_CATALOG,
+  ship: SHIP_CATALOG,
+  station: STATION_CATALOG,
+  special: SPECIAL_CATALOG,
 };
 
-/** The 6 finite codex categories (in a stable, catalog-declaration order —
- *  handy for a tab strip). 'system' is NOT one of these: it has no finite
- *  catalog, see codex.js's progress(). */
+/** The finite codex categories, in a stable order. 'system' is NOT one of
+ *  these — it has no finite catalog (see codex.js's progress()). */
 export const CATEGORIES = Object.keys(CATALOGS);
 
-/** @returns {Array|null} the archetype list for `category`, or null if
- *  `category` has no finite catalog (e.g. 'system'). */
+/** @returns {Array|null} the archetype list for `category`, or null if it has
+ *  no finite catalog (e.g. 'system'). */
 export function catalogFor(category) {
   return CATALOGS[category] || null;
 }
 
-// Rarest ruin flavour by roll width, derived from genParams.js's own
-// thresholds rather than a guessed constant: robotic/destroyed/obliterated/
-// plain split a 0..1 roll into 0.25/0.25/0.35/0.15-wide bands respectively
-// (today) — whichever is narrowest is statistically the rarest to land on.
-const RUIN_TYPE_WIDTH = {
-  robotic: GEN.ruinRobotic,
-  destroyed: GEN.ruinDestroyed - GEN.ruinRobotic,
-  obliterated: GEN.ruinObliterated - GEN.ruinDestroyed,
-  plain: 1 - GEN.ruinObliterated,
-};
-const RAREST_RUIN_TYPE = RUIN_TYPES.reduce(
-  (rarest, t) => (RUIN_TYPE_WIDTH[t] < RUIN_TYPE_WIDTH[rarest] ? t : rarest),
-  RUIN_TYPES[0],
-);
+/** Curiosities/showcase were retired — the Особое tab now holds the noteworthy
+ *  finds. Kept as a stable false so codex.js's record() needn't change. */
+export function isCuriosity() {
+  return false;
+}
 
-/**
- * Is this discovered archetype a "curiosity" — the rare/showcase-worthy
- * subset the codex highlights separately from its plain progress counters?
- * `meta` is whatever codex.js's record() was called with, plus its own
- * `archetypeKey` folded in (so this can split biome/civLevel/ruinType back
- * out of the key even if the caller didn't pass them individually).
- *
- * Each rule below is derived from something already true about the generator
- * (a roll width, a reachability gap) rather than a guessed constant:
- * - phenomenon: EVERY entry in this catalog is a hand-placed easter egg —
- *   there's no "common" phenomenon to contrast against, so all 6 qualify.
- * - ruin: the ruinType with the narrowest roll window (see RAREST_RUIN_TYPE
- *   above) is the rarest flavour to land on.
- * - race: 'city' is the one biome GENERATION.md's reachability table marks
- *   spacefaring-only — the sole structurally rare biome among living races.
- * - planet: a terraformed colony (`colonyKind: 'terraformed'`) is flagged via
- *   meta directly, since colony status isn't part of a planet's archetypeKey
- *   (only its planet *kind* is).
- * - ship / station: no rarity signal exists across either matrix (54 ship
- *   archetypes / 3 station types are all equally reachable) — never curious.
- *
- * @param {string} category
- * @param {object} [meta]
- * @returns {boolean}
- */
-export function isCuriosity(category, meta = {}) {
-  switch (category) {
-    case 'phenomenon':
-      return true;
-    case 'ruin': {
-      const ruinType = meta.ruinType ?? (meta.archetypeKey ? meta.archetypeKey.split(':')[1] : undefined);
-      return ruinType === RAREST_RUIN_TYPE;
-    }
-    case 'race': {
-      const biome = meta.biome ?? (meta.archetypeKey ? meta.archetypeKey.split(':')[0] : undefined);
-      return biome === 'city';
-    }
+// --- recording helpers (main.js) -------------------------------------------
+
+/** The special-system codex key for a system seed, or null if it isn't one of
+ *  the hand-crafted systems. Called when the player warps into a system. */
+export function specialSystemKey(seed) {
+  return SPECIAL_SYSTEM_BY_SEED[seed] || null;
+}
+
+/** The special-planet catalog entry for a (system seed, planet label), or null.
+ *  Its `race` (if any) is the named race that planet unlocks. */
+export function specialPlanetFor(seed, label) {
+  return SPECIAL_PLANET_BY_SEED_LABEL[`${seed}::${label}`] || null;
+}
+
+/** The homeworld ref (seed + planet label) a race entry links to, or null for a
+ *  future race with no planet yet. Used by «Перейти к объекту» for races. */
+export function racePlanetRef(archetypeKey) {
+  const r = RACE_BY_KEY[archetypeKey];
+  return (r && r.planetRef) || null;
+}
+
+/** The special-object builder key for a special entry (system black hole or a
+ *  one-off object), or null — drives «Рассмотреть» / the thumbnail. */
+export function specialViewKey(archetypeKey) {
+  const s = SPECIAL_BY_KEY[archetypeKey];
+  return (s && s.view) || null;
+}
+
+/** The (seed, planetLabel) a special-planet entry rebuilds from, or null. */
+export function specialPlanetRef(archetypeKey) {
+  const s = SPECIAL_BY_KEY[archetypeKey];
+  return s && s.group === 'Планеты' ? { seed: s.seed, label: s.planetLabel } : null;
+}
+
+/** The system seed a special entry lives in (for «Перейти к объекту»). */
+export function specialSeed(archetypeKey) {
+  const s = SPECIAL_BY_KEY[archetypeKey];
+  return (s && s.seed) || null;
+}
+
+/** Does this entry have a standalone 3D form «Рассмотреть» can open? Systems
+ *  and races have none; a special is viewable only if it's a black-hole/object
+ *  builder or a signature planet with a recorded instance. */
+export function isRebuildable(entry) {
+  switch (entry.category) {
+    case 'ship':
+    case 'station':
     case 'planet':
-      return meta.colonyKind === 'terraformed';
+    case 'ruin':
+      return true;
+    case 'special':
+      return !!(specialViewKey(entry.archetypeKey) || (entry.sourceRef && entry.sourceRef.planetIndex != null));
     default:
-      return false;
+      return false; // 'system', 'race'
   }
 }
 
-/** RU category headings — used by the codex tab strip and the detail dialog's
- *  subtitle. 'system' is included here (unlike CATEGORIES) because the codex
- *  UI still shows it as a tab even though it has no finite catalog. */
+/** The Особое sub-group ('Системы'|'Объекты'|'Планеты') for a special key, so a
+ *  recorded entry (which stores no group) can pick the right placeholder glyph. */
+export function specialGroup(archetypeKey) {
+  const s = SPECIAL_BY_KEY[archetypeKey];
+  return (s && s.group) || null;
+}
+
+// --- detail-dialog descriptions --------------------------------------------
+
+/** RU category headings — the tab strip and the detail dialog's subtitle. */
 export const CATEGORY_LABELS = {
   system: 'Система',
   planet: 'Планета',
@@ -209,66 +237,109 @@ export const CATEGORY_LABELS = {
   ruin: 'Руины',
   ship: 'Корабль',
   station: 'Станция',
-  phenomenon: 'Явление',
+  special: 'Особое',
 };
 
-// One-line RU flavour per fixed archetype, for the codex detail dialog. Kept
-// here beside the catalogs (not in hud.js) so the codex owns its own copy —
-// the HUD cards inside a system stay independent.
-const PLANET_DESC = {
-  lava: 'Раскалённый мир вулканов и лавовых морей — слишком близко к звезде для жизни.',
-  rocky: 'Каменистый безводный мир с изрытой кратерами корой.',
-  desert: 'Сухая планета песков и растрескавшихся равнин под жёстким солнцем.',
-  terran: 'Мир земного типа: вода, атмосфера, умеренный пояс — колыбель жизни.',
-  ocean: 'Планета сплошного океана с редкими архипелагами.',
-  ice: 'Промёрзший мир на дальней орбите — ледяные щиты и азотный иней.',
-  gas: 'Огромный газовый гигант с полосами облаков и системой колец.',
+// Planet-type encyclopedia: what it is, typical climate, resources, and how a
+// world of this type comes to be.
+const PLANET_INFO = {
+  lava: {
+    desc: 'Раскалённый мир вулканов и лавовых морей — слишком близко к звезде для жизни. Образуется у самой звезды или разогревается приливами соседних гигантов.',
+    climate: 'Расплавленная кора, сотни градусов',
+    resources: 'Тяжёлые металлы, сера, редкие изотопы',
+  },
+  rocky: {
+    desc: 'Каменистый безводный мир с изрытой кратерами корой. Малое тело, не удержавшее атмосферу и воду — выжженное близостью звезды или промороженное далью.',
+    climate: 'Безводно, резкие перепады день/ночь',
+    resources: 'Руды, силикаты, строительный камень',
+  },
+  desert: {
+    desc: 'Сухая планета песков и растрескавшихся равнин под жёстким солнцем. Обычно это мир умеренного пояса, потерявший почти всю воду.',
+    climate: 'Жарко и сухо, пыльные бури',
+    resources: 'Кремний, соли, лёд у полюсов',
+  },
+  terran: {
+    desc: 'Мир земного типа: вода, атмосфера, умеренный пояс — колыбель жизни. Возникает в обитаемом поясе звезды, где вода держится жидкой, а атмосфера — стабильной.',
+    climate: 'Умеренный, жидкая вода и воздух',
+    resources: 'Вода, органика, плодородные почвы',
+  },
+  ocean: {
+    desc: 'Планета сплошного океана с редкими архипелагами. Тёплый мир обитаемого пояса, где воды набралось больше, чем суши.',
+    climate: 'Влажный, глобальный океан',
+    resources: 'Вода, биомасса, растворённые соли',
+  },
+  ice: {
+    desc: 'Промёрзший мир на дальней орбите — ледяные щиты и азотный иней. Формируется за снеговой линией, где до звезды слишком далеко для тепла.',
+    climate: 'Мороз, азотный и водяной лёд',
+    resources: 'Лёд, летучие соединения, чистая вода',
+  },
+  gas: {
+    desc: 'Огромный газовый гигант с полосами облаков и системой колец. Массивное ядро набрало толстую водородно-гелиевую оболочку в холодной внешней части системы.',
+    climate: 'Нет твёрдой поверхности, вечные штормы',
+    resources: 'Водород, гелий — топливо для скиммеров',
+  },
 };
-const STATION_DESC = {
-  ring: 'Кольцевой хаб над родным миром цивилизации — её орбитальная столица.',
-  outpost: 'Колониальный аванпост: скромная орбитальная станция над колонией.',
-  collector: 'Газосборщик — скиммер, черпающий топливо из атмосферы газового гиганта.',
+
+// Ruin-flavour reference: what a ruined world of this flavour looks like and
+// how it got that way.
+const RUIN_INFO = {
+  plain: {
+    desc: 'Молчаливые руины давно вымершей цивилизации — ни тел, ни ответа почему. Жизнь угасла тихо: болезнь, климат или медленный упадок.',
+    fate: 'Вымерли без катастрофы',
+  },
+  robotic: {
+    desc: 'Мир, где остались одни машины: заводы и депо всё ещё работают на давно мёртвых хозяев, гоняя грузы по пустым орбитам.',
+    fate: 'Люди исчезли, автоматика жива',
+  },
+  destroyed: {
+    desc: 'Разрушенный войной или катастрофой мир — расплавленные города, шрам на коре, орбита в обломках. Кто-то уцелел и бежал на соседний мир.',
+    fate: 'Катастрофа, часть спаслась',
+  },
+  obliterated: {
+    desc: 'Уничтоженный мир: от целой цивилизации не осталось почти ничего, планета расколота на облако щебня чужим оружием.',
+    fate: 'Планету раскололи извне',
+  },
 };
-const RUIN_TYPE_DESC = {
-  plain: 'Молчаливые руины давно вымершей цивилизации — ни тел, ни ответа почему.',
-  robotic: 'Мир, где остались одни машины: заводы всё ещё работают на мёртвых хозяев.',
-  destroyed: 'Разрушенный войной мир — расплавленные города, орбита в обломках.',
-  obliterated: 'Уничтоженный мир: от целой цивилизации почти ничего не уцелело.',
+
+// Named-race flavour (real ones; future ones show a "coming" note instead).
+const RACE_INFO = {
+  humanity: 'Любопытный вид, едва вышедший за пределы родной планеты, но уже мечтающий о звёздах.',
+  fremen: 'Суровый народ пустынь, живущий по воде и оседлавший песчаных исполинов родного мира.',
+  navi: 'Рослый народ, вросший в живую сеть своей луны-джунглей и защищающий её всем племенем.',
+  signbuilders: 'Давно исчезнувшая раса зодчих, оставившая на промёрзшем мире загадочные Знаки.',
 };
-const PHENOMENON_INFO = {
-  'blackhole-galactic': {
-    desc: 'Сверхмассивная чёрная дыра в самом сердце галактики. Аккреционный диск раскалён добела, а вокруг искривлён сам свет.',
-    facts: [['Тип', 'сверхмассивная ЧД'], ['Прообраз', 'Стрелец A*'], ['Где', 'ядро галактики']],
-  },
-  'blackhole-gargantua': {
-    desc: 'Гигантская вращающаяся чёрная дыра с ярким тонким диском — та самая Гаргантюа из «Интерстеллара».',
-    facts: [['Тип', 'вращающаяся ЧД'], ['Прообраз', 'Гаргантюа'], ['Рядом', 'станция «Эндюранс»']],
-  },
-  endurance: {
-    desc: 'Кольцевая исследовательская станция, медленно вращающаяся ради искусственной гравитации, — «Эндюранс» у Гаргантюа.',
-    facts: [['Тип', 'кольцевая станция'], ['Гравитация', 'вращением'], ['Экспедиция', 'к чёрной дыре']],
-  },
-  ishimura: {
-    desc: 'Корабль-трещинник, разламывающий планеты ради руды. Команда погибла — на борту некроморфы. (Dead Space)',
-    facts: [['Класс', 'planetcracker'], ['Длина', '~1,6 км'], ['Команда', 'погибла']],
-  },
-  deathstar: {
-    desc: 'Бронированная боевая станция размером с малую луну; её суперлазер раскалывает планету одним залпом.',
-    facts: [['Тип', 'боевая станция'], ['Размер', '~160 км'], ['Орудие', 'суперлазер']],
-  },
-  dragon: {
-    desc: 'Частный многоразовый корабль с экипажем на пути к Марсу — капсула-«капля» на разгонном модуле.',
-    facts: [['Тип', 'пилотируемая капсула'], ['Экипаж', 'до 4'], ['Курс', 'Земля → Марс']],
-  },
+
+// Special-content flavour + facts, by archetypeKey.
+const SPECIAL_INFO = {
+  'sys-sagittarius': { desc: 'Сверхмассивная чёрная дыра в самом сердце галактики; вокруг искривлён сам свет.', facts: [['Тип', 'сверхмассивная ЧД'], ['Прообраз', 'Стрелец A*']] },
+  'sys-gargantua': { desc: 'Гигантская вращающаяся чёрная дыра с ярким тонким диском — та самая Гаргантюа из «Интерстеллара».', facts: [['Тип', 'вращающаяся ЧД'], ['Рядом', '«Эндюранс»']] },
+  'sys-sol': { desc: 'Наша родная система: восемь планет вокруг жёлтого карлика, колыбель Человечества.', facts: [['Звезда', 'жёлтый карлик'], ['Планет', '8']] },
+  'sys-quarantine': { desc: 'Мёртвая система под карантином: над Эгидой VII завис корабль-трещинник, команда мертва.', facts: [['Статус', 'карантин'], ['Угроза', 'некроморфы']] },
+  'sys-alderaan': { desc: 'Сектор, где боевая станция раскетолала целый мир одним залпом — на память осталось облако щебня.', facts: [['Событие', 'уничтожение Альдераана']] },
+  'sys-twinsun': { desc: 'Мир двух солнц: под сдвоенным светом лежит пустынный Татуин.', facts: [['Звёзд', '2']] },
+  'sys-spice': { desc: 'Пустынный предел, где добывают драгоценную пряность, а под песком ходят исполины.', facts: [['Ресурс', 'пряность']] },
+  'sys-jungle': { desc: 'Спутник газового гиганта, заросший живыми джунглями, — дом народа На’ви.', facts: [['Тип', 'луна-джунгли']] },
+  'sys-hoth': { desc: 'Промёрзшая планета вечных снегов и ледяных бурь.', facts: [['Климат', 'вечная мерзлота']] },
+  endurance: { desc: 'Кольцевая исследовательская станция, вращающаяся ради искусственной гравитации, — «Эндюранс» у Гаргантюа.', facts: [['Тип', 'кольцевая станция']] },
+  ishimura: { desc: 'Корабль-трещинник, разламывающий планеты ради руды. Команда погибла — на борту некроморфы. (Dead Space)', facts: [['Класс', 'planetcracker'], ['Длина', '~1,6 км']] },
+  deathstar: { desc: 'Бронированная боевая станция размером с малую луну; суперлазер раскалывает планету одним залпом.', facts: [['Тип', 'боевая станция'], ['Размер', '~160 км']] },
+  dragon: { desc: 'Частный многоразовый корабль с экипажем на пути к Марсу — капсула-«капля» на разгонном модуле.', facts: [['Экипаж', 'до 4'], ['Курс', 'Земля → Марс']] },
+  'pl-earth': { desc: 'Голубой мир воды и воздуха — единственный известный дом жизни и разума.', facts: [['Биом', 'земной'], ['Раса', 'Человечество']] },
+  'pl-mars': { desc: 'Ржавая пустынная планета, ближайшая цель первой межпланетной экспедиции Человечества.', facts: [['Биом', 'пустыня'], ['Спутников', '2']] },
+  'pl-alderaan': { desc: 'Мирная планета, уничтоженная боевой станцией одним залпом, — теперь поле обломков.', facts: [['Статус', 'уничтожена']] },
+  'pl-aegis7': { desc: 'Мёртвый шахтёрский мир: из его недр подняли Красный Обелиск, после чего колония сошла с ума.', facts: [['Статус', 'мёртв'], ['Над ним', 'Ishimura']] },
+  'pl-tau': { desc: 'Промёрзший мир, хранящий Знаки исчезнувшей расы зодчих.', facts: [['Биом', 'лёд'], ['Раса', 'Строители Знаков']] },
+  'pl-tatooine': { desc: 'Пустынная планета под двумя солнцами — родина не одного героя.', facts: [['Биом', 'пустыня'], ['Звёзд', '2']] },
+  'pl-arrakis': { desc: 'Пустынный мир пряности и песчаных исполинов, дом Фрименов.', facts: [['Биом', 'пустыня'], ['Раса', 'Фримены']] },
+  'pl-pandora': { desc: 'Живая луна-джунгли газового гиганта, дом народа На’ви.', facts: [['Биом', 'джунгли'], ['Раса', 'На’ви']] },
+  'pl-hoth': { desc: 'Планета вечных снегов и ледяных бурь.', facts: [['Биом', 'лёд']] },
 };
 
 /**
- * Rich display info for one discovered entry, for the codex detail dialog:
- * a title, an RU category subtitle, a one-line description, and a small list
- * of `[label, value]` facts. Everything is derived from the same real
- * constants the catalogs are built from (ship ROLES/FACTIONS, biome/civ
- * tables) plus the flavour tables above — no per-instance data is needed, so
- * this works for any entry whether or not its find still exists in the world.
+ * Rich display info for a discovered (or catalog) entry, for the detail dialog:
+ * a title, an RU category subtitle, a description, and a list of `[label, value]`
+ * facts. Everything comes from the same constants the catalogs use plus the
+ * flavour tables above, so it works for any entry.
  *
  * @param {object} entry a codex.js Entry ({category, archetypeKey, label, ...})
  * @returns {{category: string, title: string, subtitle: string, desc: string, facts: Array<[string, string]>}}
@@ -296,29 +367,50 @@ export function describeEntry(entry) {
       }
       break;
     }
-    case 'station':
-      desc = STATION_DESC[key] || '';
+    case 'station': {
+      const [factionId, type] = key.split(':');
+      const faction = FACTION_BY_ID[factionId];
+      const STATION_DESC = {
+        ring: 'Кольцевой хаб над родным миром цивилизации — её орбитальная столица.',
+        outpost: 'Колониальный аванпост: скромная орбитальная станция над колонией.',
+        collector: 'Газосборщик — скиммер, черпающий топливо из атмосферы газового гиганта.',
+      };
+      desc = STATION_DESC[type] || '';
+      if (faction) facts.push(['Фракция', faction.name]);
       break;
-    case 'planet':
-      desc = PLANET_DESC[key] || '';
-      break;
-    case 'race': {
-      const [biome, civLevel] = key.split(':');
-      desc = `Разумная жизнь: ${CIV_LEVELS[civLevel]?.label?.toLowerCase() || civLevel} на планете биома «${BIOME_KEYS[biome]?.label || biome}».`;
-      facts.push(['Биом', BIOME_KEYS[biome]?.label || biome], ['Развитие', CIV_LEVELS[civLevel]?.label || civLevel]);
+    }
+    case 'planet': {
+      const info = PLANET_INFO[key];
+      if (info) {
+        desc = info.desc;
+        facts.push(['Климат', info.climate], ['Ресурсы', info.resources]);
+      }
       break;
     }
     case 'ruin': {
-      const [biome, ruinType] = key.split(':');
-      desc = RUIN_TYPE_DESC[ruinType] || '';
-      facts.push(['Биом', BIOME_KEYS[biome]?.label || biome], ['Тип гибели', RUIN_TYPE_LABELS[ruinType] || ruinType]);
-      break;
-    }
-    case 'phenomenon': {
-      const info = PHENOMENON_INFO[key];
+      const info = RUIN_INFO[key];
       if (info) {
         desc = info.desc;
-        facts.push(...info.facts);
+        facts.push(['Судьба', info.fate]);
+      }
+      break;
+    }
+    case 'race': {
+      const r = RACE_BY_KEY[key];
+      if (r && r.future) {
+        desc = 'Этот вид ещё не появился в игре — карточка-заглушка. Позже он получит свою историю и родную планету.';
+        facts.push(['Статус', 'в разработке']);
+      } else {
+        desc = RACE_INFO[key] || '';
+        if (r && r.planetRef) facts.push(['Родной мир', r.planetRef.label]);
+      }
+      break;
+    }
+    case 'special': {
+      const info = SPECIAL_INFO[key];
+      if (info) {
+        desc = info.desc;
+        facts.push(...(info.facts || []));
       }
       break;
     }
