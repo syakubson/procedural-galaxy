@@ -5,4 +5,4 @@
 // with refinement/fix rounds inside one. Bump it in the same commit as the
 // change it describes (see CLAUDE.md → Conventions).
 
-export const APP_VERSION = '0.5.1';
+export const APP_VERSION = '0.5.2';

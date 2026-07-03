@@ -31,6 +31,16 @@ export class SfxManager {
     this._buffers = new Map(); // event name -> decoded AudioBuffer
     this._last = new Map(); // event name -> its most recent source (re-trigger cuts it)
     this._preload();
+    // resume the suspended context on the very FIRST gesture — before any
+    // sound is requested — so even the first click's shot starts inside its
+    // own event instead of waiting out an async resume().
+    const arm = () => {
+      window.removeEventListener('pointerdown', arm, true);
+      window.removeEventListener('keydown', arm, true);
+      this._ensureCtx().resume().catch(() => {});
+    };
+    window.addEventListener('pointerdown', arm, true);
+    window.addEventListener('keydown', arm, true);
   }
 
   _ensureCtx() {
