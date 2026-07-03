@@ -246,7 +246,7 @@ body {
 #help-toggle {
   position: fixed;
   top: 18px;
-  right: 118px; /* gear(18) + 42+8 (gallery) + 42+8 */
+  right: 168px; /* gear(18) + 42+8 (gallery) + 42+8 (codex) + 42+8 */
   z-index: 16;
   width: 42px;
   height: 42px;
@@ -521,6 +521,7 @@ body.cine-show #hint,
 body.cine-show #nav-back,
 body.cine-show #settings-toggle,
 body.cine-show #gallery-link,
+body.cine-show #codex-toggle,
 body.cine-show #view-mode,
 body.cine-show #rotate-toggle,
 body.cine-show #cine-toggle,
@@ -663,6 +664,37 @@ body.clean-view #fact-box {
   transform: scale(1.06);
 }
 #gallery-link:active {
+  transform: scale(0.96);
+}
+
+/* --- codex toggle (permanent discovery log) --- a round icon button cloned
+   from #gallery-link, one slot further along the same galaxy-only cluster. */
+#codex-toggle {
+  position: fixed;
+  top: 18px;
+  right: 118px; /* gear(18) + 42+8 (gear) + 42+8 (gallery) */
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
+  backdrop-filter: blur(8px);
+  color: var(--ivory-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+#codex-toggle:hover {
+  background: linear-gradient(180deg, rgba(20, 24, 44, 0.78), rgba(14, 17, 33, 0.78));
+  border-color: var(--vellum-strong);
+  transform: scale(1.06);
+}
+#codex-toggle:active {
   transform: scale(0.96);
 }
 
@@ -1439,4 +1471,261 @@ body.clean-view #fact-box {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+}
+
+/* --- codex: permanent, cross-party discovery log (#codex) -----------------
+   A full-screen modal — dim backdrop + a centred card — reusing the exact
+   panel chrome every other overlay uses (ink gradient, vellum border, brass
+   accents), toggled the same opacity+transform+pointer-events way as
+   #help-panel (never a display:none swap). z-index stays below #warp-overlay
+   (30) for the same reason #genversion-banner does. */
+#codex-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+#codex-panel.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.codex-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 10, 22, 0.7);
+  backdrop-filter: blur(8px);
+}
+.codex-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 92vw);
+  max-height: min(760px, 86vh);
+  padding: 26px 30px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(12, 15, 31, 0.95), rgba(8, 10, 22, 0.95));
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  color: var(--ivory-dim);
+  font-family: var(--font-mono);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+#codex-panel.open .codex-card {
+  opacity: 1;
+  transform: none;
+}
+.codex-close {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
+  color: var(--ivory-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.codex-close:hover {
+  border-color: var(--vellum-strong);
+  color: var(--ivory);
+  transform: scale(1.06);
+}
+.codex-title {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ivory);
+  margin-bottom: 14px;
+  padding-right: 40px; /* clear the ✕ button */
+}
+.codex-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.codex-tab {
+  appearance: none;
+  padding: 7px 13px;
+  border-radius: 2px;
+  border: 1px solid var(--vellum-soft);
+  background: transparent;
+  color: var(--ivory-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.codex-tab:hover {
+  border-color: var(--vellum-strong);
+  color: var(--ivory);
+}
+.codex-tab.on {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+/* the scrolling body: progress line + shelf + curiosities showcase, so the
+   title/tabs above stay pinned while a long shelf (54 ships) scrolls. */
+.codex-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 12px;
+}
+.codex-empty {
+  grid-column: 1 / -1;
+  color: var(--parchment);
+  font-size: 12px;
+  padding: 10px 2px;
+}
+.codex-shelf,
+.codex-showcase-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.codex-slot {
+  border: 1px solid var(--vellum-soft);
+  border-radius: 2px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+.codex-slot.found {
+  border-color: var(--vellum);
+}
+.codex-slot.unknown {
+  opacity: 0.4;
+  align-items: center;
+}
+.codex-slot-label {
+  font-size: 12px;
+  color: var(--ivory);
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  text-wrap: pretty;
+}
+.codex-slot.unknown .codex-slot-label {
+  color: var(--parchment);
+  font-size: 16px;
+}
+.codex-curio {
+  color: var(--st-special);
+}
+.codex-slot-btn {
+  appearance: none;
+  border: 1px solid var(--vellum-soft);
+  background: transparent;
+  color: var(--brass-bright);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+.codex-slot-btn:hover {
+  border-color: var(--brass);
+}
+.codex-showcase {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--vellum-soft);
+}
+.codex-showcase.empty {
+  display: none;
+}
+.codex-showcase-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: var(--st-special);
+  margin-bottom: 10px;
+}
+
+@media (max-width: 640px) {
+  .codex-card {
+    width: calc(100vw - 24px);
+    max-height: 82vh;
+    padding: 20px 16px 16px;
+  }
+  .codex-title {
+    font-size: 20px;
+  }
+  .codex-shelf,
+  .codex-showcase-row {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+/* --- codex object viewer: isolated full-screen canvas (ui/objectViewer.js) -
+   its own renderer, entirely separate from the main scene; only the close
+   button + a bare canvas live here — no other chrome overlaps it. */
+.codex-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 26;
+  background: #03030b; /* same void as html/body's base background */
+  /* hidden until objectViewer.js adds .open AFTER the find built successfully —
+     a failed build must never leave an opaque, unclickable sheet on screen */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.codex-viewer.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.codex-viewer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.codex-viewer-close {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
+  appearance: none;
+  padding: 10px 16px;
+  border-radius: 2px;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(11, 14, 30, 0.7), rgba(8, 10, 22, 0.7));
+  backdrop-filter: blur(8px);
+  color: var(--ivory-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.codex-viewer-close:hover {
+  background: linear-gradient(180deg, rgba(20, 24, 44, 0.82), rgba(14, 17, 33, 0.82));
+  border-color: var(--vellum-strong);
 }
