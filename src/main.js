@@ -1459,15 +1459,11 @@ class GalaxyApp {
     if (this.mode !== 'galaxy') return;
     this.mode = 'transition';
     this._genBannerDismiss?.(); // don't let the migration pill sit over the warp fade
-    const newlyCharted = !entry.visited; // before markVisited flips it (#sfx)
     this.systems.markVisited(entry); // chart it: persist + ink the marker its status colour
     this._updateProgress();
-    // the dive gets its whoosh, and a first-ever visit also stamps the map —
-    // silent during the show, same gate as the codex funnel (#sfx)
-    if (!this._cineActive()) {
-      this.sfx.play('warpIn');
-      if (newlyCharted) this.sfx.play('chart');
-    }
+    // the dive gets its whoosh — silent during the show, same gate as the
+    // codex funnel (#sfx). The first-charting stamp was cut (owner, 2026-07-03).
+    if (!this._cineActive()) this.sfx.play('warpIn');
     // codex (#codex): a procedural system goes to the 'system' log; a
     // hand-crafted one goes to «Особое» (its systems sub-group) instead, so
     // specials don't inflate the party's system count.
