@@ -116,6 +116,13 @@ export function has(category, archetypeKey) {
   return idFor(category, archetypeKey) in load();
 }
 
+/** Has the player ever discovered ANYTHING? The onboarding uses this as its
+ *  veteran check: a browser with codex finds predates the tutorial and gets
+ *  silently grandfathered instead of being lectured on the mouse wheel. */
+export function hasAnyEntries() {
+  return Object.keys(load()).length > 0;
+}
+
 /** Every entry ever flagged a curiosity, across all categories — the
  *  showcase list, oldest discovery first. */
 export function curiosities() {

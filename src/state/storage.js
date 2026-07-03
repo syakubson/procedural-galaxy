@@ -15,14 +15,15 @@ export const STORAGE_SCHEMA_VERSION = 1;
 
 // Top-level buckets. PARTY holds the current playthrough's state (world
 // overlay patches, party metadata), META holds cross-party pointers (e.g.
-// "what GEN_VERSION did we last see"), and CODEX holds the permanent
-// cross-party discovery log (src/codex/codex.js). PLAYER is a reserved seam
-// (nothing writes it yet) — declared up front so anything persisted lands in
-// one of these four buckets instead of a fifth appearing ad hoc.
+// "what GEN_VERSION did we last see"), CODEX holds the permanent cross-party
+// discovery log (src/codex/codex.js), and PLAYER holds per-device player
+// state (the onboarding tour's progress; future per-device settings) —
+// declared up front so anything persisted lands in one of these four buckets
+// instead of a fifth appearing ad hoc.
 export const NAMESPACES = {
   PARTY: 'party',
   CODEX: 'codex', // permanent cross-party records — the codex discovery log
-  PLAYER: 'player', // reserved: per-device settings
+  PLAYER: 'player', // per-device player state (onboarding; future settings)
   META: 'meta',
 };
 

@@ -342,10 +342,17 @@ export class Systems {
       const breathAmp = seen ? 0.03 : 0.05; // tiny
       const breath = 1 + breathAmp * Math.sin(pulseTime * 0.6 + s.index * 0.9); // slow
       const base = s.special ? s.baseScale : seen ? 3.6 : 3.9;
-      s.sprite.scale.setScalar(base * breath * (1 + 0.5 * s._hov)); // hover ≫ breath
-      s.sprite.material.opacity = seen ? 0.95 : 1.0;
-      // resting colour → brass, blended by the hover amount
-      _col.copy(s._restCol).lerp(_hoverCol, s._hov);
+      // onboarding beacon («показать дом»): an insistent self-driven pulse on
+      // the SAME channels as hover (scale + brass tint) so the target marker is
+      // unmistakable from any distance — hover stays the stronger, closer cue.
+      const isBeacon = s === this._beacon;
+      const beacon = isBeacon ? 0.65 + 0.45 * Math.sin(pulseTime * 4.2) : 0;
+      s.sprite.scale.setScalar(base * breath * (1 + 0.5 * s._hov + beacon)); // hover ≫ breath
+      // the beacon also BLINKS (same phase as its size pulse): uncharted rings
+      // are already gold-ish, so scale alone camouflages on a still glance
+      s.sprite.material.opacity = isBeacon ? 0.55 + 0.45 * Math.sin(pulseTime * 4.2) : seen ? 0.95 : 1.0;
+      // resting colour → brass, blended by the hover amount (a beacon holds brass)
+      _col.copy(s._restCol).lerp(_hoverCol, isBeacon ? 1 : s._hov);
       s.sprite.material.color.copy(_col);
     }
   }
@@ -354,6 +361,13 @@ export class Systems {
    *  and brass-tint it. Called from the galaxy hover pick each frame (#1). */
   setHovered(entry) {
     this._hovered = entry || null;
+  }
+
+  /** Mark `entry` (or null) as the onboarding beacon: it pulses insistently and
+   *  holds a brass tint until cleared — a separate slot from the hover highlight,
+   *  which the per-frame galaxy pick overwrites constantly. */
+  setBeacon(entry) {
+    this._beacon = entry || null;
   }
 
   /** Nudge `base` outward along its radial until it clears every already-placed

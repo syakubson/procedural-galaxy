@@ -57,13 +57,16 @@ export class CodexUI {
    *   'system' progress can count only THIS galaxy's finds.
    * @param {(entry: object) => void} deps.onNavigate warp to a find in the live
    *   galaxy (closes the codex first). Given a codex Entry.
+   * @param {() => void} [deps.onClose] fired once each time the panel closes
+   *   (any path: ×, backdrop, Escape, navigate) — the onboarding listens.
    */
-  constructor({ objectViewer, getOverlay, getSystemTotal, getPartyId, onNavigate }) {
+  constructor({ objectViewer, getOverlay, getSystemTotal, getPartyId, onNavigate, onClose }) {
     this._objectViewer = objectViewer;
     this._getOverlay = getOverlay || (() => null);
     this._getSystemTotal = getSystemTotal || (() => 0);
     this._getPartyId = getPartyId || (() => null);
     this._onNavigate = onNavigate || (() => {});
+    this._onClose = onClose || (() => {});
     this._activeCat = TABS[0].id;
     this._open = false;
     this._detailEntry = null;
@@ -83,7 +86,11 @@ export class CodexUI {
     return !!this._detailEntry;
   }
 
-  open() {
+  /** @param {string} [tab] optional category tab to land on — the onboarding
+   *   opens straight at «Планеты», where the tour's finds actually live (the
+   *   default «Системы» tab would greet the graduate with an empty shelf). */
+  open(tab) {
+    if (tab) this._activeCat = tab;
     this._open = true;
     this.el.classList.add('open');
     this.el.setAttribute('aria-hidden', 'false');
@@ -98,6 +105,7 @@ export class CodexUI {
   }
 
   close() {
+    if (!this._open) return; // idempotent — and onClose must fire once per open
     this._closeDetail();
     this._open = false;
     this._stopThumbs();
@@ -105,6 +113,7 @@ export class CodexUI {
     this.el.setAttribute('aria-hidden', 'true');
     // free the thumbnail renderer's WebGL context while the codex is idle
     releaseThumbnailRenderer();
+    this._onClose();
   }
 
   /** One Escape step: close the detail dialog first if it's up, else the whole
