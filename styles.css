@@ -246,7 +246,7 @@ body {
 #help-toggle {
   position: fixed;
   top: 18px;
-  right: 118px; /* gear(18) + 42+8 (gear) + 42+8 (codex) */
+  right: 68px; /* 18 (gear right) + 42+8 (gear) — codex is now a left rail */
   z-index: 16;
   width: 42px;
   height: 42px;
@@ -634,36 +634,53 @@ body.clean-view #fact-box {
   transform: translateY(0);
 }
 
-/* --- codex toggle (permanent discovery log) --- a round icon button sitting
-   just left of the ⚙ settings toggle (both galaxy-view only), so the two read
-   as one cohesive cluster. */
+/* --- codex tab (permanent discovery log) --- a large vertical "pull tab"
+   flush to the LEFT edge, vertically centred: the codex is a headline feature,
+   so it gets its own prominent rail rather than a small corner icon. Galaxy-
+   view only (the system facts box owns the screen inside a dive). The
+   left-middle edge is otherwise empty — the legend sits top-left, the rotate/
+   cinematic controls bottom-left. */
 #codex-toggle {
   position: fixed;
-  top: 18px;
-  right: 68px; /* 18 (gear right) + 42 (gear width) + 8 (gap) */
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 16;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
+  gap: 14px;
+  width: 48px;
+  height: 210px;
+  padding: 20px 0;
   border: 1px solid var(--vellum);
-  background: linear-gradient(180deg, rgba(11, 14, 30, 0.6), rgba(8, 10, 22, 0.6));
+  border-left: none;
+  border-radius: 0 12px 12px 0;
+  background: linear-gradient(180deg, rgba(13, 16, 34, 0.82), rgba(8, 10, 22, 0.82));
   backdrop-filter: blur(8px);
+  box-shadow: 4px 0 18px rgba(0, 0, 0, 0.35);
   color: var(--ivory-dim);
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+#codex-toggle .codex-tab-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
 }
 #codex-toggle:hover {
-  background: linear-gradient(180deg, rgba(20, 24, 44, 0.78), rgba(14, 17, 33, 0.78));
-  border-color: var(--vellum-strong);
-  transform: scale(1.06);
+  background: linear-gradient(180deg, rgba(22, 27, 50, 0.9), rgba(14, 17, 33, 0.9));
+  border-color: var(--brass);
+  color: var(--brass-bright);
+  transform: translateY(-50%) translateX(4px);
+  box-shadow: 6px 0 24px rgba(0, 0, 0, 0.45);
 }
 #codex-toggle:active {
-  transform: scale(0.96);
+  transform: translateY(-50%) translateX(1px);
 }
 
 /* --- warp transition overlay --- */
