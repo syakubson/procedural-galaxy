@@ -14,6 +14,17 @@ const STATUS_COLOR = {
 // magenta — hand-crafted easter-egg systems (#13/#19/#20)
 const SPECIAL_COLOR = '#d98ae8';
 
+// faction capitals (#stage6) — chrome tinted in the owning fleet's colour;
+// keep in sync with markers.js's CAPITAL_COLOR.
+const CAPITAL_COLOR = {
+  alliance: '#5a8aff',
+  imperial: '#ff4030',
+  swarm: '#9aff3a',
+  syndicate: '#00d4ff',
+  cartel: '#ff8a2a',
+  precursor: '#ffd27a',
+};
+
 // drop the trailing franchise tag from authored lore: «… uprising. (Star Wars)»
 // → «… uprising.» We keep in-prose parentheticals (spectral class «(G)», a name
 // alias «(Dune)», «(Battle of Yavin)») — only known universe tags are stripped.
@@ -363,7 +374,7 @@ export class InfoPanel {
     this.backEl.textContent = '← Назад к галактике';
     this.backEl.classList.add('visible');
     r.aboutTitle.textContent = 'Об этой системе';
-    const color = data.event ? '#ffcf6e' : data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status];
+    const color = data.event ? '#ffcf6e' : (data.capital && CAPITAL_COLOR[data.capital]) || (data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status]);
     r.status.textContent = (data.event ? '✦ СОБЫТИЕ · ' : '') + data.statusLabel;
     r.status.style.color = color;
     r.status.style.borderColor = color;
@@ -560,8 +571,9 @@ export class Tooltip {
     const teaser = visited
       ? '<div class="tt-teaser tt-seen">✓ Исследована · открыть снова</div>'
       : '<div class="tt-teaser">Нажмите, чтобы исследовать →</div>';
-    // special encounters read magenta with a ✦; otherwise the status palette
-    const color = data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status] || '#aab0e0';
+    // faction capitals read in their fleet's colour; other special encounters
+    // read magenta with a ✦; otherwise the status palette
+    const color = (data.capital && CAPITAL_COLOR[data.capital]) || (data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status] || '#aab0e0');
     const mark = data.special ? '✦ ' : '';
     this.el.innerHTML =
       `<div class="tt-name">${data.name}</div>` +

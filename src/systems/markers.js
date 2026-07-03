@@ -23,6 +23,19 @@ const STATUS_COLOR = {
 // magenta — hand-crafted easter-egg systems (#13/#19/#20), marked distinctly
 const SPECIAL_COLOR = '#d98ae8';
 
+// faction capitals (#stage6) — each home system inks in ITS fleet's signature
+// colour once charted (uncharted stays the ivory survey ring like everything
+// else: the fog of war doesn't leak who lives where). Hues track the faction
+// style-kits' accent/glow, brightened where the raw accent is too dark to read.
+const CAPITAL_COLOR = {
+  alliance: '#5a8aff',
+  imperial: '#ff4030',
+  swarm: '#9aff3a',
+  syndicate: '#00d4ff',
+  cartel: '#ff8a2a',
+  precursor: '#ffd27a',
+};
+
 // uncharted marker tint — warm ivory, matching the cartographer chrome (the
 // hollow «survey ring»); inks into a solid charted disc on discovery.
 const UNCHARTED_COLOR = '#e7dcbe';
@@ -185,6 +198,22 @@ export class Systems {
     // the "Death Star" system (#12), pinned on its own arm — a special encounter,
     // marked magenta like the other special systems (special)
     this._addSpecialSystem(eggPos(5, 0.42), specials[s++].data, SPECIAL, 4.2);
+
+    // --- faction capitals (#stage6), catalog order: alliance, imperial, swarm,
+    // syndicate, cartel, precursor (see generateFactionCapitals). Pinned on the
+    // arms clear of the easter-egg spots; each charts in its FACTION's colour.
+    const capitalSpots = [
+      [0, 0.66], // alliance
+      [1, 0.34], // imperial
+      [2, 0.62], // swarm
+      [3, 0.38], // syndicate
+      [4, 0.5], // cartel
+      [1, 0.8], // precursor
+    ];
+    for (const [arm, frac] of capitalSpots) {
+      const data = specials[s++].data;
+      this._addSpecialSystem(eggPos(arm, frac), data, CAPITAL_COLOR[data.capital] || SPECIAL, 4.2);
+    }
   }
 
   // The galactic-centre black hole: a fully-opaque BLACK disk that punches a
