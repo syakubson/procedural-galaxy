@@ -20,6 +20,9 @@ import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
 import { WorldOverlay } from './state/overlay.js';
 import { currentPartyId, ensureParty, hasLegacyCharted } from './state/party.js';
+import { record as codexRecord } from './codex/codex.js';
+import { CodexUI } from './codex/codexUI.js';
+import { ObjectViewer } from './ui/objectViewer.js';
 
 // Russian planet-type labels for the in-system hover card (#6).
 const SYS_TYPE_RU = {
@@ -83,6 +86,7 @@ class GalaxyApp {
     this._buildSystems();
     this.systemView = new SystemView(this.renderer, this.assetLoader);
     this._initHud();
+    this._initCodex();
     this._syncPixelRatio();
 
     this.clock = new THREE.Clock();
@@ -359,6 +363,7 @@ class GalaxyApp {
     if (this.mode === 'galaxy') {
       if (this._settingsBtn) this._settingsBtn.style.display = '';
       if (this._galleryLink) this._galleryLink.style.display = '';
+      if (this._codexBtn) this._codexBtn.style.display = '';
       this.legend.setVisible(this.config.showMarkers);
       this.controls.enabled = true;
       this.controls.autoRotate = this.config.cameraAutoRotate;
@@ -724,6 +729,61 @@ class GalaxyApp {
     this._updateProgress();
   }
 
+  /** Wire the codex (#codex): a permanent, cross-party discovery log. The
+   *  object viewer owns its OWN isolated renderer (ui/objectViewer.js) and
+   *  pauses THIS app's render loop for as long as it stays open, via
+   *  pauseRender()/resumeRender() below — the two renderers never compete
+   *  for the frame budget. */
+  _initCodex() {
+    this._objectViewerOpen = false;
+    this.objectViewer = new ObjectViewer({
+      onOpen: () => {
+        this._objectViewerOpen = true;
+        this.pauseRender();
+      },
+      onClose: () => {
+        this._objectViewerOpen = false;
+        this.resumeRender();
+      },
+    });
+    this.codexUI = new CodexUI({
+      objectViewer: this.objectViewer,
+      getOverlay: () => this.worldOverlay, // a live getter — the overlay is replaced on a seed change
+      // 'system' has no finite catalog (codex.js's progress()) — hand it the
+      // CURRENT party's chartable system count, same filter _updateProgress() uses.
+      getSystemTotal: () => this.systems.list.filter((s) => !s.special).length,
+      getPartyId: () => currentPartyId(this.config), // scopes 'system' progress to this galaxy
+    });
+    this._codexBtn = document.getElementById('codex-toggle');
+    if (this._codexBtn) this._codexBtn.addEventListener('click', () => this.codexUI.open());
+  }
+
+  /** Stop/resume the main render loop (`_loop` just early-returns on
+   *  `!this._running` — `setAnimationLoop` keeps ticking either way) while the
+   *  codex object viewer owns the frame budget with its own renderer. Mirrors
+   *  the existing visibilitychange pause: resuming also drops the accumulated
+   *  clock gap so the next frame's dt doesn't spike. */
+  pauseRender() {
+    this._running = false;
+  }
+
+  resumeRender() {
+    // A hidden tab stays paused — the visibilitychange handler will resume
+    // the loop when the tab comes back (and it, in turn, respects an open
+    // object viewer; the two pause owners never override each other).
+    this._running = !document.hidden;
+    this.clock.getDelta();
+  }
+
+  /** All codex writes funnel through here so one rule holds everywhere: the
+   *  cinematic auto-tour drives the very same enterSystem()/_focusHit()/
+   *  _focusPlanet() paths a player does, and the show discovering things on
+   *  its own would defeat the codex — only a real player action records. */
+  _codexRecord(category, archetypeKey, meta) {
+    if (this._cineActive()) return;
+    codexRecord(category, archetypeKey, meta);
+  }
+
   _syncPixelRatio() {
     const pr = Math.min(window.devicePixelRatio || 1, this.config.maxPixelRatio);
     this.renderer.setPixelRatio(pr);
@@ -740,8 +800,10 @@ class GalaxyApp {
       resizeRaf = requestAnimationFrame(() => this._onResize());
     });
     document.addEventListener('visibilitychange', () => {
-      // Pause the loop when the tab is hidden — saves battery/CPU.
-      this._running = !document.hidden;
+      // Pause the loop when the tab is hidden — saves battery/CPU. An open
+      // codex object viewer keeps the loop paused even on a visible tab
+      // (pauseRender() owns the pause for as long as the viewer is up).
+      this._running = !document.hidden && !this._objectViewerOpen;
       if (this._running) this.clock.getDelta(); // drop the accumulated gap
     });
 
@@ -775,8 +837,12 @@ class GalaxyApp {
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
 
     switch (e.code) {
-      case 'Escape': // one step back: planet focus → system overview → galaxy (#1)
-        if (this.mode === 'system') {
+      case 'Escape': // one step back: object viewer → codex → planet focus → system → galaxy (#1, #codex)
+        if (this._objectViewerOpen) {
+          this.objectViewer.close();
+        } else if (this.codexUI && this.codexUI.isOpen) {
+          this.codexUI.close();
+        } else if (this.mode === 'system') {
           if (this.systemView._focus) this._backToOverview();
           else this.exitSystem();
         }
@@ -1008,12 +1074,34 @@ class GalaxyApp {
     const name = planet.data.label || `${this.systemView.data.name} ${String.fromCharCode(98 + idx)}`;
     this.infoPanel.showPlanet(planet.data, name);
     this.planetLabels.setVisible(false);
+    this._recordPlanetCodex(planet.data, idx);
+  }
+
+  /** Codex bookkeeping for a focused planet (#codex) — this HUD card is the
+   *  first look at its inhabitants, so the planet's kind always counts, and an
+   *  inhabited world additionally unlocks its living-race archetype (a ruined
+   *  one its extinct-ruin archetype instead — never both). */
+  _recordPlanetCodex(p, planetIndex) {
+    const batchId = currentPartyId(this.config);
+    // `faction` pins the fleet skin this find was ACTUALLY seen in: an
+    // inhabited system's faction comes from the catalog's round-robin (an
+    // index over inhabited systems, not derivable from the seed alone), so
+    // the codex viewer can't reconstruct it — it must be carried along.
+    const sourceRef = { seed: this.systemView.data.seed, planetIndex, faction: this.systemView._faction };
+    this._codexRecord('planet', p.type, { batchId, sourceRef, colonyKind: p.colonyKind });
+    if (p.inhabited && p.biomeName && p.civLevel) {
+      this._codexRecord('race', `${p.biomeName}:${p.civLevel}`, { batchId, sourceRef, biome: p.biomeName });
+    } else if (p.ruined && p.biomeName) {
+      const ruinType = p.robotic ? 'robotic' : p.destroyed ? 'destroyed' : p.obliterated ? 'obliterated' : 'plain';
+      this._codexRecord('ruin', `${p.biomeName}:${ruinType}`, { batchId, sourceRef, ruinType });
+    }
   }
 
   /** Focus + open whatever was picked — a planet, ship or structure (#5/#6).
    *  Shared by canvas clicks and by clicks on the diegetic labels. */
   _focusHit(kind, ref) {
     if (kind !== 'planet') this.systemView._planetFocused = false; // non-planet focus → trails return (#4)
+    const codexBatch = currentPartyId(this.config); // discovery context (#codex)
     if (kind === 'planet') {
       this._focusPlanet(ref);
     } else if (kind === 'ship') {
@@ -1021,11 +1109,21 @@ class GalaxyApp {
       this._frameObject(ref.mesh, 'ship');
       this.infoPanel.showShip(ref.type, this.systemView._factionStyle, ref);
       this.planetLabels.setVisible(false);
+      this._codexRecord('ship', `${this.systemView._faction}:${ref.type.id}`, {
+        batchId: codexBatch,
+        sourceRef: { role: ref.type.id, faction: this.systemView._faction },
+      });
     } else if (kind === 'structure') {
       // #6: orbital structures zoom in + follow + their own info card.
       this._frameObject(ref.station, 'structure');
       this.infoPanel.showStructure(structureCard(ref), this.systemView._factionStyle);
       this.planetLabels.setVisible(false);
+      this._codexRecord('station', ref.stationKind, {
+        batchId: codexBatch,
+        // `faction` for the same reason as _recordPlanetCodex: the round-robin
+        // fleet skin isn't recoverable from the seed when rebuilding the find.
+        sourceRef: { seed: this.systemView.data.seed, faction: this.systemView._faction },
+      });
     } else if (kind === 'ishimura') {
       // #5: the planet-cracker — zoom in + its own card
       const ish = this.systemView.ishimura;
@@ -1045,6 +1143,7 @@ class GalaxyApp {
         this.systemView._factionStyle,
       );
       this.planetLabels.setVisible(false);
+      this._codexRecord('phenomenon', 'ishimura', { batchId: codexBatch, sourceRef: { phenomenonId: 'ishimura' } });
     } else if (kind === 'deathstar') {
       // #10: the battle station — zoom in + its own card
       const ds = this.systemView.deathStar;
@@ -1064,6 +1163,7 @@ class GalaxyApp {
         this.systemView._factionStyle,
       );
       this.planetLabels.setVisible(false);
+      this._codexRecord('phenomenon', 'deathstar', { batchId: codexBatch, sourceRef: { phenomenonId: 'deathstar' } });
     } else if (kind === 'dragon') {
       // #8: the Crew Dragon en route to Mars — zoom in + its own card
       const dr = this.systemView.dragon;
@@ -1083,6 +1183,7 @@ class GalaxyApp {
         this.systemView._factionStyle,
       );
       this.planetLabels.setVisible(false);
+      this._codexRecord('phenomenon', 'dragon', { batchId: codexBatch, sourceRef: { phenomenonId: 'dragon' } });
     }
   }
 
@@ -1134,15 +1235,37 @@ class GalaxyApp {
     this._genBannerDismiss?.(); // don't let the migration pill sit over the warp fade
     this.systems.markVisited(entry); // chart it: persist + ink the marker its status colour
     this._updateProgress();
+    // codex (#codex): log this system as discovered — hand-crafted specials
+    // aren't part of "the current party's system count" (_updateProgress()'s
+    // own denominator above), so they don't inflate the 'system' progress;
+    // a black-hole encounter unlocks its own phenomenon archetype though.
+    const codexBatch = currentPartyId(this.config);
+    if (!entry.special) {
+      this._codexRecord('system', entry.data.seed, {
+        batchId: codexBatch,
+        sourceRef: { seed: entry.data.seed },
+        label: entry.data.name,
+      });
+    }
+    if (entry.data && entry.data.kind === 'blackhole') {
+      const phenomenonId = `blackhole-${entry.data.variant}`;
+      this._codexRecord('phenomenon', phenomenonId, { batchId: codexBatch, sourceRef: { phenomenonId } });
+      // Gargantua's scene includes the Endurance ring station in plain view on
+      // arrival — it isn't independently pickable, so warping in IS the find.
+      if (entry.data.variant === 'gargantua') {
+        this._codexRecord('phenomenon', 'endurance', { batchId: codexBatch, sourceRef: { phenomenonId: 'endurance' } });
+      }
+    }
     this.controls.enabled = false; // lock galaxy input immediately
     this.tooltip.hide();
     this.legend.setVisible(false);
     this.canvas.style.cursor = 'default';
     // settings belong to the galaxy view only — hide the ⚙ + close the panel
     if (this._settingsBtn) this._settingsBtn.style.display = 'none';
-    // the "Fleet & stations" link lives next to the ⚙ — both are galaxy-only, so
-    // hide it inside a system (the facts box owns the top-right corner there).
+    // the "Fleet & stations" link and the codex both live next to the ⚙ — all
+    // galaxy-only, so hide them inside a system (the facts box owns that corner there).
     if (this._galleryLink) this._galleryLink.style.display = 'none';
+    if (this._codexBtn) this._codexBtn.style.display = 'none';
     this.gui.hide();
     this._settingsOpen = false;
     if (this._settingsBtn) this._settingsBtn.classList.remove('on');
@@ -1245,6 +1368,7 @@ class GalaxyApp {
     this.legend.setVisible(this.config.showMarkers);
     if (this._settingsBtn) this._settingsBtn.style.display = ''; // ⚙ back in the galaxy view
     if (this._galleryLink) this._galleryLink.style.display = ''; // gallery link back too
+    if (this._codexBtn) this._codexBtn.style.display = ''; // codex button back too
     this.mode = 'galaxy'; // flip after reveal so a stray click can't double-fire
   }
 
