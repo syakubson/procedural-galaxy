@@ -14,3 +14,27 @@ Background music — credits & licenses
     https://opengameart.org/content/space-music-out-there
 
 The CC-BY credit is also shown on-screen in the music track label.
+
+
+UI sound effects (audio/sfx/) — credits & licenses
+==================================================
+
+All interface sounds are recordings from freesound.org, licensed
+CC0 1.0 Universal (Public Domain) — no attribution required, credited
+with gratitude anyway. Each was peak-normalized to about -3 dB and
+converted offline.
+
+click.m4a        "A relay switch being activated"  by bassmosphere
+    https://freesound.org/s/384698/
+hover.m4a        "Soft UI Button Click"  by Jummit
+    https://freesound.org/s/528561/
+chart.m4a        "traditional stamp"  by I.fekry  (trimmed to 1.2 s)
+    https://freesound.org/s/470710/
+warp-in.m4a      "Sound Design Elements Whoosh SFX 049"  by AudioPapkin
+    https://freesound.org/s/812686/
+warp-out.m4a     "Sound Design Elements Whoosh SFX 048"  by AudioPapkin
+    https://freesound.org/s/812685/
+codex-open.m4a   "Page Turn, Big Book"  by supaluci
+    https://freesound.org/s/726518/
+codex-close.m4a  "Book_Page_Close_09"  by Valenspire
+    https://freesound.org/s/699324/
