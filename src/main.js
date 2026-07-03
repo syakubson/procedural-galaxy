@@ -25,17 +25,13 @@ import { CodexUI } from './codex/codexUI.js';
 import { ObjectViewer } from './ui/objectViewer.js';
 import { ROLES } from './systems/ships.js';
 import { STATION_TYPES } from './systems/stations.js';
-
-// Which special system each phenomenon lives in — so «Перейти к объекту» can
-// warp to it (a phenomenon's sourceRef holds only its id, not a system seed).
-const PHENOMENON_SYSTEM_SEED = {
-  'blackhole-galactic': 'galactic-core',
-  'blackhole-gargantua': 'interstellar',
-  endurance: 'interstellar',
-  ishimura: 'deadspace',
-  deathstar: 'death-star',
-  dragon: 'sol-system',
-};
+import {
+  specialSystemKey,
+  specialPlanetFor,
+  racePlanetRef,
+  specialSeed,
+  specialPlanetRef,
+} from './codex/codexData.js';
 
 // Russian planet-type labels for the in-system hover card (#6).
 const SYS_TYPE_RU = {
@@ -1101,34 +1097,37 @@ class GalaxyApp {
       if (!data) continue;
       if (!s.special) {
         rec('system', data.seed, { batchId, sourceRef: { seed: data.seed }, label: data.name });
+      } else {
+        // hand-crafted system → its «Особое» systems entry + its named objects
+        const sk = specialSystemKey(data.seed);
+        if (sk) rec('special', sk, { batchId, sourceRef: { seed: data.seed } });
+        if (data.seed === 'interstellar') rec('special', 'endurance', { batchId, sourceRef: { seed: data.seed } });
+        if (data.deathStar) rec('special', 'deathstar', { batchId, sourceRef: { seed: data.seed } });
+        if (data.dragonToMars) rec('special', 'dragon', { batchId, sourceRef: { seed: data.seed } });
+        if ((data.planets || []).some((p) => p.ishimura)) rec('special', 'ishimura', { batchId, sourceRef: { seed: data.seed } });
       }
       if (data.faction && data.status === 'inhabited' && !factionSeed[data.faction]) factionSeed[data.faction] = data.seed;
       (data.planets || []).forEach((p, planetIndex) => {
         const sourceRef = { seed: data.seed, planetIndex, faction: data.faction };
         rec('planet', p.type, { batchId, sourceRef, colonyKind: p.colonyKind });
-        if (p.inhabited && p.biomeName && p.civLevel) {
-          rec('race', `${p.biomeName}:${p.civLevel}`, { batchId, sourceRef, biome: p.biomeName });
-        } else if (p.ruined && p.biomeName) {
+        if (p.ruined) {
           const ruinType = p.robotic ? 'robotic' : p.destroyed ? 'destroyed' : p.obliterated ? 'obliterated' : 'plain';
-          rec('ruin', `${p.biomeName}:${ruinType}`, { batchId, sourceRef, ruinType });
+          rec('ruin', ruinType, { batchId, sourceRef, ruinType });
+        }
+        // signature special worlds + the named races that live on them
+        const sp = specialPlanetFor(data.seed, p.label);
+        if (sp) {
+          rec('special', sp.archetypeKey, { batchId, sourceRef });
+          if (sp.race) rec('race', sp.race, { batchId, sourceRef });
         }
       });
-      if (data.kind === 'blackhole') {
-        rec('phenomenon', `blackhole-${data.variant}`, { batchId, sourceRef: { phenomenonId: `blackhole-${data.variant}` } });
-        if (data.variant === 'gargantua') rec('phenomenon', 'endurance', { batchId, sourceRef: { phenomenonId: 'endurance' } });
-      }
-      if (data.deathStar) rec('phenomenon', 'deathstar', { batchId, sourceRef: { phenomenonId: 'deathstar' } });
-      if (data.dragonToMars) rec('phenomenon', 'dragon', { batchId, sourceRef: { phenomenonId: 'dragon' } });
-      if ((data.planets || []).some((p) => p.ishimura)) {
-        rec('phenomenon', 'ishimura', { batchId, sourceRef: { phenomenonId: 'ishimura' } });
-      }
     }
-    // stations: the 3 kinds, anchored to any faction present (createStation
-    // rebuilds any kind in any faction style, so this stays viewable).
-    const anchorFaction = Object.keys(factionSeed)[0] || 'alliance';
-    const anchorSeed = factionSeed[anchorFaction] || (this.systems.list.find((s) => !s.special)?.data?.seed ?? null);
-    for (const st of STATION_TYPES) {
-      rec('station', st.id, { batchId, sourceRef: { seed: anchorSeed, faction: anchorFaction } });
+    // stations: 3 kinds × every faction present (createStation rebuilds any
+    // kind in any faction style, so each `${faction}:${kind}` stays viewable).
+    for (const [faction, seed] of Object.entries(factionSeed)) {
+      for (const st of STATION_TYPES) {
+        rec('station', `${faction}:${st.id}`, { batchId, sourceRef: { seed, faction } });
+      }
     }
     // ships: every role of every faction the galaxy actually fields.
     for (const [faction, seed] of Object.entries(factionSeed)) {
@@ -1146,8 +1145,20 @@ class GalaxyApp {
   async navigateToEntry(entry) {
     const ref = entry.sourceRef || {};
     let seed = ref.seed || null;
-    if (entry.category === 'system') seed = ref.seed || entry.archetypeKey;
-    else if (entry.category === 'phenomenon') seed = PHENOMENON_SYSTEM_SEED[entry.archetypeKey] || seed;
+    let planetLabel = null; // for finds located by label (special/race worlds)
+    if (entry.category === 'system') {
+      seed = ref.seed || entry.archetypeKey;
+    } else if (entry.category === 'special') {
+      seed = specialSeed(entry.archetypeKey) || seed;
+      const pr = specialPlanetRef(entry.archetypeKey);
+      if (pr) planetLabel = pr.label;
+    } else if (entry.category === 'race') {
+      const pr = racePlanetRef(entry.archetypeKey);
+      if (pr) {
+        seed = pr.seed;
+        planetLabel = pr.label;
+      }
+    }
     if (!seed) return;
     const target = this.systems.list.find((s) => s.data && s.data.seed === seed);
     if (!target) return;
@@ -1157,9 +1168,16 @@ class GalaxyApp {
     await this.enterSystem(target);
     if (this.mode !== 'system') return; // enter was interrupted
 
-    if (entry.category === 'planet' || entry.category === 'race' || entry.category === 'ruin') {
+    const focusByLabel = (label) => {
+      const p = (this.systemView.planets || []).find((pl) => pl.data && pl.data.label === label);
+      if (p) this._focusPlanet(p);
+    };
+
+    if (entry.category === 'planet' || entry.category === 'ruin') {
       const p = this.systemView.planets[ref.planetIndex];
       if (p) this._focusPlanet(p);
+    } else if (entry.category === 'race') {
+      focusByLabel(planetLabel);
     } else if (entry.category === 'ship') {
       const ships = this.systemView.ships || [];
       const ship = ships.find((sh) => sh.type && sh.type.id === ref.role) || ships[0];
@@ -1167,13 +1185,17 @@ class GalaxyApp {
     } else if (entry.category === 'station') {
       const host = (this.systemView.planets || []).find((p) => p.station);
       if (host) this._focusHit('structure', host);
-    } else if (entry.category === 'phenomenon') {
-      // map the phenomenon id to the SystemView field holding it (note the
-      // Death Star's field is `deathStar`, capital S) — the _focusHit kind
-      // string stays the lowercase id its branch matches on.
-      const field = { ishimura: 'ishimura', deathstar: 'deathStar', dragon: 'dragon' }[entry.archetypeKey];
-      const obj = field && this.systemView[field];
-      if (obj) this._focusHit(entry.archetypeKey, obj);
+    } else if (entry.category === 'special') {
+      if (planetLabel) {
+        focusByLabel(planetLabel); // a signature planet (Земля, Татуин, …)
+      } else {
+        // a one-off object — map its id to the SystemView field holding it
+        // (the Death Star's field is `deathStar`, capital S); black-hole and
+        // Endurance systems have no separate pickable, so warping in suffices.
+        const field = { ishimura: 'ishimura', deathstar: 'deathStar', dragon: 'dragon' }[entry.archetypeKey];
+        const obj = field && this.systemView[field];
+        if (obj) this._focusHit(entry.archetypeKey, obj);
+      }
     }
   }
 
@@ -1202,17 +1224,25 @@ class GalaxyApp {
    *  one its extinct-ruin archetype instead — never both). */
   _recordPlanetCodex(p, planetIndex) {
     const batchId = currentPartyId(this.config);
+    const seed = this.systemView.data.seed;
     // `faction` pins the fleet skin this find was ACTUALLY seen in: an
     // inhabited system's faction comes from the catalog's round-robin (an
     // index over inhabited systems, not derivable from the seed alone), so
     // the codex viewer can't reconstruct it — it must be carried along.
-    const sourceRef = { seed: this.systemView.data.seed, planetIndex, faction: this.systemView._faction };
+    const sourceRef = { seed, planetIndex, faction: this.systemView._faction };
     this._codexRecord('planet', p.type, { batchId, sourceRef, colonyKind: p.colonyKind });
-    if (p.inhabited && p.biomeName && p.civLevel) {
-      this._codexRecord('race', `${p.biomeName}:${p.civLevel}`, { batchId, sourceRef, biome: p.biomeName });
-    } else if (p.ruined && p.biomeName) {
+    // ruins are a 4-flavour reference now — the flavour IS the archetype; the
+    // sourceRef still points at this actual ruined world for the 3D view.
+    if (p.ruined) {
       const ruinType = p.robotic ? 'robotic' : p.destroyed ? 'destroyed' : p.obliterated ? 'obliterated' : 'plain';
-      this._codexRecord('ruin', `${p.biomeName}:${ruinType}`, { batchId, sourceRef, ruinType });
+      this._codexRecord('ruin', ruinType, { batchId, sourceRef, ruinType });
+    }
+    // a hand-crafted signature world (Земля, Татуин, …) unlocks its «Особое»
+    // planet entry and, where one lives here, its named race.
+    const sp = specialPlanetFor(seed, p.label);
+    if (sp) {
+      this._codexRecord('special', sp.archetypeKey, { batchId, sourceRef });
+      if (sp.race) this._codexRecord('race', sp.race, { batchId, sourceRef });
     }
   }
 
@@ -1239,10 +1269,10 @@ class GalaxyApp {
       this._frameObject(ref.station, 'structure');
       this.infoPanel.showStructure(structureCard(ref), this.systemView._factionStyle);
       this.planetLabels.setVisible(false);
-      this._codexRecord('station', ref.stationKind, {
+      // station archetype is faction × kind now, so its faction is baked into
+      // the key (grouped by faction on the Stations tab).
+      this._codexRecord('station', `${this.systemView._faction}:${ref.stationKind}`, {
         batchId: codexBatch,
-        // `faction` for the same reason as _recordPlanetCodex: the round-robin
-        // fleet skin isn't recoverable from the seed when rebuilding the find.
         sourceRef: { seed: this.systemView.data.seed, faction: this.systemView._faction },
       });
     } else if (kind === 'ishimura') {
@@ -1264,7 +1294,7 @@ class GalaxyApp {
         this.systemView._factionStyle,
       );
       this.planetLabels.setVisible(false);
-      this._codexRecord('phenomenon', 'ishimura', { batchId: codexBatch, sourceRef: { phenomenonId: 'ishimura' } });
+      this._codexRecord('special', 'ishimura', { batchId: codexBatch, sourceRef: { seed: this.systemView.data.seed } });
     } else if (kind === 'deathstar') {
       // #10: the battle station — zoom in + its own card
       const ds = this.systemView.deathStar;
@@ -1284,7 +1314,7 @@ class GalaxyApp {
         this.systemView._factionStyle,
       );
       this.planetLabels.setVisible(false);
-      this._codexRecord('phenomenon', 'deathstar', { batchId: codexBatch, sourceRef: { phenomenonId: 'deathstar' } });
+      this._codexRecord('special', 'deathstar', { batchId: codexBatch, sourceRef: { seed: this.systemView.data.seed } });
     } else if (kind === 'dragon') {
       // #8: the Crew Dragon en route to Mars — zoom in + its own card
       const dr = this.systemView.dragon;
@@ -1304,7 +1334,7 @@ class GalaxyApp {
         this.systemView._factionStyle,
       );
       this.planetLabels.setVisible(false);
-      this._codexRecord('phenomenon', 'dragon', { batchId: codexBatch, sourceRef: { phenomenonId: 'dragon' } });
+      this._codexRecord('special', 'dragon', { batchId: codexBatch, sourceRef: { seed: this.systemView.data.seed } });
     }
   }
 
@@ -1356,25 +1386,20 @@ class GalaxyApp {
     this._genBannerDismiss?.(); // don't let the migration pill sit over the warp fade
     this.systems.markVisited(entry); // chart it: persist + ink the marker its status colour
     this._updateProgress();
-    // codex (#codex): log this system as discovered — hand-crafted specials
-    // aren't part of "the current party's system count" (_updateProgress()'s
-    // own denominator above), so they don't inflate the 'system' progress;
-    // a black-hole encounter unlocks its own phenomenon archetype though.
+    // codex (#codex): a procedural system goes to the 'system' log; a
+    // hand-crafted one goes to «Особое» (its systems sub-group) instead, so
+    // specials don't inflate the party's system count.
     const codexBatch = currentPartyId(this.config);
+    const seed = entry.data.seed;
     if (!entry.special) {
-      this._codexRecord('system', entry.data.seed, {
-        batchId: codexBatch,
-        sourceRef: { seed: entry.data.seed },
-        label: entry.data.name,
-      });
-    }
-    if (entry.data && entry.data.kind === 'blackhole') {
-      const phenomenonId = `blackhole-${entry.data.variant}`;
-      this._codexRecord('phenomenon', phenomenonId, { batchId: codexBatch, sourceRef: { phenomenonId } });
-      // Gargantua's scene includes the Endurance ring station in plain view on
-      // arrival — it isn't independently pickable, so warping in IS the find.
-      if (entry.data.variant === 'gargantua') {
-        this._codexRecord('phenomenon', 'endurance', { batchId: codexBatch, sourceRef: { phenomenonId: 'endurance' } });
+      this._codexRecord('system', seed, { batchId: codexBatch, sourceRef: { seed }, label: entry.data.name });
+    } else {
+      const sk = specialSystemKey(seed);
+      if (sk) this._codexRecord('special', sk, { batchId: codexBatch, sourceRef: { seed } });
+      // the Endurance ring is in plain view the moment you arrive at Gargantua,
+      // and isn't independently pickable — so warping in IS the find.
+      if (seed === 'interstellar') {
+        this._codexRecord('special', 'endurance', { batchId: codexBatch, sourceRef: { seed } });
       }
     }
     this.controls.enabled = false; // lock galaxy input immediately
