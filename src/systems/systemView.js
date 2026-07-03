@@ -914,8 +914,10 @@ function starGlowTexture() {
   return _starGlowTex;
 }
 
-// Stable small hash for seeding planet noise offsets.
-function hashStr(str) {
+// Stable small hash for seeding planet noise offsets. Exported so the codex
+// viewer can rebuild the SAME seedBase for a stored planet find (do not merge
+// with rng.js's hashSeed — different algorithm, different purpose).
+export function hashStr(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) {
     h = (Math.imul(h, 31) + str.charCodeAt(i)) | 0;

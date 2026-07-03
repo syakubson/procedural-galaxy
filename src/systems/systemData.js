@@ -67,7 +67,9 @@ function solarMassFromLabel(label) {
 }
 
 // Planet archetypes. `kind` selects the surface branch in the planet shader.
-const PLANET_DEFS = {
+// Exported so the codex catalog can enumerate the 7 planet kinds without
+// keeping its own copy of this table.
+export const PLANET_KINDS = {
   lava: { kind: 3, c1: '#2a1610', c2: '#5a2a18', c3: '#140a08', hot: '#ff6a1e', atmo: '#ff6a30', atmoS: 0.32, clouds: 0, rMin: 0.45, rMax: 0.85 },
   rocky: { kind: 0, c1: '#7a6858', c2: '#998a78', c3: '#34302a', hot: '#000000', atmo: '#6a5a44', atmoS: 0.1, clouds: 0, rMin: 0.4, rMax: 0.9 },
   desert: { kind: 0, c1: '#b89366', c2: '#cdb083', c3: '#6a4a28', hot: '#000000', atmo: '#b89360', atmoS: 0.2, clouds: 0, rMin: 0.5, rMax: 1.0 },
@@ -78,8 +80,11 @@ const PLANET_DEFS = {
 };
 
 // Habitable-world biomes (Star-Wars-style variety). Colours override the kind-1
-// surface; `biome` selects the sub-branch in the planet shader.
-const BIOMES = {
+// surface; `biome` selects the sub-branch in the planet shader. Exported: this
+// IS the exhaustive reachable biome-key set for both living and ruined worlds
+// (see RUIN_BIOMES below, derived from these same keys) — the codex catalog and
+// lore.js's EXTINCT_WHO table must cover exactly this key set.
+export const BIOME_KEYS = {
   earthlike: { label: 'Земного типа', biome: 0, ocean: '#16406f', land: '#3f8a4a', land2: '#8a7a55' },
   ocean: { label: 'Океанический', biome: 1, ocean: '#0e3a66', land: '#3a8a72', land2: '#6f9a8a' },
   jungle: { label: 'Мир джунглей', biome: 2, ocean: '#15506a', land: '#2f7a2e', land2: '#5e8a36' },
@@ -88,7 +93,19 @@ const BIOMES = {
   city: { label: 'Планета-город', biome: 5, ocean: '#22324a', land: '#6f7588', land2: '#474c5e' },
 };
 
-const CIV = {
+// Reachable ruin-biome key set — a ruin rolls the SAME biome table a living
+// world would (see ruinWeights below) plus a flat "city" baseline, so it can
+// land on any of BIOME_KEYS' keys, never more/fewer. Derived, not duplicated,
+// so it can never silently drift out of sync with BIOME_KEYS (or with
+// lore.js's EXTINCT_WHO, which must carry one entry per key here).
+export const RUIN_BIOMES = Object.keys(BIOME_KEYS);
+
+// Ruin flavours a ruined homeworld can end up with, in roll order (see the
+// threshold chain a few lines below in generateSystem, which must keep
+// assigning these same 4 values in this same order).
+export const RUIN_TYPES = ['plain', 'robotic', 'destroyed', 'obliterated'];
+
+export const CIV_LEVELS = {
   tribal: { label: 'Племена', light: 0.3, sats: [0, 0], station: false, colonies: 0, ships: 0 },
   industrial: { label: 'Индустриальная эпоха', light: 1.0, sats: [2, 5], station: false, colonies: 0, ships: 0 },
   spacefaring: { label: 'Космическая цивилизация', light: 1.5, sats: [3, 7], station: true, colonies: 2, ships: 4 },
@@ -214,7 +231,7 @@ export function generateSystem(seed) {
     // R4: the band's archetype table IS the compatibility rule — an absent
     // key is a ban (lava can't sit in `cold`, ice/gas can't sit in `scorch`).
     const type = weightedKey(rng, GEN.world.archetypes[band]);
-    const def = PLANET_DEFS[type];
+    const def = PLANET_KINDS[type];
     const radius = rng.range(def.rMin, def.rMax);
     const hasRings = type === 'gas' ? rng.next() < 0.55 : type === 'ice' ? rng.next() < 0.12 : false;
     const ringOuter = hasRings ? radius * 2.25 : 0;
@@ -318,7 +335,7 @@ export function generateSystem(seed) {
     // civilisation stage
     const cRoll = rng.next();
     civLevel = cRoll < GEN.civTribal ? 'tribal' : cRoll < GEN.civIndustrial ? 'industrial' : 'spacefaring';
-    const civ = CIV[civLevel];
+    const civ = CIV_LEVELS[civLevel];
 
     // R8/R9: the natural biome ALWAYS gets rolled from insolation × archetype ×
     // star class, then (R10) a spacefaring civ MAY pave a city over it — city
@@ -387,14 +404,14 @@ export function generateSystem(seed) {
     //   obliterated — blown to pieces by an alien race: a debris field
     //   (else)      — a plain, lifeless greyed-out ruin
     const rRoll = rng.next();
-    let ruinType = 'plain';
-    if (rRoll < GEN.ruinRobotic) ruinType = 'robotic';
-    else if (rRoll < GEN.ruinDestroyed) ruinType = 'destroyed';
-    else if (rRoll < GEN.ruinObliterated) ruinType = 'obliterated';
+    let ruinType = RUIN_TYPES[0]; // 'plain'
+    if (rRoll < GEN.ruinRobotic) ruinType = RUIN_TYPES[1]; // 'robotic'
+    else if (rRoll < GEN.ruinDestroyed) ruinType = RUIN_TYPES[2]; // 'destroyed'
+    else if (rRoll < GEN.ruinObliterated) ruinType = RUIN_TYPES[3]; // 'obliterated'
 
     // R11: same insolation table a living world would use (this WAS a living
     // climate), plus a "was it a whole planet-city?" baseline that robotic
-    // ruins lean into hard.
+    // ruins lean into hard. The reachable key set here is exactly RUIN_BIOMES.
     const tercile = tercileFromInsol(home.insol);
     const ruinWeights = { ...GEN.world.biomes[tercile][home.type], city: 1 };
     const ruinMul = GEN.world.ruinBiomeMul[ruinType];
@@ -448,7 +465,7 @@ export function generateSystem(seed) {
   const lore = generateLore(rng, status, planetKinds);
   const res = generateResources(rng, planetKinds, status);
   let ships = 0;
-  if (status === 'inhabited' && civLevel === 'spacefaring') ships = CIV.spacefaring.ships;
+  if (status === 'inhabited' && civLevel === 'spacefaring') ships = CIV_LEVELS.spacefaring.ships;
   else if (roboticTraffic) ships = rng.int(GEN.roboticShips[0], GEN.roboticShips[1]); // robot cargo haulers (#8)
   else if (fleetDwelling) ships = rng.int(GEN.fleetShips[0], GEN.fleetShips[1]); // the surviving fleet (#10)
   else if (scoutFlagship) ships = 1; // a lone colony-scout flagship (#25)
@@ -650,12 +667,12 @@ function specPlanet(spec, rng) {
   let biomeVal = 0;
   let biomeLabel;
   if (kw.biome) {
-    const b = BIOMES[kw.biome];
-    def = { ...PLANET_DEFS.terran, c1: b.ocean, c2: b.land, c3: b.land2, biome: b.biome };
+    const b = BIOME_KEYS[kw.biome];
+    def = { ...PLANET_KINDS.terran, c1: b.ocean, c2: b.land, c3: b.land2, biome: b.biome };
     biomeVal = b.biome;
     biomeLabel = b.label;
   } else {
-    def = PLANET_DEFS[kw.type] || PLANET_DEFS.rocky;
+    def = PLANET_KINDS[kw.type] || PLANET_KINDS.rocky;
   }
   if (spec.color) def = { ...def, c2: spec.color };
   const radius = Math.min(Math.max(spec.radius != null ? spec.radius : (def.rMin + def.rMax) * 0.5, 0.3), 3.4);
@@ -1069,11 +1086,11 @@ export function generateFilmWorlds() {
 }
 
 function applyBiome(planet, biomeName) {
-  const b = BIOMES[biomeName];
+  const b = BIOME_KEYS[biomeName];
   planet.type = 'terran';
   planet.biomeName = biomeName;
   planet.biomeLabel = b.label;
   planet.biome = b.biome;
   // synthesise a kind-1 def with the biome palette
-  planet.def = { ...PLANET_DEFS.terran, c1: b.ocean, c2: b.land, c3: b.land2, biome: b.biome };
+  planet.def = { ...PLANET_KINDS.terran, c1: b.ocean, c2: b.land, c3: b.land2, biome: b.biome };
 }
