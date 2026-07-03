@@ -577,11 +577,18 @@ class GalaxyApp {
         if (sample) {
           try {
             this.systemView.load(sample.data);
-            await this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
+            // Track the in-flight compile: compileAsync's readiness poll runs
+            // in its own timer and CRASHES (not rejects) if a material it's
+            // polling gets disposed under it — enterSystem() therefore awaits
+            // this before load() replaces the warmup scene.
+            this._warmupCompile = this.renderer.compileAsync(this.systemView.scene, this.systemView.camera);
+            await this._warmupCompile;
             if (this.mode === 'galaxy') this.systemView.clear(); // don't nuke a system dived into meanwhile
             this._warmed = true;
           } catch {
             // a failed warmup just means the first real dive compiles normally
+          } finally {
+            this._warmupCompile = null;
           }
         }
       }
@@ -1281,6 +1288,11 @@ class GalaxyApp {
     this._preDolly = { pos: this.camera.position.clone(), target: this.controls.target.clone() };
     const toPos = this.camera.position.clone().lerp(entry.worldPos, 0.72);
 
+    // If the idle warmup is still compiling its sample scene, let it finish
+    // first: load() below disposes that scene's materials, and compileAsync's
+    // readiness poll throws (uncaught, in its own timer) on a disposed
+    // material. Only ever waits inside the ~1.5s-after-boot race window.
+    if (this._warmupCompile) await this._warmupCompile.catch(() => {});
     // build the system now (cheap), and compile its shaders in PARALLEL with the
     // flight (non-blocking via KHR_parallel_shader_compile) — no mid-warp hitch.
     this.systemView.load(entry.data);
