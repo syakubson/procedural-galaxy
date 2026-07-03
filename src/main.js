@@ -18,6 +18,7 @@ import { framingFor } from './systems/focusConfig.js';
 import { InfoPanel, Tooltip, Overlay, Legend, structureCard } from './ui/hud.js';
 import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
+import { SfxManager } from './audio/sfx.js';
 import { WorldOverlay } from './state/overlay.js';
 import { currentPartyId, ensureParty, hasLegacyCharted } from './state/party.js';
 import { record as codexRecord, flush as codexFlush } from './codex/codex.js';
@@ -97,6 +98,7 @@ class GalaxyApp {
     this.systemView = new SystemView(this.renderer, this.assetLoader);
     this._initHud();
     this._initCodex();
+    this.sfx = new SfxManager(); // UI sounds — before _bindEvents (listeners) and buildGUI (its «Звук» folder)
     this._syncPixelRatio();
 
     this.clock = new THREE.Clock();
@@ -721,6 +723,7 @@ class GalaxyApp {
     this.systems = new Systems(this.config, { overlay: this.worldOverlay });
     this.systems.setVisible(this.config.showMarkers);
     this.scene.add(this.systems.group);
+    this._lastHoverHit = null; // the hover-tick memory must not outlive the old markers (#sfx)
   }
 
   /** Recreate the world overlay when the current seed no longer matches the
@@ -784,11 +787,15 @@ class GalaxyApp {
       getSystemTotal: () => this.systems.list.filter((s) => !s.special).length,
       getPartyId: () => currentPartyId(this.config), // scopes 'system' progress to this galaxy
       onNavigate: (entry) => this.navigateToEntry(entry), // «Перейти к объекту» → warp there
-      onClose: () => this.onboarding.notify('codexClose'), // tutorial: its codex step advances on CLOSE
+      onClose: () => {
+        this.sfx.play('codexClose'); // a soft book close (#sfx)
+        this.onboarding.notify('codexClose'); // tutorial: its codex step advances on CLOSE
+      },
     });
     this._codexBtn = document.getElementById('codex-toggle');
     if (this._codexBtn) {
       this._codexBtn.addEventListener('click', () => {
+        this.sfx.play('codexOpen'); // a heavy page turn — the rail's own voice (#sfx)
         // during the tour's codex step land straight on the tab that actually
         // holds the graduate's finds — the default «Системы» tab is empty then
         this.codexUI.open(this.onboarding.wantsCodexTab());
@@ -867,6 +874,7 @@ class GalaxyApp {
     // pointer left the canvas → drop any marker hover highlight (#1)
     this.canvas.addEventListener('pointerleave', () => {
       if (this.systems) this.systems.setHovered(null);
+      this._lastHoverHit = null; // re-arm the hover tick (#sfx) — leave + return must tick again
       this.tooltip.hide();
     });
 
@@ -875,6 +883,15 @@ class GalaxyApp {
     window.addEventListener('keydown', (e) => this._onKeyDown(e));
     window.addEventListener('keyup', (e) => this._keys.delete(e.code));
     window.addEventListener('blur', () => this._keys.clear());
+
+    // --- UI sounds (#sfx): ONE delegated listener voices every button press.
+    // Buttons whose press already carries a dedicated voice are exempt: the
+    // codex rail speaks with its page-turn, the panel's ✕ with its book-close
+    // (the other close paths — backdrop, Escape — have no click either).
+    document.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('button') : null;
+      if (btn && btn.id !== 'codex-toggle' && !btn.classList.contains('codex-close')) this.sfx.play('click');
+    });
   }
 
   /** Discrete shortcuts + held-movement-key tracking (#2). Movement itself is
@@ -1003,6 +1020,9 @@ class GalaxyApp {
     this.raycaster.setFromCamera(this._pointer, this.camera);
     const hit = this.systems.pick(this.raycaster);
     this.systems.setHovered(hit); // grow + brass-tint the hovered marker (#1)
+    // a NEW marker under the pointer ticks once (#sfx) — never per frame
+    if (hit && hit !== this._lastHoverHit) this.sfx.play('hover');
+    this._lastHoverHit = hit || null;
     if (hit) {
       this.tooltip.show(hit.data, e.x, e.y, hit.visited);
       this.canvas.style.cursor = 'pointer';
@@ -1431,8 +1451,15 @@ class GalaxyApp {
     if (this.mode !== 'galaxy') return;
     this.mode = 'transition';
     this._genBannerDismiss?.(); // don't let the migration pill sit over the warp fade
+    const newlyCharted = !entry.visited; // before markVisited flips it (#sfx)
     this.systems.markVisited(entry); // chart it: persist + ink the marker its status colour
     this._updateProgress();
+    // the dive gets its whoosh, and a first-ever visit also stamps the map —
+    // silent during the show, same gate as the codex funnel (#sfx)
+    if (!this._cineActive()) {
+      this.sfx.play('warpIn');
+      if (newlyCharted) this.sfx.play('chart');
+    }
     // codex (#codex): a procedural system goes to the 'system' log; a
     // hand-crafted one goes to «Особое» (its systems sub-group) instead, so
     // specials don't inflate the party's system count.
@@ -1511,6 +1538,7 @@ class GalaxyApp {
   async exitSystem() {
     if (this.mode !== 'system') return;
     this.mode = 'transition';
+    if (!this._cineActive()) this.sfx.play('warpOut'); // the pull-back's whoosh (#sfx)
     this.infoPanel.hide();
     this.planetLabels.setVisible(false);
     if (this._reticle) this._reticle.classList.remove('visible');

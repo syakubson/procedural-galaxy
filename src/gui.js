@@ -97,6 +97,12 @@ export function buildGUI(app) {
   fLight.add(c, 'nebulaIntensity', 0, 1.5, 0.01).name('Плотность газа').onChange(live);
   fLight.close();
 
+  // --- UI sounds (stage 5): master volume + mute, persisted per device ---
+  const fSound = gui.addFolder('Звук');
+  fSound.add(app.sfx, 'volume', 0, 1, 0.05).name('Громкость эффектов').onChange((v) => app.sfx.setVolume(v));
+  fSound.add(app.sfx, 'muted').name('Без эффектов').onChange((m) => app.sfx.setMuted(m)); // music has its own ♪ toggle
+  fSound.close();
+
   // --- readout ---
   gui.add(app.stats, 'fps').name('FPS').disable().listen();
 

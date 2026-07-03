@@ -363,6 +363,12 @@ Ambient — three licensed tracks (`audio/tracks/`): **Kevin MacLeod (CC-BY)** a
 Attribution is shown in the track caption and in `audio/CREDITS.txt`. Toggled with the sound
 buttons in the bottom-right corner (music is on by default, starting on your first interaction).
 
+UI sounds (`audio/sfx/`) — seven short CC0 recordings from freesound.org: a relay click for
+buttons, a soft tick on marker hover, a rubber stamp when a system is first inked into the map,
+a designed whoosh pair for the warp in/out, and a page turn / book close for the codex. The
+cinematic show stays silent. Volume + mute live in the settings panel («Звук»), persisted per
+device; credits in `audio/CREDITS.txt`.
+
 </details>
 
 <details>
@@ -380,6 +386,7 @@ galaxy/
 ├── media/                  # README demo video, poster, screenshot gallery
 ├── vendor/                 # vendored Three.js core/addons + lil-gui
 ├── audio/tracks/           # ambient (CC-BY / CC0) + CREDITS.txt
+├── audio/sfx/              # UI one-shots (CC0, freesound.org) — click/hover/chart/warp/codex
 └── src/
     ├── main.js             # renderer, camera, OrbitControls, loop, keyboard, adaptivity
     ├── config.js           # defaults + quality presets (star/sun counts)
@@ -393,6 +400,8 @@ galaxy/
     ├── postfx.js           # HDR pipeline + ACES tonemapping
     ├── gui.js              # the lil-gui panel
     ├── audio/ambient.js    # ambient player (tracks + switching)
+    ├── audio/sfx.js        # UI-sound manager (lazy pool, volume/mute persisted)
+    ├── audio/sfxEvents.js  # event → asset + relative-volume table
     ├── state/              # persistence: storage envelope, world overlay, party lifecycle
     ├── codex/              # the discovery codex: catalogs, log, panel, find rebuilder
     ├── onboarding/         # first-flight tour: declarative steps + the FSM coachmark
