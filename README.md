@@ -84,6 +84,7 @@ tens of thousands of stars.
 - 🛰️ **Hidden scenes** — Sagittarius A\*, Interstellar's Gargantua + Endurance, our Solar System, a Death Star, and more.
 - 📔 **A codex of finds** — every world, race, ruin, ship and phenomenon you discover joins a permanent collection with honest "N of M" counters and a 3D showcase viewer; it survives seed changes.
 - 🧭 **A first-flight tour** — a short skippable tutorial walks a new player through the Solar System: rotate, zoom, fly home, meet Earth, find it in the codex. Advances on your own actions, shows once.
+- 🔉 **Sound as atmosphere** — a deliberately sparse, zero-latency UI soundscape: a whoosh pair for warps and planet glides, a page turn for the codex, a barely-there tick on hover. Buttons and the cinematic show stay silent; the ♪ button is the master switch, both volumes live in settings.
 - ⚡ **Runs on weak PCs** — no build step, no dependencies, no internet; rotation/twinkle/size live on the GPU.
 
 ---
@@ -363,10 +364,10 @@ Ambient — three licensed tracks (`audio/tracks/`): **Kevin MacLeod (CC-BY)** a
 Attribution is shown in the track caption and in `audio/CREDITS.txt`. Toggled with the sound
 buttons in the bottom-right corner (music is on by default, starting on your first interaction).
 
-UI sounds (`audio/sfx/`) — a small public-domain set: a soft synth tap for buttons and a
-barely-there synth tick on marker hover (siblings, synthesized in-house), a designed whoosh pair
-for the warp in/out (the quieter planet glide reuses the warp-in), and a page turn / book close
-for the codex. The cinematic show stays silent.
+UI sounds (`audio/sfx/`) — a small public-domain set: a barely-there synth tick on marker hover
+(synthesized in-house), a designed whoosh pair for the warp in/out (the quieter planet glide
+reuses the warp-in), and a page turn / book close for the codex. Buttons are deliberately
+silent, and the cinematic show stays silent too.
 The ♪ button is the one master switch for ALL audio (music + effects); the two volumes live in
 the settings panel («Звук»), persisted per device. Credits in `audio/CREDITS.txt`.
 

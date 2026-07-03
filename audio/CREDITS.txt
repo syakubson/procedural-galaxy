@@ -24,7 +24,6 @@ CC0 1.0 Universal (Public Domain) — no attribution required, credited
 with gratitude anyway. Each was peak-normalized to about -3 dB and
 converted offline.
 
-click.wav        synthesized in-house (an enveloped sine tap) — public domain
 hover.wav        synthesized in-house (an enveloped sine tick) — public domain
 warp-in.m4a      "Sound Design Elements Whoosh SFX 049"  by AudioPapkin
     https://freesound.org/s/812686/  (also voices the planet glide, quieter)

@@ -890,16 +890,8 @@ class GalaxyApp {
     window.addEventListener('keyup', (e) => this._keys.delete(e.code));
     window.addEventListener('blur', () => this._keys.clear());
 
-    // --- UI sounds (#sfx): ONE delegated listener voices every button press.
-    // Buttons whose press already carries a dedicated voice are exempt: the
-    // codex rail speaks with its page-turn, the panel's ✕ with its book-close
-    // (the other close paths — backdrop, Escape — have no click either), and
-    // «← Назад» with its own warp-out / planet glide.
-    const SILENT_BTNS = new Set(['codex-toggle', 'nav-back']);
-    document.addEventListener('click', (e) => {
-      const btn = e.target && e.target.closest ? e.target.closest('button') : null;
-      if (btn && !SILENT_BTNS.has(btn.id) && !btn.classList.contains('codex-close')) this.sfx.play('click');
-    });
+    // --- UI sounds (#sfx): buttons are deliberately SILENT (owner, 2026-07-04)
+    // — only meaningful moments speak: marker hover, warps, the codex book.
   }
 
   /** Discrete shortcuts + held-movement-key tracking (#2). Movement itself is

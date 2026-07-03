@@ -52,6 +52,20 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   `_buildSystems()` → `SystemView` (also takes the loader) → HUD → codex (`_initCodex`) → GUI →
   the render loop → `_warmUpSystemShaders()` (idle-timer, ~1.5s — also where deferred skybox
   loads fire).
+- **Onboarding (`src/onboarding/`).** A 9-step first-flight tour through the Solar System:
+  steps are pure data (steps.js), the FSM (onboarding.js) advances via `notify(event)` calls
+  from main.js on REAL player actions and can fast-forward past manual narration steps.
+  Persists under `NAMESPACES.PLAYER/'onboarding'`; `_begin()` stamps `{done:false}` so an
+  abandoned tour restarts instead of being grandfathered by its own codex records; a browser
+  with prior codex finds never sees it. Mutually exclusive with the cinematic show.
+- **UI sounds (`src/audio/sfx.js` + `sfxEvents.js`).** WebAudio, all assets fetched+decoded
+  up front (zero-latency); crisp one-shots ship as WAV (AAC pads ~23 ms of priming silence —
+  reads as input lag on a transient), swelling whooshes as m4a. Deliberate silences: buttons,
+  the first-charting, and the whole cinematic show (`!_cineActive()` gate at every call site,
+  same rule as the codex funnel). The ♪ music toggle is the ONE master audio switch
+  (AmbientMusic.onStateChange → sfx.setMuted); the two volumes persist under
+  `NAMESPACES.PLAYER`. New sounds: bake offline via trim-leading-silence + peak ≈ -3 dB,
+  credit in `audio/CREDITS.txt`, set relative loudness ONLY in sfxEvents.js.
 - **Codex (`src/codex/`).** A PERMANENT cross-party discovery log (storage namespace `CODEX` —
   no party id / GEN_VERSION in its key). Records fire on meaningful player actions through
   `main.js`'s `_codexRecord()` funnel, which stays silent during the cinematic auto-tour; the

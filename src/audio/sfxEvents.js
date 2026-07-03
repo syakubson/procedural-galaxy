@@ -15,8 +15,8 @@
 // lag on a transient. The warp whooshes SWELL in, so m4a stays fine there.
 export const SFX_EVENTS = {
   // levels halved across the board 2026-07-03 — owner: «слишком громкие».
-  // No 'chart' event: the first-charting stamp was cut entirely (owner).
-  click: { src: 'audio/sfx/click.wav', volume: 0.18 }, // a soft synth tap — every chrome button
+  // No 'chart' and no 'click' events: the first-charting stamp and the button
+  // click were both cut entirely (owner) — buttons act, they don't speak.
   hover: { src: 'audio/sfx/hover.wav', volume: 0.1 }, // a barely-there synth tick — a NEW marker under the pointer
   warpIn: { src: 'audio/sfx/warp-in.m4a', volume: 0.3 }, // designed whoosh 049 — diving into a system
   warpOut: { src: 'audio/sfx/warp-out.m4a', volume: 0.3 }, // its sibling 048 — pulling back out
