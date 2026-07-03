@@ -50,11 +50,17 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   the render loop → `_warmUpSystemShaders()` (idle-timer, ~1.5s — also where deferred skybox
   loads fire).
 - **Codex (`src/codex/`).** A PERMANENT cross-party discovery log (storage namespace `CODEX` —
-  no party id / GEN_VERSION in its key). Records fire only on meaningful player actions through
+  no party id / GEN_VERSION in its key). Records fire on meaningful player actions through
   `main.js`'s `_codexRecord()` funnel, which stays silent during the cinematic auto-tour; the
-  debug reveal-all records nothing. The «Рассмотреть» viewer re-drives the SAME builders with
-  the SAME seeds (plus `sourceRef.faction`, since inhabited fleet skins are assigned round-robin
-  outside the seed) — never invent a second rendering path for a find.
+  ONE sanctioned bulk exception is reveal-all (`_recordEverythingDiscoverable()`), which fills
+  the codex from the whole galaxy in a single deferred-persist pass (`record(...,{defer})` +
+  `flush()`). The gallery renders each find as a thumbnail (`thumbnails.js`, a shared offscreen
+  renderer driving the SAME `codexViewer.buildFor` rebuild); undiscovered slots show a
+  per-category glyph (`codexIcons.js`). A card opens a detail dialog with «Рассмотреть» (the 3D
+  viewer) and «Перейти к объекту» (`navigateToEntry` warps to it). Every rebuild re-drives the
+  SAME builders with the SAME seeds (plus `sourceRef.faction`, since inhabited fleet skins are
+  assigned round-robin outside the seed) — never invent a second rendering path for a find. The
+  gallery tile class is `.codex-tile`; `.codex-card` is the panel container (keep them distinct).
 
 ## Verify before claiming done
 
