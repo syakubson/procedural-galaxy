@@ -4,11 +4,11 @@
 // much a given bucket of assets (e.g. skyboxes) actually cost.
 //
 // Deliberately small: no priority queue, no concurrency cap, no cancelTag.
-// Nothing in the app yet needs to interrupt an in-flight load or throttle how
-// many run at once — those land later, once real concurrent demand (hero
-// textures, atlases) shows up. Every caller here awaits load() and treats a
-// rejection as "the asset just doesn't exist yet" (the scene already has a
-// procedural fallback, so a failed skybox fetch is cosmetic, not fatal).
+// Nothing in the app needs to interrupt an in-flight load or throttle how
+// many run at once — add those the day something does. Every caller here
+// awaits load() and treats a rejection as "the asset just doesn't exist"
+// (the scene already has a procedural fallback, so a failed skybox fetch is
+// cosmetic, not fatal).
 //
 // texture vs TextureLoader parity: three.js's TextureLoader decodes into an
 // <img> and relies on `texture.flipY` (default true) to flip it at GPU-upload

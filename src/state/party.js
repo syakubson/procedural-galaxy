@@ -1,5 +1,5 @@
-// A "party" is one playthrough of the galaxy: a seed, when it started, and —
-// once a campaign engine exists — how far it's progressed. Today that's just
+// A "party" is one playthrough of the galaxy: a seed, when it started, and
+// whatever progress ends up attached to it. Today that's just
 // enough to key the world overlay's patches and to detect a stale save when
 // the generator rules change underneath it. Everything here persists through
 // storage.js's PARTY/META namespaces; nothing here touches localStorage
@@ -87,11 +87,11 @@ export function savePatches(partyId, patches) {
   return write(NAMESPACES.PARTY, patchesScopeKey(GEN_VERSION, partyId), patches);
 }
 
-// endParty()/an ArchiveEntry list of past playthroughs are NOT implemented
-// yet — there's no UI that ends a party, and no player list to render one
-// against. A later campaign stage adds: endParty(partyId) marking
-// PartyMeta.status 'ended' + appending an ArchiveEntry, and a party picker
-// that reads that archive instead of scanning localStorage keys.
+// endParty()/an ArchiveEntry list of past playthroughs are NOT implemented —
+// there's no UI that ends a party, and no player list to render one against.
+// If that day comes: endParty(partyId) marks PartyMeta.status 'ended' and
+// appends an ArchiveEntry, and a party picker reads that archive instead of
+// scanning localStorage keys.
 
 /** One-shot detector for the pre-overlay per-seed keys
  *  (`galaxy.charted.<seed>`) this module's patches replace. Used to catch a

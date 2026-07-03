@@ -79,4 +79,5 @@ so a redeploy is picked up without a hard refresh; `.vercelignore` keeps dev-onl
 - Don't commit large binaries. The README demo lives in `media/` already compressed (≈1 MB H.264);
   re-compress new media with ffmpeg (`scale=1280:-2`, `crf 30`, `+faststart`), don't drop a raw
   multi-hundred-MB screen recording into git.
-- `TODO.md` (the roadmap) is gitignored on purpose — it's a scratch wishlist, not public docs.
+- `TODO.md` / `CHECKPOINT.md` are gitignored scratch names — never commit working notes of
+  any kind here; this repository carries only the shipped project itself.

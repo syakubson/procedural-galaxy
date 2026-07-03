@@ -98,11 +98,11 @@ export function applyQuality(config, quality) {
 }
 
 // Per-profile performance budgets, keyed the same as QUALITY_PRESETS. These
-// numbers are a stage-0 starting hypothesis, not measured ceilings — they get
-// calibrated against a real headed perf run (see scripts/perf_bench.py) once
-// there's hero content and a reference machine to compare against. Low is the
-// only tier that hard-gates hero textures (maxHeroTextureMB: 0): weak PCs get
-// the procedural fallback material, never a network request for one.
+// numbers are a starting hypothesis, not measured ceilings — calibrate them
+// against a real headed perf run (see scripts/perf_bench.py) on a reference
+// machine before trusting them. Low is the only tier that hard-gates hero
+// textures (maxHeroTextureMB: 0): weak PCs get the procedural material,
+// never a network request for a texture.
 // maxBundleKB is judged against the UNCOMPRESSED transfer weight (what the
 // local dev server actually serves — vendored three.module.js alone is
 // ~1.24 MB of it); a CDN's gzip/brotli ships the same page 3-4x smaller, so

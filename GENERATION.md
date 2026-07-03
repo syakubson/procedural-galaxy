@@ -147,7 +147,7 @@ freighters, and applies to wild systems whether or not they had a life candidate
 
 ## Archetype catalog contract (civLevel/ruinType × biome)
 
-For a future codex/catalog to know exactly which combinations to expect:
+The exhaustive reachability table — which combinations can actually generate:
 
 - **Living races** — `{earthlike, ocean, jungle, tundra, desert} × {tribal, industrial, spacefaring}`
   (15) plus `city × spacefaring` (1) = **16 reachable**. `city × {tribal, industrial}` is

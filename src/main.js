@@ -697,9 +697,9 @@ class GalaxyApp {
     const partyId = currentPartyId(this.config);
     if (!this.worldOverlay || this.worldOverlay.partyId !== partyId) {
       // A new seed is a new party: register its metadata record too, or the
-      // overlay would write orphan patches that no future party picker /
-      // archive stage could attribute (ensureParty is idempotent). The
-      // migration banner stays a boot-only affair — no re-show here.
+      // overlay would write orphan patches nothing can attribute to a party
+      // record (ensureParty is idempotent). The migration banner stays a
+      // boot-only affair — no re-show here.
       this._partyStatus = ensureParty(this.config);
       this.worldOverlay = new WorldOverlay(partyId);
     }
@@ -1483,9 +1483,8 @@ class GalaxyApp {
       // this can legitimately read 0 right after boot and pick up the real
       // total once those fetches land.
       systemAssetMB: (this.assetLoader?.bytesLoadedTotal?.() ?? 0) / (1024 * 1024),
-      // Hero textures are a later roadmap stage — nothing loads under the
-      // 'hero' tag yet, so this stays 0 (which the low-profile budget of 0 MB
-      // happens to already satisfy).
+      // Nothing loads under the 'hero' tag, so this reads 0 (which the
+      // low-profile budget of 0 MB happens to already satisfy).
       heroTextureMB: (this.assetLoader?.bytesLoaded?.('hero') ?? 0) / (1024 * 1024),
       // Omitted (undefined) until the load event has finished, so checkBudget
       // skips them instead of judging a half-measured page.
@@ -1497,7 +1496,7 @@ class GalaxyApp {
     return { profile: appliedProfile, metrics, budget, violations, ok };
   }
 
-  /** Dev helper for the perf bench and (later) the codex viewer: jump straight
+  /** Dev helper for the perf bench: jump straight
    *  into the first catalog entry matching `predicate(entry)`, bypassing marker
    *  picking entirely — lets a script warp to e.g. the Death Star or a black
    *  hole by id without hunting for it on screen. Returns the target's stable

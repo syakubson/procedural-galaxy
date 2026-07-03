@@ -34,7 +34,7 @@ export function applyOverlay(base, patch) {
 
 /**
  * One party's mutable layer over the deterministic base galaxy. Patches are
- * keyed by systemId (== data.seed, the same id the catalog/markers/codex all
+ * keyed by systemId (== data.seed, the same id the catalog and markers
  * share) and persisted as ONE object per party — a party touches at most a
  * few dozen systems, so per-system keys would buy nothing, and keeping it one
  * object is what lets patchMany() reveal/patch a whole batch in a single
@@ -72,17 +72,17 @@ export class WorldOverlay {
   }
 
   /** The effective (base + patch) view of one system. Every consumer that
-   *  shows a system to the player — markers, the system viewer, later the
-   *  codex's 3D re-render — reads through this, never the raw generate*()
-   *  output, so a patched fact (once patches carry more than `visited`)
-   *  always shows up everywhere at once. */
+   *  shows a system to the player — markers, the system viewer, anything
+   *  else — reads through this, never the raw generate*() output, so a
+   *  patched fact (once patches carry more than `visited`) always shows up
+   *  everywhere at once. */
   effective(systemId, base) {
     return applyOverlay(base, this._patches[systemId]);
   }
 
-  /** Drop every patch for this party. Nothing calls this yet — a later
-   *  campaign stage retires/archives a party wholesale; see the endParty()
-   *  note in party.js. */
+  /** Drop every patch for this party. Nothing calls this yet — it exists so
+   *  that retiring a party wholesale has an obvious, tested seam; see the
+   *  endParty() note in party.js. */
   clear() {
     this._patches = {};
     this._persist();

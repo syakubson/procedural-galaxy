@@ -1,7 +1,7 @@
 // The single owner of window.localStorage in this codebase. Every module that
-// needs to persist something — the world overlay, party lifecycle, and later
-// the codex / onboarding / SFX settings — goes through read()/write()/remove()
-// here instead of touching localStorage directly. Centralising it means one
+// needs to persist something — the world overlay, party lifecycle, anything
+// else that ever comes up — goes through read()/write()/remove() here instead
+// of touching localStorage directly. Centralising it means one
 // place enforces the key format and the schema version, and one place absorbs
 // storage failures (quota exceeded, private-mode Safari, a locked-down embed)
 // so every call site is spared its own try/catch.
@@ -14,15 +14,14 @@
 export const STORAGE_SCHEMA_VERSION = 1;
 
 // Top-level buckets. PARTY holds the current playthrough's state (world
-// overlay patches, party/campaign metadata) and META holds cross-party
-// pointers (e.g. "what GEN_VERSION did we last see"). CODEX and PLAYER are
-// reserved for later stages — the permanent discovery log and per-device
-// settings such as SFX volume — declared now so every future persisted key
+// overlay patches, party metadata) and META holds cross-party pointers
+// (e.g. "what GEN_VERSION did we last see"). CODEX and PLAYER are reserved
+// seams (nothing writes them) — declared up front so anything persisted
 // lands in one of these four buckets instead of a fifth appearing ad hoc.
 export const NAMESPACES = {
   PARTY: 'party',
-  CODEX: 'codex', // reserved: permanent discovery log, not reset per party
-  PLAYER: 'player', // reserved: per-device settings (e.g. SFX mute/volume)
+  CODEX: 'codex', // reserved: permanent cross-party records
+  PLAYER: 'player', // reserved: per-device settings
   META: 'meta',
 };
 

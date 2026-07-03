@@ -1,9 +1,8 @@
 // The full roster of star systems in a galaxy — data only, no THREE, no DOM.
-// markers.js consumes this to place/render sprites; a later campaign engine
-// (running in-browser and, eventually, on a server) would consume the SAME
-// list to know what exists to fight over. Keeping this pure and side-effect
-// free is what lets both sides trust "same config -> same systems" without
-// either one re-deriving the other's generation rules.
+// markers.js consumes this to place/render sprites; anything else that needs
+// to know "what exists in this galaxy" consumes the SAME list. Keeping this
+// pure and side-effect free is what lets every consumer trust "same config ->
+// same systems" without re-deriving the generation rules.
 
 import {
   generateSystem,
@@ -18,8 +17,8 @@ import {
 
 /**
  * @typedef {{ id: string, kind: 'system'|'special', data: object }} CatalogEntry
- * `id` is always `data.seed` — the one identifier every layer (the world
- * overlay, later the codex and a campaign engine) keys on, so nothing needs a
+ * `id` is always `data.seed` — the one identifier every layer that addresses
+ * systems (the world overlay first among them) keys on, so nothing needs a
  * second, synthetic id scheme.
  */
 
