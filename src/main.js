@@ -22,6 +22,7 @@ import { WorldOverlay } from './state/overlay.js';
 import { currentPartyId, ensureParty, hasLegacyCharted } from './state/party.js';
 import { record as codexRecord, flush as codexFlush } from './codex/codex.js';
 import { CodexUI } from './codex/codexUI.js';
+import { Onboarding } from './onboarding/onboarding.js';
 import { ObjectViewer } from './ui/objectViewer.js';
 import { ROLES } from './systems/ships.js';
 import { STATION_TYPES } from './systems/stations.js';
@@ -109,6 +110,10 @@ class GalaxyApp {
     this._initCinematic();
     this._initControlsHelp();
     this._maybeShowGenVersionBanner();
+    // first-flight tutorial — created after every overlay button exists (it
+    // points at them); self-gates on saved state / a veteran codex / the show.
+    this.onboarding = new Onboarding(this);
+    this.onboarding.maybeStart();
 
     this._loop = this._loop.bind(this);
     this.renderer.setAnimationLoop(this._loop);
@@ -328,7 +333,15 @@ class GalaxyApp {
       if (this._cineActive() && !exempt(e.target)) this.stopCinematic();
     });
     window.addEventListener('wheel', () => this._cineActive() && this.stopCinematic(), { passive: true });
-    window.addEventListener('keydown', () => this._cineActive() && this.stopCinematic());
+    window.addEventListener('keydown', () => {
+      // the C keydown that just STARTED the show (handled by _onKeyDown, which
+      // is bound earlier on the same window) is a toggle, not an exit.
+      if (this._cineKeyToggle) {
+        this._cineKeyToggle = false;
+        return;
+      }
+      if (this._cineActive()) this.stopCinematic();
+    });
   }
 
   _cineActive() {
@@ -336,7 +349,10 @@ class GalaxyApp {
   }
 
   startCinematic() {
-    if (this._cineActive() || this.mode !== 'galaxy') return;
+    // the _galaxyDolly guard: the tour's «показать дом» flight is the one case
+    // where a galaxy dolly runs while mode is still 'galaxy' — starting the
+    // show mid-flight would freeze that dolly under the show's mode flips.
+    if (this._cineActive() || this.mode !== 'galaxy' || this._galaxyDolly) return;
     this._cine = { active: true };
     this._suppressClick = true; // swallow the click that started the show
     this._hoverObj = null;
@@ -768,9 +784,16 @@ class GalaxyApp {
       getSystemTotal: () => this.systems.list.filter((s) => !s.special).length,
       getPartyId: () => currentPartyId(this.config), // scopes 'system' progress to this galaxy
       onNavigate: (entry) => this.navigateToEntry(entry), // «Перейти к объекту» → warp there
+      onClose: () => this.onboarding.notify('codexClose'), // tutorial: its codex step advances on CLOSE
     });
     this._codexBtn = document.getElementById('codex-toggle');
-    if (this._codexBtn) this._codexBtn.addEventListener('click', () => this.codexUI.open());
+    if (this._codexBtn) {
+      this._codexBtn.addEventListener('click', () => {
+        // during the tour's codex step land straight on the tab that actually
+        // holds the graduate's finds — the default «Системы» tab is empty then
+        this.codexUI.open(this.onboarding.wantsCodexTab());
+      });
+    }
   }
 
   /** Stop/resume the main render loop (`_loop` just early-returns on
@@ -830,7 +853,17 @@ class GalaxyApp {
     this.canvas.addEventListener('pointerup', (e) => {
       const moved = Math.hypot(e.clientX - this._downAt.x, e.clientY - this._downAt.y);
       if (moved < 6) this._onClick(e); // distinguish a click from an orbit-drag
+      else if (this.mode === 'galaxy') this.onboarding.notify('rotate'); // tutorial: «поверни галактику»
     });
+    // tutorial: a wheel zoom over the galaxy is the «zoom» step's action.
+    // Canvas-scoped on purpose — scrolling an open codex panel must not count.
+    this.canvas.addEventListener(
+      'wheel',
+      () => {
+        if (this.mode === 'galaxy') this.onboarding.notify('zoom');
+      },
+      { passive: true },
+    );
     // pointer left the canvas → drop any marker hover highlight (#1)
     this.canvas.addEventListener('pointerleave', () => {
       if (this.systems) this.systems.setHovered(null);
@@ -866,7 +899,13 @@ class GalaxyApp {
         if (this.mode === 'galaxy' && this._rotateBtn) this._rotateBtn.click();
         return;
       case 'KeyC': // toggle the cinematic show
-        if (this.mode === 'galaxy' && this._cineBtn) this._cineBtn.click();
+        if (this.mode === 'galaxy' && this._cineBtn) {
+          // this listener is bound BEFORE the show's own any-key-exits one, so
+          // the very keydown that starts the show would immediately stop it —
+          // flag it so the exit listener ignores exactly this event.
+          this._cineKeyToggle = true;
+          this._cineBtn.click();
+        }
         return;
       case 'KeyM': { // toggle music
         const mb = document.getElementById('music-toggle');
@@ -883,6 +922,15 @@ class GalaxyApp {
     if (MOVE_CODES.has(e.code)) {
       this._keys.add(e.code);
       e.preventDefault(); // arrows/space would otherwise scroll the page
+      // tutorial parity for keyboard-first players: Q/E/± advance the «zoom»
+      // step, arrows/WASD the «rotate» step — same as their mouse equivalents.
+      if (this.mode === 'galaxy') {
+        const zoomKey =
+          e.code === 'KeyQ' || e.code === 'KeyE' ||
+          e.code === 'Equal' || e.code === 'Minus' ||
+          e.code === 'NumpadAdd' || e.code === 'NumpadSubtract';
+        this.onboarding.notify(zoomKey ? 'zoom' : 'rotate');
+      }
     }
   }
 
@@ -1214,6 +1262,7 @@ class GalaxyApp {
     this.infoPanel.showPlanet(planet.data, name);
     this.planetLabels.setVisible(false);
     this._recordPlanetCodex(planet.data, idx);
+    this.onboarding.notify('focusPlanet', planet); // tutorial: «кликни по Земле»
   }
 
   /** Codex bookkeeping for a focused planet (#codex) — this HUD card is the
@@ -1456,6 +1505,7 @@ class GalaxyApp {
     this.infoPanel.show(entry.data);
     await this.overlay.fadeTo(0, 460); // reveal while the zoom continues to the overview
     this.mode = 'system'; // flip only now, so Esc can't race the reveal
+    this.onboarding.notify('enterSystem', entry); // tutorial: «войди в Солнечную»
   }
 
   async exitSystem() {
@@ -1516,11 +1566,15 @@ class GalaxyApp {
     if (this._settingsBtn) this._settingsBtn.style.display = ''; // ⚙ back in the galaxy view
     if (this._codexBtn) this._codexBtn.style.display = ''; // codex button back too
     this.mode = 'galaxy'; // flip after reveal so a stray click can't double-fire
+    this.onboarding.notify('exitSystem'); // tutorial: «вернись к галактике»
   }
 
   /** Animate the galaxy camera + target to (toPos,toTarget); resolves when done (#9). */
   _galaxyDollyTo(toPos, toTarget, dur) {
     return new Promise((resolve) => {
+      // a replaced flight still settles its promise — the caller's finally
+      // (e.g. the tour's showHome) must run even when a warp takes over
+      if (this._galaxyDolly) this._galaxyDolly.resolve();
       this._galaxyDolly = {
         t: 0,
         dur,

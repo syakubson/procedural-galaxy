@@ -525,11 +525,164 @@ body.cine-show #view-mode,
 body.cine-show #rotate-toggle,
 body.cine-show #cine-toggle,
 body.cine-show #music-next,
-body.cine-show #music-track {
+body.cine-show #music-track,
+body.cine-show #onboard-card {
   opacity: 0 !important;
   pointer-events: none !important;
 }
 /* #music-toggle stays live in the show so you can mute it (#cine) */
+
+/* --- first-flight onboarding (stage 3): one coachmark card, bottom-center ---
+   It replaces the static #hint for the tour's duration (body.onboarding) and
+   never covers the canvas — the player keeps full control at every step. */
+body.onboarding #hint {
+  display: none;
+}
+
+#onboard-card {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%) translateY(12px);
+  z-index: 21; /* above the chrome buttons (16), below the codex panel (24) */
+  width: min(560px, 92vw);
+  padding: 14px 18px 12px;
+  border-radius: 2px;
+  border: 1px solid var(--vellum);
+  background: linear-gradient(180deg, rgba(13, 16, 34, 0.88), rgba(8, 10, 22, 0.88));
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+#onboard-card.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+/* inside a system the dossier panel owns bottom-center/left — the card docks
+   bottom-right instead, above the view-mode / music button row (kept AFTER
+   .visible: same specificity, so source order lets it win the transform) */
+#onboard-card.in-system {
+  left: auto;
+  right: 24px;
+  bottom: 76px;
+  transform: none;
+}
+
+/* each step visibly «arrives» — opacity-only, so the flash never fights the
+   two positioning transforms above */
+@keyframes onboardStepIn {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+#onboard-card.step-in {
+  animation: onboardStepIn 0.35s ease;
+}
+
+.onboard-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 6px;
+}
+
+.onboard-title {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  color: var(--ivory);
+  margin-bottom: 4px;
+}
+
+.onboard-body {
+  font-family: var(--font-serif);
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: var(--ivory-dim);
+}
+
+.onboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.onboard-btn {
+  padding: 7px 16px;
+  border-radius: 2px;
+  border: 1px solid var(--vellum);
+  background: transparent;
+  color: var(--ivory-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.onboard-btn:hover {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+
+.onboard-btn.primary {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+
+.onboard-btn.primary:hover {
+  background: rgba(205, 162, 78, 0.12);
+}
+
+.onboard-skip {
+  margin-left: auto;
+  padding: 6px 2px;
+  border: none;
+  background: none;
+  color: var(--parchment);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.onboard-skip:hover {
+  opacity: 1;
+  color: var(--ivory-dim);
+}
+
+/* brass halo on the DOM element the active step points at (the codex rail);
+   the resting shadow term matches #codex-toggle's own so the loop is seamless */
+@keyframes onboardGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(205, 162, 78, 0), 4px 0 18px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 22px 4px rgba(205, 162, 78, 0.45), 4px 0 18px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.onboard-glow {
+  animation: onboardGlow 1.6s ease-in-out infinite;
+  border-color: var(--brass) !important;
+  color: var(--brass-bright) !important;
+}
 
 /* view-mode cycle button (system view only): full UI → no labels → cinematic */
 #view-mode {
