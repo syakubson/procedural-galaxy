@@ -82,6 +82,7 @@ tens of thousands of stars.
 - 🧬 **Worlds with a story** — biomes, day/night cities, fleets, ruins, and a generated civilisation on each inhabited planet.
 - 🎲 **Deterministic from a seed** — the same seed rebuilds the same galaxy, down to the last planet.
 - 🛰️ **Hidden scenes** — Sagittarius A\*, Interstellar's Gargantua + Endurance, our Solar System, a Death Star, and more.
+- 🚩 **Six fleet factions with homes** — each of the 6 ship factions has a hand-crafted capital system (marked on the map in its fleet colour once charted), a named flagship with its own legend, and per-faction station lore in the codex.
 - 📔 **A codex of finds** — every world, race, ruin, ship and phenomenon you discover joins a permanent collection with honest "N of M" counters and a 3D showcase viewer; it survives seed changes.
 - 🧭 **A first-flight tour** — a short skippable tutorial walks a new player through the Solar System: rotate, zoom, fly home, meet Earth, find it in the codex. Advances on your own actions, shows once.
 - 🔉 **Sound as atmosphere** — a deliberately sparse, zero-latency UI soundscape: a whoosh pair for warps and planet glides, a page turn for the codex, a barely-there tick on hover. Buttons and the cinematic show stay silent; the ♪ button is the master switch, both volumes live in settings.
@@ -299,6 +300,9 @@ For destroyed worlds, **refugees** flee to a colony on a neighbouring planet wit
 
 **Factions.** On inhabited systems, factions are assigned **round-robin**, so all 6 ship races /
 styles are guaranteed to appear. The full fleet + station "bestiary" is the codex (grouped by faction).
+Each faction also has a hand-crafted **capital system** (Первая Верфь, Зольный Престол, Первый Сад,
+Меридиан-Ноль, Вольная Гавань, Чертог Молчания) flying its canonical named flagship; capitals chart
+in the faction's own colour on the map, and their homeworlds unlock named races in the codex.
 
 </details>
 

@@ -66,6 +66,15 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   (AmbientMusic.onStateChange → sfx.setMuted); the two volumes persist under
   `NAMESPACES.PLAYER`. New sounds: bake offline via trim-leading-silence + peak ≈ -3 dB,
   credit in `audio/CREDITS.txt`, set relative loudness ONLY in sfxEvents.js.
+- **Faction capitals & fleet lore (`src/codex/fleetLore.js`).** Each of the six fleet factions has a
+  hand-crafted HOME system (`generateFactionCapitals()` in systemData.js, seeds `capital-<id>`) settled
+  by it: fixed `faction`, a `capital: <id>` flag, and its CANONICAL named flagship via `flagshipOverride`.
+  Capitals are appended to the catalog AFTER every other special — never insert one earlier (rng order).
+  Their map markers ink in `CAPITAL_COLOR` (markers.js; mirrored in hud.js) only once charted — the fog
+  of war must not leak who lives where. Flagship + station lore lives in fleetLore.js and must stay in
+  sync with the capitals' `flagshipOverride` (one canon, two surfaces). Lore canon guardrails: Earth is
+  pre-spacefaring and belongs to NO faction, and how humans relate to the aelari is never explained in
+  any text — hints only.
 - **Codex (`src/codex/`).** A PERMANENT cross-party discovery log (storage namespace `CODEX` —
   no party id / GEN_VERSION in its key). Records fire on meaningful player actions through
   `main.js`'s `_codexRecord()` funnel, which stays silent during the cinematic auto-tour; the
