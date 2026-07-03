@@ -35,9 +35,9 @@ function idFor(category, archetypeKey) {
 }
 
 /**
- * Record a discovered archetype. Call this only on a MEANINGFUL discovery
- * (never in a loop, never from a debug/"reveal all" action) — see main.js's
- * record points.
+ * Record a discovered archetype. Call this on a MEANINGFUL discovery (a real
+ * player action) — the one sanctioned bulk exception is main.js's reveal-all,
+ * which records the whole galaxy at once via `opts.defer` + flush() below.
  *
  * Idempotent: re-recording an archetype the codex already knows returns the
  * EXISTING entry (`isNew: false`) — `firstSeenAt` never moves. The ONE field a
@@ -60,16 +60,20 @@ function idFor(category, archetypeKey) {
  *     found in `category`'s catalog (always true for 'system').
  *   - anything else `isCuriosity()` needs for this category (e.g.
  *     `colonyKind`, `ruinType`, `biome` — see codexData.js).
+ * @param {object} [opts]
+ * @param {boolean} [opts.defer] skip the localStorage write and mutate only the
+ *   in-memory map — for a bulk caller (reveal-all) that persists ONCE with
+ *   flush() afterward, instead of one full-map serialize per entry.
  * @returns {{entry: object, isNew: boolean}}
  */
-export function record(category, archetypeKey, meta = {}) {
+export function record(category, archetypeKey, meta = {}, opts = {}) {
   const entries = load();
   const id = idFor(category, archetypeKey);
   const existing = entries[id];
   if (existing) {
     if (!existing.curiosity && isCuriosity(category, { ...meta, archetypeKey })) {
       existing.curiosity = true; // upgrade only — see the JSDoc above
-      persist();
+      if (!opts.defer) persist();
     }
     return { entry: existing, isNew: false };
   }
@@ -90,8 +94,14 @@ export function record(category, archetypeKey, meta = {}) {
     genVersion: meta.genVersion ?? GEN_VERSION,
   };
   entries[id] = entry;
-  persist();
+  if (!opts.defer) persist();
   return { entry, isNew: true };
+}
+
+/** Persist the in-memory codex to storage once. Pairs with record(..., {defer:true})
+ *  so a bulk recorder serializes the map a single time instead of per entry. */
+export function flush() {
+  persist();
 }
 
 /** All discovered entries in `category`, oldest discovery first. */
