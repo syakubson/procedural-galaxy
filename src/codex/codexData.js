@@ -10,9 +10,11 @@
 
 import { GEN } from '../systems/genParams.js';
 import { BIOME_KEYS, CIV_LEVELS, PLANET_KINDS, RUIN_BIOMES, RUIN_TYPES } from '../systems/systemData.js';
-import { FACTIONS } from '../systems/ships/factions.js';
+import { FACTIONS, FACTION_BY_ID } from '../systems/ships/factions.js';
 import { ROLES } from '../systems/ships/roles.js';
 import { STATION_TYPES } from '../systems/stations.js';
+
+const ROLE_BY_ID = Object.fromEntries(ROLES.map((r) => [r.id, r]));
 
 // --- ships: 9 roles × 6 factions = 54 --------------------------------------
 // archetypeKey `${factionId}:${roleId}` mirrors buildShip(role, faction)'s own
@@ -195,4 +197,136 @@ export function isCuriosity(category, meta = {}) {
     default:
       return false;
   }
+}
+
+/** RU category headings — used by the codex tab strip and the detail dialog's
+ *  subtitle. 'system' is included here (unlike CATEGORIES) because the codex
+ *  UI still shows it as a tab even though it has no finite catalog. */
+export const CATEGORY_LABELS = {
+  system: 'Система',
+  planet: 'Планета',
+  race: 'Раса',
+  ruin: 'Руины',
+  ship: 'Корабль',
+  station: 'Станция',
+  phenomenon: 'Явление',
+};
+
+// One-line RU flavour per fixed archetype, for the codex detail dialog. Kept
+// here beside the catalogs (not in hud.js) so the codex owns its own copy —
+// the HUD cards inside a system stay independent.
+const PLANET_DESC = {
+  lava: 'Раскалённый мир вулканов и лавовых морей — слишком близко к звезде для жизни.',
+  rocky: 'Каменистый безводный мир с изрытой кратерами корой.',
+  desert: 'Сухая планета песков и растрескавшихся равнин под жёстким солнцем.',
+  terran: 'Мир земного типа: вода, атмосфера, умеренный пояс — колыбель жизни.',
+  ocean: 'Планета сплошного океана с редкими архипелагами.',
+  ice: 'Промёрзший мир на дальней орбите — ледяные щиты и азотный иней.',
+  gas: 'Огромный газовый гигант с полосами облаков и системой колец.',
+};
+const STATION_DESC = {
+  ring: 'Кольцевой хаб над родным миром цивилизации — её орбитальная столица.',
+  outpost: 'Колониальный аванпост: скромная орбитальная станция над колонией.',
+  collector: 'Газосборщик — скиммер, черпающий топливо из атмосферы газового гиганта.',
+};
+const RUIN_TYPE_DESC = {
+  plain: 'Молчаливые руины давно вымершей цивилизации — ни тел, ни ответа почему.',
+  robotic: 'Мир, где остались одни машины: заводы всё ещё работают на мёртвых хозяев.',
+  destroyed: 'Разрушенный войной мир — расплавленные города, орбита в обломках.',
+  obliterated: 'Уничтоженный мир: от целой цивилизации почти ничего не уцелело.',
+};
+const PHENOMENON_INFO = {
+  'blackhole-galactic': {
+    desc: 'Сверхмассивная чёрная дыра в самом сердце галактики. Аккреционный диск раскалён добела, а вокруг искривлён сам свет.',
+    facts: [['Тип', 'сверхмассивная ЧД'], ['Прообраз', 'Стрелец A*'], ['Где', 'ядро галактики']],
+  },
+  'blackhole-gargantua': {
+    desc: 'Гигантская вращающаяся чёрная дыра с ярким тонким диском — та самая Гаргантюа из «Интерстеллара».',
+    facts: [['Тип', 'вращающаяся ЧД'], ['Прообраз', 'Гаргантюа'], ['Рядом', 'станция «Эндюранс»']],
+  },
+  endurance: {
+    desc: 'Кольцевая исследовательская станция, медленно вращающаяся ради искусственной гравитации, — «Эндюранс» у Гаргантюа.',
+    facts: [['Тип', 'кольцевая станция'], ['Гравитация', 'вращением'], ['Экспедиция', 'к чёрной дыре']],
+  },
+  ishimura: {
+    desc: 'Корабль-трещинник, разламывающий планеты ради руды. Команда погибла — на борту некроморфы. (Dead Space)',
+    facts: [['Класс', 'planetcracker'], ['Длина', '~1,6 км'], ['Команда', 'погибла']],
+  },
+  deathstar: {
+    desc: 'Бронированная боевая станция размером с малую луну; её суперлазер раскалывает планету одним залпом.',
+    facts: [['Тип', 'боевая станция'], ['Размер', '~160 км'], ['Орудие', 'суперлазер']],
+  },
+  dragon: {
+    desc: 'Частный многоразовый корабль с экипажем на пути к Марсу — капсула-«капля» на разгонном модуле.',
+    facts: [['Тип', 'пилотируемая капсула'], ['Экипаж', 'до 4'], ['Курс', 'Земля → Марс']],
+  },
+};
+
+/**
+ * Rich display info for one discovered entry, for the codex detail dialog:
+ * a title, an RU category subtitle, a one-line description, and a small list
+ * of `[label, value]` facts. Everything is derived from the same real
+ * constants the catalogs are built from (ship ROLES/FACTIONS, biome/civ
+ * tables) plus the flavour tables above — no per-instance data is needed, so
+ * this works for any entry whether or not its find still exists in the world.
+ *
+ * @param {object} entry a codex.js Entry ({category, archetypeKey, label, ...})
+ * @returns {{category: string, title: string, subtitle: string, desc: string, facts: Array<[string, string]>}}
+ */
+export function describeEntry(entry) {
+  const category = entry.category;
+  const subtitle = CATEGORY_LABELS[category] || category;
+  const title = entry.label || entry.archetypeKey;
+  const facts = [];
+  let desc = '';
+  const key = entry.archetypeKey || '';
+
+  switch (category) {
+    case 'ship': {
+      const [factionId, roleId] = key.split(':');
+      const role = ROLE_BY_ID[roleId];
+      const faction = FACTION_BY_ID[factionId];
+      if (role) {
+        desc = role.desc;
+        facts.push(['Назначение', role.purpose], ['Длина', `${role.lengthM} м`], ['Экипаж', String(role.crew)], ['Вооружение', role.arm]);
+      }
+      if (faction) {
+        facts.push(['Флот', faction.name]);
+        if (faction.lore) desc += (desc ? ' ' : '') + faction.lore;
+      }
+      break;
+    }
+    case 'station':
+      desc = STATION_DESC[key] || '';
+      break;
+    case 'planet':
+      desc = PLANET_DESC[key] || '';
+      break;
+    case 'race': {
+      const [biome, civLevel] = key.split(':');
+      desc = `Разумная жизнь: ${CIV_LEVELS[civLevel]?.label?.toLowerCase() || civLevel} на планете биома «${BIOME_KEYS[biome]?.label || biome}».`;
+      facts.push(['Биом', BIOME_KEYS[biome]?.label || biome], ['Развитие', CIV_LEVELS[civLevel]?.label || civLevel]);
+      break;
+    }
+    case 'ruin': {
+      const [biome, ruinType] = key.split(':');
+      desc = RUIN_TYPE_DESC[ruinType] || '';
+      facts.push(['Биом', BIOME_KEYS[biome]?.label || biome], ['Тип гибели', RUIN_TYPE_LABELS[ruinType] || ruinType]);
+      break;
+    }
+    case 'phenomenon': {
+      const info = PHENOMENON_INFO[key];
+      if (info) {
+        desc = info.desc;
+        facts.push(...info.facts);
+      }
+      break;
+    }
+    case 'system':
+      desc = 'Звёздная система, нанесённая на карту в этой галактике.';
+      break;
+    default:
+      break;
+  }
+  return { category, title, subtitle, desc, facts };
 }
