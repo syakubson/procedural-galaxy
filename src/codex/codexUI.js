@@ -4,18 +4,19 @@
 // the same opacity+transform+pointer-events idiom every other cartographer
 // overlay uses (#help-panel) — never a display:none swap.
 //
-// The shelf is a gallery of cards: a discovered card shows a rendered
-// thumbnail (thumbnails.js) of the actual find and opens a detail dialog on
-// click; an undiscovered slot shows a per-category placeholder glyph
-// (codexIcons.js) — counted, never named. The detail dialog carries the full
-// description plus two actions: «Рассмотреть» (the isolated 3D viewer) and
-// «Перейти к объекту» (warp to it in the live galaxy, via onNavigate).
+// The shelf is a gallery of cards, optionally split into sections (ships by
+// faction, «Особое» by системы/объекты/планеты): a discovered card shows a
+// rendered thumbnail (thumbnails.js) and opens a detail dialog on click; an
+// undiscovered slot shows a per-category placeholder glyph (codexIcons.js) —
+// counted, never named (except announced-but-future entries, shown by name).
+// The detail dialog carries the full description plus «Рассмотреть» (the
+// isolated 3D viewer) and «Перейти к объекту» (warp to it in the live galaxy).
 //
-// Reads ONLY through codex.js's public API (list/progress/curiosities) and
-// codexData.js's catalogs/describeEntry; it never touches storage.js directly.
+// Reads ONLY through codex.js's public API and codexData.js's catalogs/
+// describeEntry; it never touches storage.js directly.
 
-import { catalogFor, describeEntry } from './codexData.js';
-import { curiosities, list, progress } from './codex.js';
+import { catalogFor, describeEntry, isRebuildable, racePlanetRef, specialGroup } from './codexData.js';
+import { list, progress } from './codex.js';
 import { categoryIcon } from './codexIcons.js';
 import { buildFor } from './codexViewer.js';
 import { thumbnailFor, releaseThumbnailRenderer } from './thumbnails.js';
@@ -29,8 +30,18 @@ const TABS = [
   { id: 'ruin', label: 'Руины' },
   { id: 'ship', label: 'Корабли' },
   { id: 'station', label: 'Станции' },
-  { id: 'phenomenon', label: 'Явления' },
+  { id: 'special', label: 'Особое' },
 ];
+
+// Which placeholder glyph a special find uses, by its Особое sub-group.
+const SPECIAL_GROUP_ICON = { Системы: 'system', Объекты: 'phenomenon', Планеты: 'planet' };
+
+/** The codexIcons glyph key for an entry — a special find picks its glyph by
+ *  sub-group, everything else by its category. */
+function iconKeyFor(entry) {
+  if (entry.category === 'special') return SPECIAL_GROUP_ICON[specialGroup(entry.archetypeKey)] || 'phenomenon';
+  return entry.category;
+}
 
 export class CodexUI {
   /**
@@ -117,10 +128,6 @@ export class CodexUI {
       '<div class="codex-prog"><div class="codex-prog-label lg-prog"></div><div class="codex-prog-bar"><i></i></div></div>' +
       '<div class="codex-scroll">' +
       '<div class="codex-shelf"></div>' +
-      '<div class="codex-showcase">' +
-      '<div class="codex-showcase-title">Витрина курьёзов</div>' +
-      '<div class="codex-showcase-row"></div>' +
-      '</div>' +
       '</div>' +
       '</div>' +
       this._detailMarkup();
@@ -132,8 +139,6 @@ export class CodexUI {
       progLabel: el.querySelector('.codex-prog-label'),
       progBar: el.querySelector('.codex-prog-bar > i'),
       shelf: el.querySelector('.codex-shelf'),
-      showcase: el.querySelector('.codex-showcase'),
-      showcaseRow: el.querySelector('.codex-showcase-row'),
       detail: el.querySelector('.codex-detail'),
       detailThumb: el.querySelector('.codex-detail-thumb'),
       detailSub: el.querySelector('.codex-detail-sub'),
@@ -181,8 +186,7 @@ export class CodexUI {
     );
   }
 
-  /** Redraw the active tab's shelf + progress + the curiosities showcase (the
-   *  showcase spans every category, so it's refreshed on every render). */
+  /** Redraw the active tab's shelf + progress line. */
   _render() {
     this._stopThumbs();
     this._thumbGen++;
@@ -200,9 +204,10 @@ export class CodexUI {
       total = this._getSystemTotal();
       this._r.progLabel.innerHTML = `В этой галактике: <b>${found}</b> / ${total}`;
     } else {
-      const p = progress(cat);
-      found = p.found;
-      total = p.total;
+      // count against DISCOVERABLE archetypes only — future placeholder races
+      // (never obtainable yet) don't drag the denominator below 100%.
+      total = catalog.filter((c) => !c.future).length;
+      found = progress(cat).found;
       this._r.progLabel.innerHTML = `Найдено <b>${found}</b> / ${total}`;
     }
     const pct = total > 0 ? Math.min(100, Math.round((found / total) * 100)) : 0;
@@ -210,13 +215,21 @@ export class CodexUI {
 
     this._r.shelf.innerHTML = '';
     if (catalog) {
-      // a full shelf, every catalog slot in its fixed place — discovered ones
-      // show a thumbnail + name, the rest stay category placeholders (counted
-      // in the progress line, never spoiled by name).
+      // every catalog slot in its fixed place — discovered ones show a thumbnail
+      // + name, the rest stay placeholders. Grouped catalogs (ships/stations by
+      // faction, «Особое» by sub-group) get a section header per group.
       const byKey = new Map(list(cat).map((e) => [e.archetypeKey, e]));
+      let curGroup = null;
       for (const c of catalog) {
+        if (c.group && c.group !== curGroup) {
+          curGroup = c.group;
+          const h = document.createElement('div');
+          h.className = 'codex-section';
+          h.textContent = c.group;
+          this._r.shelf.appendChild(h);
+        }
         const entry = byKey.get(c.archetypeKey);
-        this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(cat));
+        this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(c, cat));
       }
     } else {
       // 'system' has no catalog to lay out in advance — just the discovery log.
@@ -231,52 +244,54 @@ export class CodexUI {
       }
     }
 
-    this._r.showcaseRow.innerHTML = '';
-    const curios = curiosities();
-    this._r.showcase.classList.toggle('empty', !curios.length);
-    for (const entry of curios) this._r.showcaseRow.appendChild(this._card(entry));
-
     this._startThumbs();
   }
 
-  /** A discovered entry's card: a thumbnail (rendered lazily) over a category
-   *  placeholder, its name, and a curiosity mark. Clicking opens the detail
-   *  dialog. */
+  /** A discovered entry's card: a thumbnail (rendered lazily) over a placeholder
+   *  glyph, its name. Clicking opens the detail dialog. */
   _card(entry) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = `codex-tile found cat-${entry.category}`;
     const thumb = document.createElement('div');
     thumb.className = 'codex-thumb';
-    thumb.innerHTML = `<span class="codex-thumb-icon">${categoryIcon(entry.category)}</span>`;
+    thumb.innerHTML = `<span class="codex-thumb-icon">${categoryIcon(iconKeyFor(entry))}</span>`;
     const name = document.createElement('div');
     name.className = 'codex-tile-name';
     const label = document.createElement('span');
     label.textContent = entry.label; // textContent, not innerHTML — labels are data, never markup
     name.appendChild(label);
-    if (entry.curiosity) {
-      const star = document.createElement('span');
-      star.className = 'codex-curio';
-      star.title = 'Курьёз';
-      star.textContent = '✦';
-      name.appendChild(star);
-    }
     el.appendChild(thumb);
     el.appendChild(name);
     el.addEventListener('click', () => this._openDetail(entry));
-    // queue the real thumbnail (system entries have none → keep the glyph)
-    if (entry.category !== 'system') this._thumbQueue.push({ entry, thumb, gen: this._thumbGen });
+    // queue the real thumbnail (entries with no 3D form keep the glyph)
+    if (isRebuildable(entry)) this._thumbQueue.push({ entry, thumb, gen: this._thumbGen });
     return el;
   }
 
-  /** An unreached catalog slot: the category's placeholder glyph, dimmed and
-   *  unnamed — a shape that says "planet" or "ship", never which one. */
-  _lockedCard(category) {
+  /** An unreached catalog slot: the placeholder glyph, dimmed. Anonymous ("?")
+   *  for a normal undiscovered find; an announced-but-future entry (a race not
+   *  in the game yet) shows its name and a «скоро» tag instead. */
+  _lockedCard(c, category) {
     const el = document.createElement('div');
-    el.className = `codex-tile locked cat-${category}`;
-    el.innerHTML =
-      `<div class="codex-thumb"><span class="codex-thumb-icon">${categoryIcon(category)}</span></div>` +
-      '<div class="codex-tile-name"><span>?</span></div>';
+    el.className = `codex-tile locked cat-${category}${c.future ? ' future' : ''}`;
+    const iconKey = category === 'special' ? SPECIAL_GROUP_ICON[c.group] || 'phenomenon' : category;
+    const thumb = document.createElement('div');
+    thumb.className = 'codex-thumb';
+    thumb.innerHTML = `<span class="codex-thumb-icon">${categoryIcon(iconKey)}</span>`;
+    const name = document.createElement('div');
+    name.className = 'codex-tile-name';
+    if (c.future) {
+      const label = document.createElement('span');
+      label.textContent = c.label;
+      const soon = document.createElement('span');
+      soon.className = 'codex-soon';
+      soon.textContent = 'скоро';
+      name.append(label, soon);
+    } else {
+      name.innerHTML = '<span>?</span>';
+    }
+    el.append(thumb, name);
     return el;
   }
 
@@ -310,7 +325,7 @@ export class CodexUI {
   _openDetail(entry) {
     this._detailEntry = entry;
     const info = describeEntry(entry);
-    this._r.detailSub.textContent = info.subtitle + (entry.curiosity ? ' · курьёз' : '');
+    this._r.detailSub.textContent = info.subtitle;
     this._r.detailTitle.textContent = info.title;
     this._r.detailDesc.textContent = info.desc || '';
     this._r.detailDesc.classList.toggle('empty', !info.desc);
@@ -324,20 +339,20 @@ export class CodexUI {
       this._r.detailFacts.append(dt, dd);
     }
 
-    // thumbnail: the same render the shelf uses, or the category glyph for a
-    // system (no 3D object).
-    const url = thumbnailFor(entry, { overlay: this._getOverlay() });
+    // thumbnail: the same render the shelf uses, or the group glyph for a find
+    // with no standalone 3D object (a system, a race).
+    const url = isRebuildable(entry) ? thumbnailFor(entry, { overlay: this._getOverlay() }) : null;
     this._r.detailThumb.className = `codex-detail-thumb cat-${entry.category}`;
     if (url) {
       this._r.detailThumb.style.backgroundImage = `url("${url}")`;
       this._r.detailThumb.innerHTML = '';
     } else {
       this._r.detailThumb.style.backgroundImage = '';
-      this._r.detailThumb.innerHTML = `<span class="codex-thumb-icon">${categoryIcon(entry.category)}</span>`;
+      this._r.detailThumb.innerHTML = `<span class="codex-thumb-icon">${categoryIcon(iconKeyFor(entry))}</span>`;
     }
 
     this._r.detailActions.innerHTML = '';
-    if (entry.category !== 'system') {
+    if (isRebuildable(entry)) {
       this._r.detailActions.appendChild(this._actionBtn('Рассмотреть', 'primary', () => this._view(entry)));
     }
     if (this._canNavigate(entry)) {
@@ -363,11 +378,12 @@ export class CodexUI {
     return btn;
   }
 
-  /** Can the live galaxy warp to this find? Systems/planets/stations carry a
-   *  seed; phenomena resolve to a fixed special system in main.js. Older ship
-   *  records without a seed can't be located precisely, so they're view-only. */
+  /** Can the live galaxy warp to this find? A special always resolves to its
+   *  hand-crafted system; a real named race to its homeworld (a future race
+   *  has none); everything else needs a recorded seed. */
   _canNavigate(entry) {
-    if (entry.category === 'phenomenon') return true;
+    if (entry.category === 'special') return true;
+    if (entry.category === 'race') return !!racePlanetRef(entry.archetypeKey);
     return !!(entry.sourceRef && entry.sourceRef.seed);
   }
 
