@@ -1623,16 +1623,31 @@ body.clean-view #fact-box {
   line-height: 1.5;
   padding: 24px 2px;
 }
-.codex-shelf,
-.codex-showcase-row {
+.codex-shelf {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 12px;
 }
+/* a section header inside the grid (ships/stations by faction, «Особое» by
+   sub-group) — spans the full width, sits above the row it introduces. */
+.codex-section {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--vellum-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.codex-section:first-child {
+  margin-top: 0;
+}
 
 /* one gallery tile: a square thumbnail over a name strip. Its own class (NOT
    .codex-card — that's the panel container) so panel chrome never bleeds in.
-   Category accent (--cat) tints the placeholder glyph, curiosity mark, hover. */
+   Category accent (--cat) tints the placeholder glyph and hover ring. */
 .codex-tile.cat-system,
 .codex-detail-thumb.cat-system {
   --cat: var(--st-wild);
@@ -1657,8 +1672,8 @@ body.clean-view #fact-box {
 .codex-detail-thumb.cat-station {
   --cat: var(--brass);
 }
-.codex-tile.cat-phenomenon,
-.codex-detail-thumb.cat-phenomenon {
+.codex-tile.cat-special,
+.codex-detail-thumb.cat-special {
   --cat: var(--st-special);
 }
 .codex-tile {
@@ -1725,25 +1740,24 @@ body.clean-view #fact-box {
   color: var(--parchment);
   justify-content: center;
 }
-.codex-curio {
-  color: var(--cat, var(--st-special));
+/* an announced-but-future entry (a race not in the game yet): named, a touch
+   brighter than an anonymous "?" slot, with a small «скоро» tag. */
+.codex-tile.locked.future {
+  opacity: 0.72;
+}
+.codex-tile.locked.future .codex-tile-name {
+  color: var(--ivory-dim);
+  justify-content: space-between;
+}
+.codex-soon {
   flex: none;
-}
-.codex-showcase {
-  margin-top: 22px;
-  padding-top: 16px;
-  border-top: 1px solid var(--vellum-soft);
-}
-.codex-showcase.empty {
-  display: none;
-}
-.codex-showcase-title {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  letter-spacing: 0.28em;
-  color: var(--st-special);
-  margin-bottom: 12px;
+  color: var(--cat, var(--brass));
+  border: 1px solid var(--vellum-soft);
+  border-radius: 2px;
+  padding: 1px 5px;
 }
 
 /* detail dialog: a second layer over the panel, opened by a card. Its own
@@ -1918,8 +1932,7 @@ body.clean-view #fact-box {
   .codex-title {
     font-size: 20px;
   }
-  .codex-shelf,
-  .codex-showcase-row {
+  .codex-shelf {
     grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
     gap: 9px;
   }
