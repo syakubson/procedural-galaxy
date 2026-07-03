@@ -26,8 +26,8 @@ converted offline.
 
 click.m4a        "A relay switch being activated"  by bassmosphere
     https://freesound.org/s/384698/
-hover.m4a        "Soft UI Button Click"  by Jummit
-    https://freesound.org/s/528561/
+hover.m4a        "tap on felt"  by emapuree
+    https://freesound.org/s/848748/
 chart.m4a        "traditional stamp"  by I.fekry  (trimmed to 1.2 s)
     https://freesound.org/s/470710/
 warp-in.m4a      "Sound Design Elements Whoosh SFX 049"  by AudioPapkin

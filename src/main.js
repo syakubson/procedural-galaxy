@@ -19,6 +19,7 @@ import { InfoPanel, Tooltip, Overlay, Legend, structureCard } from './ui/hud.js'
 import { PlanetLabels } from './ui/planetLabels.js';
 import { AmbientMusic } from './audio/ambient.js';
 import { SfxManager } from './audio/sfx.js';
+import { APP_VERSION } from './version.js';
 import { WorldOverlay } from './state/overlay.js';
 import { currentPartyId, ensureParty, hasLegacyCharted } from './state/party.js';
 import { record as codexRecord, flush as codexFlush } from './codex/codex.js';
@@ -60,6 +61,7 @@ const _ksph = new THREE.Spherical(); // scratch: that offset in spherical coords
 class GalaxyApp {
   constructor(canvas) {
     this.canvas = canvas;
+    this.version = APP_VERSION; // also in the «?» panel footer + the boot log line
     this.config = createDefaultConfig('medium');
     this.stats = { fps: 0, drawCalls: 0, triangles: 0 };
 
@@ -282,7 +284,8 @@ class GalaxyApp {
             ? `<div class="help-group">${k}</div>`
             : `<div class="help-row"><kbd>${k}</kbd><span>${v}</span></div>`,
         )
-        .join('');
+        .join('') +
+      `<div class="help-version">Galaxy Explorer · v${APP_VERSION}</div>`;
     document.body.appendChild(panel);
 
     btn.addEventListener('click', () => {
@@ -1272,6 +1275,7 @@ class GalaxyApp {
   /** One step back from a focused planet/ship to the system overview (#1): drop
    *  the focus, restore the system dossier + the diegetic labels + the trails. */
   _backToOverview() {
+    if (!this._cineActive()) this.sfx.play('planetFocus'); // the glide back out is the same air (#sfx)
     this.systemView.unfocus(); // also clears _planetFocused → trails return (#4)
     if (this.systemView.data) this.infoPanel.show(this.systemView.data);
     this.planetLabels.setVisible(true);
@@ -1873,6 +1877,7 @@ class GalaxyApp {
 const canvas = document.getElementById('scene');
 // Expose for debugging / console tweaking.
 window.galaxyApp = new GalaxyApp(canvas);
+console.info(`Galaxy Explorer v${APP_VERSION}`); // one boot line — handy in bug reports
 
 // The scene builds synchronously, so the loader can fade out immediately.
 const loader = document.getElementById('loader');

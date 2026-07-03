@@ -1,14 +1,16 @@
-// SfxManager (stage 5): tiny, lazy UI-sound player over the SFX_EVENTS table.
-// One HTMLAudioElement per event, created on first play and then re-triggered
-// by rewinding — a rapid re-trigger (hover ticks) cuts itself off instead of
-// stacking, which is exactly the right feel for UI feedback. No WebAudio
-// graph: seven short one-shot samples don't need one, and <audio> keeps the
-// main thread + frame budget untouched.
+// SfxManager (stage 5): WebAudio-backed UI-sound player over the SFX_EVENTS
+// table. All eight one-shots (~100 KB total) are fetched and decoded into
+// AudioBuffers UP FRONT, so a press/hover triggers with zero fetch/element
+// latency — the original <audio>-per-event version created its element on
+// FIRST play, which audibly lagged the very first click of each kind.
 //
-// Autoplay policy: browsers reject play() before the first user gesture.
-// Every SFX here is triggered BY a gesture except the galaxy-marker hover —
-// so a pre-gesture hover's rejection is swallowed silently and the sound
-// simply starts working from the first click on.
+// A re-trigger stops the previous shot of the same event (no stacking of
+// rapid hover ticks); different events overlap freely. Master volume is one
+// GainNode; per-event levels are per-shot gains from the table.
+//
+// Autoplay policy: the AudioContext is born suspended and resume() is called
+// on every play — the first gesture-driven sound resumes it for good, and a
+// pre-gesture hover simply stays silent (resume() is then rejected — fine).
 //
 // Persistence: NAMESPACES.PLAYER / 'sfx' → { muted, volume } — per-device,
 // party-independent, same bucket as the onboarding stamp.
@@ -24,7 +26,36 @@ export class SfxManager {
     const saved = read(NAMESPACES.PLAYER, SCOPE_KEY, null) || {};
     this.muted = !!saved.muted;
     this.volume = typeof saved.volume === 'number' ? saved.volume : DEFAULT_VOLUME;
-    this._pool = new Map(); // event name -> lazily created HTMLAudioElement
+    this._ctx = null; // lazy — see _ensureCtx()
+    this._master = null; // master GainNode (this.volume)
+    this._buffers = new Map(); // event name -> decoded AudioBuffer
+    this._last = new Map(); // event name -> its most recent source (re-trigger cuts it)
+    this._preload();
+  }
+
+  _ensureCtx() {
+    if (!this._ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      this._ctx = new Ctx(); // born 'suspended' pre-gesture — decode still works
+      this._master = this._ctx.createGain();
+      this._master.gain.value = this.volume;
+      this._master.connect(this._ctx.destination);
+    }
+    return this._ctx;
+  }
+
+  /** Fetch + decode every event's asset immediately (fetch needs no gesture),
+   *  so the first audible play is instant. A failed asset just leaves its
+   *  event silent — play() skips names with no buffer. */
+  _preload() {
+    const ctx = this._ensureCtx();
+    for (const [name, def] of Object.entries(SFX_EVENTS)) {
+      fetch(def.src)
+        .then((r) => r.arrayBuffer())
+        .then((raw) => ctx.decodeAudioData(raw))
+        .then((buf) => this._buffers.set(name, buf))
+        .catch(() => {}); // missing/undecodable asset → that event stays silent
+    }
   }
 
   /** Fire one UI sound by its SFX_EVENTS name. Unknown names are a silent
@@ -32,17 +63,26 @@ export class SfxManager {
   play(name) {
     if (this.muted || this.volume <= 0) return;
     const def = SFX_EVENTS[name];
-    if (!def) return;
-    let a = this._pool.get(name);
-    if (!a) {
-      a = new Audio(def.src);
-      a.preload = 'auto';
-      this._pool.set(name, a);
+    const buf = this._buffers.get(name);
+    if (!def || !buf) return; // unknown event, or its asset is still decoding
+    const ctx = this._ensureCtx();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {}); // pre-gesture → stays silent
+    const prev = this._last.get(name);
+    if (prev) {
+      try {
+        prev.stop(); // a rapid re-trigger cuts itself off — no tick pile-ups
+      } catch {
+        /* already ended */
+      }
     }
-    a.volume = Math.min(1, def.volume * this.volume);
-    a.currentTime = 0; // re-trigger cuts the previous shot — no stacking
-    const p = a.play();
-    if (p && p.catch) p.catch(() => {}); // pre-gesture autoplay block — skip silently
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = ctx.createGain();
+    gain.gain.value = def.volume;
+    src.connect(gain);
+    gain.connect(this._master);
+    src.start();
+    this._last.set(name, src);
   }
 
   setMuted(muted) {
@@ -53,6 +93,7 @@ export class SfxManager {
   /** Master volume 0..1 — multiplies every event's own relative volume. */
   setVolume(volume) {
     this.volume = Math.min(1, Math.max(0, volume));
+    if (this._master) this._master.gain.value = this.volume;
     this._persist();
   }
 
