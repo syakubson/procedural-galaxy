@@ -45,7 +45,7 @@ export const FACTION = {
   accent: 0x2f6bff,
   glow: 0x8fc4ff,
   nav: { port: 0xff4036, star: 0x49ff84, top: 0xffffff },
-  lore: 'Стальной гунметалловый флот Альянса: утилитарный, надёжный, авианосцы вместо линкоров.',
+  lore: 'Флот оружейной стали: утилитарный, надёжный, авианосцы вместо линкоров.',
   roles: { flagship: makeAllianceFlagship },
   station: allianceStation,
 };
