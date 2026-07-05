@@ -212,7 +212,7 @@ export class Systems {
     ];
     for (const [arm, frac] of capitalSpots) {
       const data = specials[s++].data;
-      this._addSpecialSystem(eggPos(arm, frac), data, CAPITAL_COLOR[data.capital] || SPECIAL, 4.2);
+      this._addSpecialSystem(eggPos(arm, frac), data, CAPITAL_COLOR[data.capital] || SPECIAL, 4.6);
     }
   }
 
@@ -293,14 +293,22 @@ export class Systems {
 
   // A pickable marker for a hand-crafted easter-egg STAR system (#13/#19/#20):
   // the normal star-marker look in a distinct colour, flagged special so it's
-  // excluded from the discovery counter (it's a bonus find).
+  // excluded from the discovery counter (it's a bonus find). A faction CAPITAL
+  // (#stage6) swaps the whole icon family for the cartographer's capital mark —
+  // a five-pointed star (hollow until charted, filled after) — so it reads as
+  // a capital by SHAPE, not just by tint (colour alone drowned in the disk).
+  // The shape doesn't leak WHO lives there: the faction colour still waits for
+  // the actual visit.
   _addSpecialSystem(base, data, color, scale) {
     const idx = this.list.length;
     const pos = this._avoidOverlap(base.clone()); // keep clear of other markers (#3)
     const visited = this._isVisited(data.seed);
     const restColor = visited ? color : UNCHARTED_COLOR;
+    const capital = !!data.capital;
+    const texRing = capital ? getCapitalRingTexture() : getRingTexture();
+    const texDisc = capital ? getCapitalDiscTexture() : getDiscTexture();
     const mat = new THREE.SpriteMaterial({
-      map: visited ? getDiscTexture() : getRingTexture(),
+      map: visited ? texDisc : texRing,
       color: new THREE.Color(restColor),
       transparent: true,
       depthWrite: false,
@@ -320,6 +328,7 @@ export class Systems {
       baseScale: scale,
       visited,
       statusColor: color,
+      _texDisc: texDisc, // markVisited swaps to THIS icon (capitals keep their star)
       _restCol: new THREE.Color(restColor),
       _hov: 0,
     };
@@ -427,7 +436,7 @@ export class Systems {
   markVisited(entry) {
     entry.visited = true;
     if (entry.sprite && entry.statusColor) {
-      entry.sprite.material.map = getDiscTexture();
+      entry.sprite.material.map = entry._texDisc || getDiscTexture();
       entry.sprite.material.color.set(entry.statusColor);
       entry.sprite.material.needsUpdate = true;
       if (entry._restCol) entry._restCol.set(entry.statusColor);
@@ -444,7 +453,7 @@ export class Systems {
       if (s.noFade) continue; // the galactic-core void isn't a chartable system
       s.visited = true;
       if (s.sprite && s.statusColor) {
-        s.sprite.material.map = getDiscTexture();
+        s.sprite.material.map = s._texDisc || getDiscTexture();
         s.sprite.material.color.set(s.statusColor);
         s.sprite.material.needsUpdate = true;
         if (s._restCol) s._restCol.set(s.statusColor);
@@ -594,6 +603,113 @@ function getDiscTexture() {
   _discTex.colorSpace = THREE.SRGBColorSpace;
   _discTex.anisotropy = 4;
   return _discTex;
+}
+
+// Trace a five-pointed star (one point up) onto `ctx` — the classic map mark
+// for a capital. `R` is the outer point radius; the waist sits at 0.44·R.
+function traceStar(ctx, cx, cy, R) {
+  const inner = R * 0.44;
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const r = k % 2 === 0 ? R : inner;
+    const a = -Math.PI / 2 + (k * Math.PI) / 5;
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    if (k === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+// Uncharted faction capital (#stage6) — the survey-ring family, but the mark
+// is a hollow five-pointed star inside the faint range ring: reads «a capital
+// sits here» by shape alone, long before colour. Baked WHITE, tinted ivory at
+// rest / brass on hover like every other marker. Built once, shared.
+let _capRingTex = null;
+function getCapitalRingTexture() {
+  if (_capRingTex) return _capRingTex;
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+  ctx.lineJoin = 'round';
+
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.47);
+  halo.addColorStop(0, 'rgba(7,9,18,0.55)');
+  halo.addColorStop(0.7, 'rgba(7,9,18,0.24)');
+  halo.addColorStop(1, 'rgba(7,9,18,0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, size, size);
+
+  // faint outer range ring — keeps it in the survey-instrument family
+  ctx.lineWidth = size * 0.012;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.38, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // hollow star — the capital mark itself
+  ctx.lineWidth = size * 0.026;
+  ctx.strokeStyle = 'rgba(255,255,255,1)';
+  traceStar(ctx, cx, cy, size * 0.27);
+  ctx.stroke();
+
+  // centre pip — the plotted position
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.026, 0, Math.PI * 2);
+  ctx.fill();
+
+  _capRingTex = new THREE.CanvasTexture(canvas);
+  _capRingTex.colorSpace = THREE.SRGBColorSpace;
+  _capRingTex.anisotropy = 4;
+  return _capRingTex;
+}
+
+// Charted faction capital — the star fills in (tinted to the faction colour by
+// material.color) with a dark rim for contrast, inside the same range ring.
+let _capDiscTex = null;
+function getCapitalDiscTexture() {
+  if (_capDiscTex) return _capDiscTex;
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+  ctx.lineJoin = 'round';
+
+  const halo = ctx.createRadialGradient(cx, cy, size * 0.06, cx, cy, size * 0.48);
+  halo.addColorStop(0, 'rgba(7,8,16,0.62)');
+  halo.addColorStop(0.7, 'rgba(7,8,16,0.28)');
+  halo.addColorStop(1, 'rgba(7,8,16,0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, size, size);
+
+  // thin concentric ring, as on the charted status disc
+  ctx.lineWidth = size * 0.022;
+  ctx.strokeStyle = 'rgba(255,255,255,1)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.38, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // dark rim under the star so the fill pops on bright backgrounds
+  ctx.lineWidth = size * 0.05;
+  ctx.strokeStyle = 'rgba(9,11,20,0.85)';
+  traceStar(ctx, cx, cy, size * 0.28);
+  ctx.stroke();
+
+  // the filled capital star (tinted by the sprite material)
+  ctx.fillStyle = 'rgba(255,255,255,1)';
+  traceStar(ctx, cx, cy, size * 0.28);
+  ctx.fill();
+
+  _capDiscTex = new THREE.CanvasTexture(canvas);
+  _capDiscTex.colorSpace = THREE.SRGBColorSpace;
+  _capDiscTex.anisotropy = 4;
+  return _capDiscTex;
 }
 
 // Marker for black-hole objects: a dark core punched out + a bright ring.

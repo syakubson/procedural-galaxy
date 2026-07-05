@@ -375,7 +375,7 @@ export class InfoPanel {
     this.backEl.classList.add('visible');
     r.aboutTitle.textContent = 'Об этой системе';
     const color = data.event ? '#ffcf6e' : (data.capital && CAPITAL_COLOR[data.capital]) || (data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status]);
-    r.status.textContent = (data.event ? '✦ СОБЫТИЕ · ' : '') + data.statusLabel;
+    r.status.textContent = (data.event ? '✦ СОБЫТИЕ · ' : data.capital ? '★ ' : '') + data.statusLabel;
     r.status.style.color = color;
     r.status.style.borderColor = color;
     r.name.textContent = data.name;
@@ -534,7 +534,9 @@ export class Tooltip {
     // only "uncharted", never its status or contents (that's the reward for
     // diving in). The galactic-centre black hole (noFade) is always revealed.
     if (!visited && !data.noFade) {
-      const label = data.special ? 'Неопознанный объект' : 'Неопознанная система';
+      // a capital's star marker already announces WHAT it is — the tooltip may
+      // say so too; WHOSE it is stays hidden until the actual visit (#stage6)
+      const label = data.capital ? '★ Столица фракции' : data.special ? 'Неопознанный объект' : 'Неопознанная система';
       this.el.innerHTML =
         `<div class="tt-name">${label}</div>` +
         `<div class="tt-status" style="color:var(--parchment)">не исследована</div>` +
@@ -574,7 +576,7 @@ export class Tooltip {
     // faction capitals read in their fleet's colour; other special encounters
     // read magenta with a ✦; otherwise the status palette
     const color = (data.capital && CAPITAL_COLOR[data.capital]) || (data.special ? SPECIAL_COLOR : STATUS_COLOR[data.status] || '#aab0e0');
-    const mark = data.special ? '✦ ' : '';
+    const mark = data.capital ? '★ ' : data.special ? '✦ ' : '';
     this.el.innerHTML =
       `<div class="tt-name">${data.name}</div>` +
       `<div class="tt-status" style="color:${color}">${mark}${data.statusLabel}</div>` +
