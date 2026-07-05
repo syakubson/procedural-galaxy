@@ -70,8 +70,11 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   hand-crafted HOME system (`generateFactionCapitals()` in systemData.js, seeds `capital-<id>`) settled
   by it: fixed `faction`, a `capital: <id>` flag, and its CANONICAL named flagship via `flagshipOverride`.
   Capitals are appended to the catalog AFTER every other special — never insert one earlier (rng order).
-  Their map markers ink in `CAPITAL_COLOR` (markers.js; mirrored in hud.js) only once charted — the fog
-  of war must not leak who lives where. Flagship + station lore lives in fleetLore.js and must stay in
+  Their map markers are five-pointed STARS (the cartographer's capital mark) — hollow until charted,
+  filled after — and ink in `CAPITAL_COLOR` (markers.js; mirrored in hud.js and codexUI's FACTION_TINT)
+  only once charted: shape may say "a capital", colour (whose) waits for the visit. The codex has no
+  Корабли/Станции tabs — both catalogs live inside the «Фракции» tab (one section per faction: chronicle
+  header, fleet, structures, history card that unlocks by visiting the capital). Flagship + station lore lives in fleetLore.js and must stay in
   sync with the capitals' `flagshipOverride` (one canon, two surfaces). Lore canon guardrails: Earth is
   pre-spacefaring and belongs to NO faction, and how humans relate to the aelari is never explained in
   any text — hints only.
