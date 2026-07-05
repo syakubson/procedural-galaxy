@@ -10,6 +10,7 @@ import { FACTIONS, FACTION_BY_ID } from '../systems/ships/factions.js';
 import { ROLES } from '../systems/ships/roles.js';
 import { STATION_TYPES } from '../systems/stations.js';
 import { FLAGSHIP_LORE, STATION_LORE, FACTION_LORE } from './fleetLore.js';
+import { getShipStats } from '../systems/ships/shipStats.js';
 
 const ROLE_BY_ID = Object.fromEntries(ROLES.map((r) => [r.id, r]));
 
@@ -424,6 +425,7 @@ export function describeEntry(entry) {
   const title = entry.label || entry.archetypeKey;
   const facts = [];
   let desc = '';
+  let stats = null; // ships only: the 1–10 characteristics block (#stage6)
   const key = entry.archetypeKey || '';
 
   switch (category) {
@@ -446,6 +448,9 @@ export function describeEntry(entry) {
         desc = `${fl.desc} ${fl.history}`;
         facts.unshift(['Имя', fl.name]);
       }
+      // the 1–10 characteristics block + the fleet-wide quirk (#stage6)
+      stats = getShipStats(roleId, factionId);
+      if (stats && stats.quirk) facts.push(['Особенность', stats.quirk]);
       break;
     }
     case 'station': {
@@ -503,5 +508,5 @@ export function describeEntry(entry) {
     default:
       break;
   }
-  return { category, title, subtitle, desc, facts };
+  return { category, title, subtitle, desc, facts, stats };
 }
