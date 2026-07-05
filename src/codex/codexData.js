@@ -9,7 +9,7 @@ import { PLANET_KINDS, RUIN_TYPES } from '../systems/systemData.js';
 import { FACTIONS, FACTION_BY_ID } from '../systems/ships/factions.js';
 import { ROLES } from '../systems/ships/roles.js';
 import { STATION_TYPES } from '../systems/stations.js';
-import { FLAGSHIP_LORE, STATION_LORE } from './fleetLore.js';
+import { FLAGSHIP_LORE, STATION_LORE, FACTION_LORE } from './fleetLore.js';
 
 const ROLE_BY_ID = Object.fromEntries(ROLES.map((r) => [r.id, r]));
 
@@ -190,6 +190,41 @@ export function isCuriosity() {
  *  the hand-crafted systems. Called when the player warps into a system. */
 export function specialSystemKey(seed) {
   return SPECIAL_SYSTEM_BY_SEED[seed] || null;
+}
+
+// --- the «Фракции» shelf (#stage6) ------------------------------------------
+// One section per fleet faction: its chronicle, its capital/race/flagship refs
+// and its slice of the ship + station catalogs. Which codex keys belong to
+// which faction is enumerated here (there's no generator table for it).
+const FACTION_CODEX_REFS = {
+  alliance: { capitalKey: 'sys-cap-alliance', raceKey: 'aelari' },
+  imperial: { capitalKey: 'sys-cap-imperial', raceKey: 'hesht' },
+  swarm: { capitalKey: 'sys-cap-swarm', raceKey: 'porosl' },
+  syndicate: { capitalKey: 'sys-cap-syndicate', raceKey: null }, // многорасовый — по контракту
+  cartel: { capitalKey: 'sys-cap-cartel', raceKey: null }, // сброд всех рас
+  precursor: { capitalKey: 'sys-cap-precursor', raceKey: 'precursors' },
+};
+
+/** Everything the codex «Фракции» tab lays out, one item per faction, in the
+ *  canonical FACTIONS order. Pure data lookups — no discovery state here. */
+export function factionShelf() {
+  return FACTIONS.map((f) => {
+    const refs = FACTION_CODEX_REFS[f.id] || {};
+    const cap = refs.capitalKey ? SPECIAL_BY_KEY[refs.capitalKey] : null;
+    const race = refs.raceKey ? RACE_BY_KEY[refs.raceKey] : null;
+    return {
+      id: f.id,
+      name: f.name,
+      tagline: f.lore || '',
+      capitalKey: refs.capitalKey || null,
+      capitalName: cap ? cap.label : '',
+      raceName: race ? race.label : 'смешанный состав',
+      flagshipName: (FLAGSHIP_LORE[f.id] || {}).name || '',
+      lore: FACTION_LORE[f.id] || null,
+      ships: SHIP_CATALOG.filter((c) => c.factionId === f.id),
+      stations: STATION_CATALOG.filter((c) => c.factionId === f.id),
+    };
+  });
 }
 
 /** The special-planet catalog entry for a (system seed, planet label), or null.

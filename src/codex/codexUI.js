@@ -15,23 +15,36 @@
 // Reads ONLY through codex.js's public API and codexData.js's catalogs/
 // describeEntry; it never touches storage.js directly.
 
-import { catalogFor, describeEntry, isRebuildable, racePlanetRef, specialGroup } from './codexData.js';
-import { list, progress } from './codex.js';
+import { catalogFor, describeEntry, factionShelf, isRebuildable, racePlanetRef, specialGroup } from './codexData.js';
+import { has, list, progress } from './codex.js';
 import { categoryIcon } from './codexIcons.js';
 import { buildFor } from './codexViewer.js';
 import { thumbnailFor, releaseThumbnailRenderer } from './thumbnails.js';
 
 // Tab order + RU labels. 'system' has no finite catalog (see codex.js's
 // progress()) but still gets its own tab — the log of every system charted.
+// 'faction' is a VIEW, not a category: it lays the ship + station catalogs out
+// as one section per fleet faction (chronicle, fleet, structures) — the old
+// «Корабли»/«Станции» tabs live inside it now.
 const TABS = [
   { id: 'system', label: 'Системы' },
   { id: 'planet', label: 'Планеты' },
   { id: 'race', label: 'Расы' },
   { id: 'ruin', label: 'Руины' },
-  { id: 'ship', label: 'Корабли' },
-  { id: 'station', label: 'Станции' },
+  { id: 'faction', label: 'Фракции' },
   { id: 'special', label: 'Особое' },
 ];
+
+// Faction signature tints for the «Фракции» section headers — keep in sync
+// with CAPITAL_COLOR in markers.js / hud.js.
+const FACTION_TINT = {
+  alliance: '#5a8aff',
+  imperial: '#ff4030',
+  swarm: '#9aff3a',
+  syndicate: '#00d4ff',
+  cartel: '#ff8a2a',
+  precursor: '#ffd27a',
+};
 
 // Which placeholder glyph a special find uses, by its Особое sub-group.
 const SPECIAL_GROUP_ICON = { Системы: 'system', Объекты: 'phenomenon', Планеты: 'planet' };
@@ -212,6 +225,11 @@ export class CodexUI {
       found = list(cat).filter((e) => e.batchId === partyId).length;
       total = this._getSystemTotal();
       this._r.progLabel.innerHTML = `В этой галактике: <b>${found}</b> / ${total}`;
+    } else if (cat === 'faction') {
+      // the faction shelf spans TWO catalogs — its progress is their union
+      total = catalogFor('ship').length + catalogFor('station').length;
+      found = progress('ship').found + progress('station').found;
+      this._r.progLabel.innerHTML = `Найдено <b>${found}</b> / ${total}`;
     } else {
       // count against DISCOVERABLE archetypes only — future placeholder races
       // (never obtainable yet) don't drag the denominator below 100%.
@@ -223,7 +241,9 @@ export class CodexUI {
     this._r.progBar.style.width = `${pct}%`;
 
     this._r.shelf.innerHTML = '';
-    if (catalog) {
+    if (cat === 'faction') {
+      this._renderFactionShelf();
+    } else if (catalog) {
       // every catalog slot in its fixed place — discovered ones show a thumbnail
       // + name, the rest stay placeholders. Grouped catalogs (ships/stations by
       // faction, «Особое» by sub-group) get a section header per group.
@@ -254,6 +274,68 @@ export class CodexUI {
     }
 
     this._startThumbs();
+  }
+
+  /** The «Фракции» shelf: one section per fleet faction — a chronicle header
+   *  (name, tagline, capital/race/flagship line), then its slice of the ship
+   *  and station catalogs, then the faction history, which unlocks by visiting
+   *  the capital (the codex never shows what wasn't earned). */
+  _renderFactionShelf() {
+    const shipByKey = new Map(list('ship').map((e) => [e.archetypeKey, e]));
+    const stationByKey = new Map(list('station').map((e) => [e.archetypeKey, e]));
+
+    for (const f of factionShelf()) {
+      const head = document.createElement('div');
+      head.className = 'codex-faction-head';
+      head.style.setProperty('--fac', FACTION_TINT[f.id] || 'var(--brass)');
+      const title = document.createElement('div');
+      title.className = 'codex-faction-name';
+      title.textContent = f.name;
+      const tagline = document.createElement('div');
+      tagline.className = 'codex-faction-tagline';
+      tagline.textContent = f.tagline;
+      const meta = document.createElement('div');
+      meta.className = 'codex-faction-meta';
+      meta.textContent = `★ ${f.capitalName} · раса: ${f.raceName} · флагман: «${f.flagshipName}»`;
+      head.append(title, tagline, meta);
+      this._r.shelf.appendChild(head);
+
+      this._subsection('Флот');
+      for (const c of f.ships) {
+        const entry = shipByKey.get(c.archetypeKey);
+        this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(c, 'ship'));
+      }
+
+      this._subsection('Строения');
+      for (const c of f.stations) {
+        const entry = stationByKey.get(c.archetypeKey);
+        this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(c, 'station'));
+      }
+
+      this._subsection('История');
+      const lore = document.createElement('div');
+      const unlocked = f.capitalKey && has('special', f.capitalKey) && f.lore;
+      if (unlocked) {
+        lore.className = 'codex-lore';
+        const p1 = document.createElement('p');
+        p1.textContent = f.lore.essence;
+        const p2 = document.createElement('p');
+        p2.textContent = f.lore.history;
+        lore.append(p1, p2);
+      } else {
+        lore.className = 'codex-lore locked';
+        lore.textContent = `Посетите столицу — ★ ${f.capitalName} — чтобы открыть историю фракции.`;
+      }
+      this._r.shelf.appendChild(lore);
+    }
+  }
+
+  /** A small sub-section header inside a faction section (Флот / Строения / История). */
+  _subsection(label) {
+    const h = document.createElement('div');
+    h.className = 'codex-subsection';
+    h.textContent = label;
+    this._r.shelf.appendChild(h);
   }
 
   /** A discovered entry's card: a thumbnail (rendered lazily) over a placeholder

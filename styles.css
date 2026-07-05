@@ -1793,6 +1793,71 @@ body.clean-view #fact-box {
   margin-top: 0;
 }
 
+/* «Фракции»: a faction section header — the fleet's signature colour bar +
+   serif name, its one-line character and a mono meta line (capital · race ·
+   flagship). --fac is set inline per faction (see codexUI's FACTION_TINT). */
+.codex-faction-head {
+  grid-column: 1 / -1;
+  margin: 18px 0 0;
+  padding: 10px 12px 9px;
+  border-left: 3px solid var(--fac, var(--brass));
+  border-bottom: 1px solid var(--vellum-soft);
+  background: linear-gradient(90deg, rgba(222, 213, 186, 0.06), transparent 70%);
+}
+.codex-faction-head:first-child {
+  margin-top: 0;
+}
+.codex-faction-name {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  color: var(--ivory);
+}
+.codex-faction-tagline {
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ivory-dim);
+}
+.codex-faction-meta {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--fac, var(--brass));
+}
+/* a sub-section rule inside a faction block (Флот / Строения / История) */
+.codex-subsection {
+  grid-column: 1 / -1;
+  margin: 8px 0 -4px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--parchment);
+}
+/* the faction chronicle card — unlocks by visiting the capital */
+.codex-lore {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  border: 1px solid var(--vellum-soft);
+  border-radius: 2px;
+  background: rgba(10, 12, 24, 0.5);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ivory-dim);
+}
+.codex-lore p {
+  margin: 0;
+}
+.codex-lore p + p {
+  margin-top: 8px;
+}
+.codex-lore.locked {
+  border-style: dashed;
+  font-style: italic;
+  color: var(--parchment);
+}
+
 /* one gallery tile: a square thumbnail over a name strip. Its own class (NOT
    .codex-card — that's the panel container) so panel chrome never bleeds in.
    Category accent (--cat) tints the placeholder glyph and hover ring. */
