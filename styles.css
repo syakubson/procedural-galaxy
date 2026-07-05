@@ -1835,6 +1835,40 @@ body.clean-view #fact-box {
   text-transform: uppercase;
   color: var(--parchment);
 }
+/* the faction switcher inside «Фракции» — one tinted button per fleet */
+.codex-fac-tabs {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.codex-fac-tab {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--vellum-soft);
+  border-radius: 2px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--ivory-dim);
+  cursor: pointer;
+  border-bottom: 2px solid var(--vellum-soft);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.codex-fac-tab:hover {
+  color: var(--ivory);
+  border-color: var(--vellum);
+}
+.codex-fac-tab.on {
+  color: var(--ivory);
+  border-bottom-color: var(--fac, var(--brass));
+}
+.codex-fac-tab:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
 /* the faction chronicle card — unlocks by visiting the capital */
 .codex-lore {
   grid-column: 1 / -1;
@@ -1851,6 +1885,63 @@ body.clean-view #fact-box {
 }
 .codex-lore p + p {
   margin-top: 8px;
+}
+.codex-lore-essence {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--ivory);
+}
+.codex-lore-chapter {
+  margin: 14px 0 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* ship characteristics in the detail dialog: label · bar · value rows */
+.codex-detail-stats {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 2px;
+}
+.codex-detail-stats:empty {
+  display: none;
+}
+.codex-stat-row {
+  display: grid;
+  grid-template-columns: 118px 1fr 20px;
+  align-items: center;
+  gap: 10px;
+}
+.codex-stat-name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--parchment);
+}
+.codex-stat-track {
+  height: 6px;
+  border: 1px solid var(--vellum-soft);
+  border-radius: 1px;
+  background: rgba(10, 12, 24, 0.6);
+}
+.codex-stat-track > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--brass), var(--brass-bright));
+}
+.codex-stat-track.unknown {
+  border-style: dashed;
+}
+.codex-stat-val {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ivory-dim);
 }
 .codex-lore.locked {
   border-style: dashed;

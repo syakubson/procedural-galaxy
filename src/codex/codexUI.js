@@ -81,6 +81,7 @@ export class CodexUI {
     this._onNavigate = onNavigate || (() => {});
     this._onClose = onClose || (() => {});
     this._activeCat = TABS[0].id;
+    this._activeFaction = 'alliance'; // the faction sub-tab the «Фракции» shelf shows
     this._open = false;
     this._detailEntry = null;
     this._thumbGen = 0; // bumps each render → invalidates in-flight thumbnail jobs
@@ -166,6 +167,7 @@ export class CodexUI {
       detailSub: el.querySelector('.codex-detail-sub'),
       detailTitle: el.querySelector('.codex-detail-title'),
       detailDesc: el.querySelector('.codex-detail-desc'),
+      detailStats: el.querySelector('.codex-detail-stats'),
       detailFacts: el.querySelector('.codex-detail-facts'),
       detailActions: el.querySelector('.codex-detail-actions'),
     };
@@ -200,6 +202,7 @@ export class CodexUI {
       '<div class="codex-detail-sub"></div>' +
       '<div class="codex-detail-title"></div>' +
       '<div class="codex-detail-desc"></div>' +
+      '<div class="codex-detail-stats"></div>' +
       '<dl class="codex-detail-facts"></dl>' +
       '<div class="codex-detail-actions"></div>' +
       '</div>' +
@@ -276,58 +279,93 @@ export class CodexUI {
     this._startThumbs();
   }
 
-  /** The «Фракции» shelf: one section per fleet faction — a chronicle header
-   *  (name, tagline, capital/race/flagship line), then its slice of the ship
-   *  and station catalogs, then the faction history, which unlocks by visiting
-   *  the capital (the codex never shows what wasn't earned). */
+  /** The «Фракции» shelf: a faction switcher row, then ONE faction's section —
+   *  a chronicle header (name, tagline, capital/race/flagship line), its slice
+   *  of the ship and station catalogs, and the faction chronicle, which
+   *  unlocks by visiting the capital (the codex never shows what wasn't
+   *  earned). One faction at a time — six full sections were a scroll marathon
+   *  (owner report, 2026-07-05). */
   _renderFactionShelf() {
+    const shelf = factionShelf();
+    const active = shelf.find((f) => f.id === this._activeFaction) || shelf[0];
+
+    // the switcher: one button per faction, tinted by its signature colour
+    const tabs = document.createElement('div');
+    tabs.className = 'codex-fac-tabs';
+    for (const f of shelf) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `codex-fac-tab${f.id === active.id ? ' on' : ''}`;
+      btn.style.setProperty('--fac', FACTION_TINT[f.id] || 'var(--brass)');
+      btn.textContent = f.name;
+      btn.addEventListener('click', () => {
+        this._activeFaction = f.id;
+        this._render();
+      });
+      tabs.appendChild(btn);
+    }
+    this._r.shelf.appendChild(tabs);
+
     const shipByKey = new Map(list('ship').map((e) => [e.archetypeKey, e]));
     const stationByKey = new Map(list('station').map((e) => [e.archetypeKey, e]));
+    const f = active;
 
-    for (const f of factionShelf()) {
-      const head = document.createElement('div');
-      head.className = 'codex-faction-head';
-      head.style.setProperty('--fac', FACTION_TINT[f.id] || 'var(--brass)');
-      const title = document.createElement('div');
-      title.className = 'codex-faction-name';
-      title.textContent = f.name;
-      const tagline = document.createElement('div');
-      tagline.className = 'codex-faction-tagline';
-      tagline.textContent = f.tagline;
-      const meta = document.createElement('div');
-      meta.className = 'codex-faction-meta';
-      meta.textContent = `★ ${f.capitalName} · раса: ${f.raceName} · флагман: «${f.flagshipName}»`;
-      head.append(title, tagline, meta);
-      this._r.shelf.appendChild(head);
+    const head = document.createElement('div');
+    head.className = 'codex-faction-head';
+    head.style.setProperty('--fac', FACTION_TINT[f.id] || 'var(--brass)');
+    const title = document.createElement('div');
+    title.className = 'codex-faction-name';
+    title.textContent = f.name;
+    const tagline = document.createElement('div');
+    tagline.className = 'codex-faction-tagline';
+    tagline.textContent = f.tagline;
+    const meta = document.createElement('div');
+    meta.className = 'codex-faction-meta';
+    meta.textContent = `★ ${f.capitalName} · раса: ${f.raceName} · флагман: «${f.flagshipName}»`;
+    head.append(title, tagline, meta);
+    this._r.shelf.appendChild(head);
 
-      this._subsection('Флот');
-      for (const c of f.ships) {
-        const entry = shipByKey.get(c.archetypeKey);
-        this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(c, 'ship'));
-      }
-
-      this._subsection('Строения');
-      for (const c of f.stations) {
-        const entry = stationByKey.get(c.archetypeKey);
-        this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(c, 'station'));
-      }
-
-      this._subsection('История');
-      const lore = document.createElement('div');
-      const unlocked = f.capitalKey && has('special', f.capitalKey) && f.lore;
-      if (unlocked) {
-        lore.className = 'codex-lore';
-        const p1 = document.createElement('p');
-        p1.textContent = f.lore.essence;
-        const p2 = document.createElement('p');
-        p2.textContent = f.lore.history;
-        lore.append(p1, p2);
-      } else {
-        lore.className = 'codex-lore locked';
-        lore.textContent = `Посетите столицу — ★ ${f.capitalName} — чтобы открыть историю фракции.`;
-      }
-      this._r.shelf.appendChild(lore);
+    this._subsection('Флот');
+    for (const c of f.ships) {
+      const entry = shipByKey.get(c.archetypeKey);
+      this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(c, 'ship'));
     }
+
+    this._subsection('Строения');
+    for (const c of f.stations) {
+      const entry = stationByKey.get(c.archetypeKey);
+      this._r.shelf.appendChild(entry ? this._card(entry) : this._lockedCard(c, 'station'));
+    }
+
+    this._subsection('Хроника');
+    const lore = document.createElement('div');
+    const unlocked = f.capitalKey && has('special', f.capitalKey) && f.lore;
+    if (unlocked) {
+      lore.className = 'codex-lore';
+      const essence = document.createElement('p');
+      essence.className = 'codex-lore-essence';
+      essence.textContent = f.lore.essence;
+      lore.appendChild(essence);
+      // chapters is the chronicle form; a plain {history} string still renders
+      const chapters = f.lore.chapters || (f.lore.history ? [{ title: '', text: f.lore.history }] : []);
+      for (const ch of chapters) {
+        if (ch.title) {
+          const h = document.createElement('h4');
+          h.className = 'codex-lore-chapter';
+          h.textContent = ch.title;
+          lore.appendChild(h);
+        }
+        for (const para of ch.text.split(/\n\n+/)) {
+          const p = document.createElement('p');
+          p.textContent = para;
+          lore.appendChild(p);
+        }
+      }
+    } else {
+      lore.className = 'codex-lore locked';
+      lore.textContent = `Посетите столицу — ★ ${f.capitalName} — чтобы открыть хронику фракции.`;
+    }
+    this._r.shelf.appendChild(lore);
   }
 
   /** A small sub-section header inside a faction section (Флот / Строения / История). */
@@ -420,6 +458,31 @@ export class CodexUI {
     this._r.detailTitle.textContent = info.title;
     this._r.detailDesc.textContent = info.desc || '';
     this._r.detailDesc.classList.toggle('empty', !info.desc);
+
+    // ship characteristics (#stage6): a 1–10 bar per stat; precursor hulls
+    // give no readings — the track stays empty and the value shows «?»
+    this._r.detailStats.innerHTML = '';
+    if (info.stats) {
+      for (const [label, v] of info.stats.rows) {
+        const row = document.createElement('div');
+        row.className = 'codex-stat-row';
+        const name = document.createElement('span');
+        name.className = 'codex-stat-name';
+        name.textContent = label;
+        const track = document.createElement('div');
+        track.className = `codex-stat-track${v == null ? ' unknown' : ''}`;
+        if (v != null) {
+          const fill = document.createElement('i');
+          fill.style.width = `${v * 10}%`;
+          track.appendChild(fill);
+        }
+        const val = document.createElement('span');
+        val.className = 'codex-stat-val';
+        val.textContent = v == null ? '?' : String(v);
+        row.append(name, track, val);
+        this._r.detailStats.appendChild(row);
+      }
+    }
 
     this._r.detailFacts.innerHTML = '';
     for (const [k, v] of info.facts || []) {
