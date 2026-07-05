@@ -73,8 +73,13 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   Their map markers are five-pointed STARS (the cartographer's capital mark) — hollow until charted,
   filled after — and ink in `CAPITAL_COLOR` (markers.js; mirrored in hud.js and codexUI's FACTION_TINT)
   only once charted: shape may say "a capital", colour (whose) waits for the visit. The codex has no
-  Корабли/Станции tabs — both catalogs live inside the «Фракции» tab (one section per faction: chronicle
-  header, fleet, structures, history card that unlocks by visiting the capital). Flagship + station lore lives in fleetLore.js and must stay in
+  Корабли/Станции tabs — both catalogs live inside the «Фракции» tab, ONE faction at a time behind a
+  tinted switcher row (header, fleet, structures, and a five-chapter chronicle from fleetLore.js's
+  FACTION_LORE that unlocks by visiting the capital). Ship characteristics come from
+  `src/systems/ships/shipStats.js` (role baseline + faction bias, 1–10; precursor hulls give no
+  readings) — if gameplay ever consumes stats, THAT file stays the single source. All fleet lore is
+  written against an anti-AI-pattern checklist (no «не X, а Y» stamps, no mirror aphorisms, ≤2
+  button endings per chronicle) — keep new texts to the same bar. Flagship + station lore lives in fleetLore.js and must stay in
   sync with the capitals' `flagshipOverride` (one canon, two surfaces). Lore canon guardrails: Earth is
   pre-spacefaring and belongs to NO faction, and how humans relate to the aelari is never explained in
   any text — hints only.

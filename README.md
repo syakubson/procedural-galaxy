@@ -138,7 +138,7 @@ sections below.
 | **Space** | drop a focused planet back to the system overview |
 | **"?" button (top-right)** | open the controls cheat-sheet |
 | **Settings gear (top-right)** | open / close the generator panel |
-| **Codex tab (left edge)** | your permanent collection of discoveries — worlds, races, ruins, special finds and a «Фракции» shelf where each fleet faction keeps its fleet, structures and chronicle — with progress and a 3D viewer |
+| **Codex tab (left edge)** | your permanent collection of discoveries — worlds, races, ruins, special finds and a «Фракции» shelf: per-faction pages with the fleet (each ship carries 1–10 characteristics), structures and a five-chapter chronicle that unlocks at the capital |
 | **Play/pause &amp; camera buttons (bottom-left)** | map rotation toggle &amp; cinematic tour |
 | **View-mode button (bottom-right)** | system display mode (see below) |
 | **Sound buttons (bottom-right)** | toggle ambient + next track (music is on by default) |
