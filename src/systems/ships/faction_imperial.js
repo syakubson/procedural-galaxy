@@ -948,7 +948,8 @@ function dockArm(s) {
 // lights, a slow-spinning defence RING of angular wedge docking-arms (bays, strut
 // trusses, turret emplacements, red arm-tip beacons) held in an octagon frame,
 // plus core batteries, sensor dishes, antenna masts and a command spire crowned by
-// a red beacon. Core centred at origin; the ring spins about Z. Biggest of the three.
+// a red beacon. Core centred at origin; the ring lies flat and spins horizontally
+// about +Y (around the spire), not through it. Biggest of the three.
 function makeImperialRing(s) {
   const grp = group();
 
@@ -1020,7 +1021,7 @@ function makeImperialRing(s) {
   // ── Red running lights on the core flanks ──
   for (const x of [-1, 1]) navLight(grp, s, 'port', x * 0.52, 0, 0, 0.022);
 
-  // ── SPINNING defence RING (about Z): octagon frame + red line, four docking arms ──
+  // ── SPINNING defence RING (horizontal, about +Y): octagon frame + red line, four docking arms ──
   const ring = group();
   const RF = 1.26; // frame vertex radius (near the arm bays)
   for (let i = 0; i < 8; i++) {
@@ -1034,14 +1035,20 @@ function makeImperialRing(s) {
     const a = (i / 4) * Math.PI * 2;
     ring.add(part(sph(0.04, 6), NAV(s, 'star'), Math.cos(a) * RF, Math.sin(a) * RF, 0));
   }
-  // four docking arms, offset 45° so none collides with the +Y command spire
+  // four docking arms, evenly spaced (offset 45° for symmetry)
   for (let i = 0; i < 4; i++) {
     const arm = dockArm(s);
     arm.rotation.z = (i / 4) * Math.PI * 2 + Math.PI / 4;
     ring.add(arm);
   }
+  // Lay the docking ring FLAT (fold it into the XZ plane) so it spins as a
+  // HORIZONTAL carousel about +Y — circling the command spire — instead of a
+  // vertical wheel that sweeps straight through it. bake() bakes this tilt into
+  // the wheel geometry, then the system view rotates it about Y (spinAxis).
+  ring.rotation.x = Math.PI / 2;
   grp.add(ring);
-  grp.userData.spin = ring; // createStation rotates this group per frame
+  grp.userData.spin = ring; // rotated per frame by the system view
+  grp.userData.spinAxis = 'y'; // horizontal carousel (default 'z' = vertical wheel)
 
   return grp;
 }

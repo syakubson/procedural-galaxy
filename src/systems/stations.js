@@ -146,6 +146,9 @@ export function createStation(type, scale = 1, style) {
   } else {
     out = bake(raw);
   }
+  // Optional wheel spin axis ('y' for a horizontal carousel); default handled by
+  // the system view. Undefined for the usual vertical (Z) habitat wheels.
+  out.userData.spinAxis = raw.userData.spinAxis;
   out.scale.setScalar(scale);
   return out;
 }

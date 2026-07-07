@@ -251,6 +251,7 @@ export class Planet {
         if (stype === 'collector') this.station.rotation.z = -Math.PI / 2;
         this._stationPivot.add(this.station);
         this._stationSpin = this.station.userData.spin || null; // the habitat wheel
+        this._stationSpinAxis = this.station.userData.spinAxis || 'z'; // wheel spin axis (default Z; 'y' = horizontal)
         // make the structure clickable → focus + its own info card (#6)
         this.stationKind = stype;
         this.stationScale = sscale;
@@ -392,7 +393,7 @@ export class Planet {
           s.mesh.position.set(Math.cos(s.angle) * s.orbit, 0, Math.sin(s.angle) * s.orbit);
         }
         if (this._stationPivot) this._stationPivot.rotation.y += dt * 0.1; // slower station orbit (#6)
-        if (this._stationSpin) this._stationSpin.rotation.z += dt * 0.28; // slower habitat wheel (#6)
+        if (this._stationSpin) this._stationSpin.rotation[this._stationSpinAxis] += dt * 0.28; // habitat wheel (#6; axis per station)
       }
     }
   }
