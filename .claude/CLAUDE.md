@@ -83,6 +83,16 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   sync with the capitals' `flagshipOverride` (one canon, two surfaces). Lore canon guardrails: Earth is
   pre-spacefaring and belongs to NO faction, and how humans relate to the aelari is never explained in
   any text — hints only.
+- **Ship geometry (`src/systems/ships/`).** `buildShip(role, faction)` bakes ~25 small meshes →
+  2 draw calls (opaque + additive vertex-colour), unlit — the in-game path. `buildShipParts(role,
+  faction)` returns the merged hull geometry (position+normal+colour, any material) plus the
+  engine/nav EMITTERS pulled OUT of the bake, for lit/animated rendering. A faction MAY replace any
+  role or station with a BESPOKE builder via `style.roles[id]` / `style.stations[type]`; the Alliance
+  ships a full bespoke line (`faction_alliance.js` — 9 cosmo-style hulls + 3 stations, welded blocky
+  segments in a SW-Old-Republic / Halo-UNSC visual language). Factions without a bespoke line use the
+  shared role silhouettes (`roles.js`). Detail helpers (barrel/nozzle/dish/blister/nacelle/greeble/
+  radiatorPanel/rcsQuad/…) and an opt-in matcap path (`setShipMatcap`/`makeMatcap`, default OFF) live
+  in `style.js`. Match the surrounding builder style and keep the 2-draw-call bake.
 - **Codex (`src/codex/`).** A PERMANENT cross-party discovery log (storage namespace `CODEX` —
   no party id / GEN_VERSION in its key). Records fire on meaningful player actions through
   `main.js`'s `_codexRecord()` funnel, which stays silent during the cinematic auto-tour; the
