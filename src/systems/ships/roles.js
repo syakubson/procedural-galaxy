@@ -5,7 +5,7 @@
 // shown in the system ship card and the codex.
 
 import * as THREE from 'three';
-import { C, ACC, g, box, cyl, sph, cone, part, addRot, engineGlow, runningLights, antenna, wedge } from './style.js';
+import { C, ACC, g, box, cyl, sph, cone, part, addRot, engineGlow, navLight, runningLights, antenna, wedge, barrel, nozzle, panelZ, panelX, greeble } from './style.js';
 
 // 1. Scout/courier — XS, fastest: a slim pod, canopy, stub wings, antenna.
 function makeScout(s) {
@@ -20,21 +20,64 @@ function makeScout(s) {
   return grp;
 }
 
-// 2. Fighter — S, fast: slim fuselage, swept wings, cannons, signature fin.
+// 2. Fighter — S, fast: the v2 "detail language" exemplar. A three-segment
+// fuselage with intakes and a chin sensor, a framed canopy, a signature tail
+// fin, swept dihedral wings carrying cannons + underwing missiles, engraved
+// panel lines and twin nozzle bells. ~2.5k tris — still 2 draw calls baked.
 function makeFighter(s) {
   const grp = new THREE.Group();
-  addRot(grp, cyl(0.018, 0.03, 0.22, 8), C(s, 'accent'), 0, 0, 0, Math.PI / 2);
-  addRot(grp, cone(0.018, 0.12, 8), C(s, 'dark'), 0, 0, 0.17, Math.PI / 2);
-  grp.add(part(sph(0.02, 8), C(s, 'glass'), 0, 0.012, 0.06));
-  for (const x of [-0.07, 0.07]) {
-    const w = part(box(0.026, 0.008, 0.09), C(s, 'accent'), x, 0, -0.05);
-    w.rotation.y = x > 0 ? -0.5 : 0.5;
-    grp.add(w);
-    grp.add(part(box(0.006, 0.006, 0.07), C(s, 'dark'), x * 1.7, 0, 0.02));
+
+  // fuselage — three tapered segments give a real profile, not one tube
+  addRot(grp, cyl(0.03, 0.032, 0.14, 12), C(s, 'hull'), 0, 0, 0.03, Math.PI / 2); // forward body
+  addRot(grp, cyl(0.032, 0.026, 0.12, 12), C(s, 'hull2'), 0, 0, -0.09, Math.PI / 2); // aft body
+  addRot(grp, cone(0.03, 0.16, 14), C(s, 'accent'), 0, 0, 0.19, Math.PI / 2); // nose cone
+  grp.add(part(box(0.004, 0.004, 0.06), C(s, 'dark'), 0, 0, 0.3)); // pitot sensor spike
+
+  // chin sensor pod + twin belly intakes with accent lips
+  greeble(grp, s, 'dark', 0, -0.022, 0.09, 0.03, 0.02, 0.045);
+  for (const x of [-1, 1]) {
+    greeble(grp, s, 'dark', x * 0.032, -0.006, -0.02, 0.018, 0.03, 0.06); // intake duct
+    grp.add(part(box(0.02, 0.006, 0.05), ACC(s), x * 0.032, 0.011, -0.01)); // intake lip accent
   }
-  grp.add(part(box(0.008, 0.05, 0.06), ACC(s), 0, 0.03, -0.06));
-  engineGlow(grp, s, 0.03, 0, -0.1, 0.018);
-  engineGlow(grp, s, -0.03, 0, -0.1, 0.018);
+
+  // canopy — glass bubble, centre frame, front bow
+  grp.add(part(sph(0.026, 12), C(s, 'glass'), 0, 0.02, 0.07));
+  greeble(grp, s, 'dark', 0, 0.03, 0.07, 0.008, 0.01, 0.06); // canopy spine frame
+  greeble(grp, s, 'dark', 0, 0.03, 0.098, 0.03, 0.006, 0.006); // canopy front bow
+
+  // dorsal spine + signature tail fin
+  greeble(grp, s, 'dark', 0, 0.028, -0.04, 0.01, 0.028, 0.16); // spine
+  grp.add(part(box(0.008, 0.06, 0.07), ACC(s), 0, 0.05, -0.12)); // signature fin
+  greeble(grp, s, 'dark', 0, 0.03, -0.14, 0.008, 0.04, 0.05); // fin base
+
+  // wings — swept + dihedral, leading-edge accent, tip pods, cannons, missiles
+  for (const x of [-1, 1]) {
+    const wing = part(box(0.13, 0.008, 0.11), C(s, 'hull'), x * 0.08, -0.006, -0.04);
+    wing.rotation.y = x * 0.55;
+    wing.rotation.z = x * -0.1;
+    grp.add(wing);
+    const le = part(box(0.13, 0.007, 0.016), ACC(s), x * 0.08, -0.004, 0.006);
+    le.rotation.y = x * 0.55;
+    le.rotation.z = x * -0.1;
+    grp.add(le); // leading-edge accent
+    greeble(grp, s, 'dark', x * 0.142, -0.006, -0.03, 0.016, 0.012, 0.06); // wingtip pod
+    navLight(grp, s, x > 0 ? 'star' : 'port', x * 0.15, -0.006, -0.005, 0.01);
+    barrel(grp, s, x * 0.06, -0.014, 0.06, 0.005, 0.12); // wing cannon
+    greeble(grp, s, 'dark', x * 0.1, -0.016, -0.02, 0.006, 0.012, 0.008); // hardpoint pylon
+    addRot(grp, cyl(0.007, 0.007, 0.07, 6), C(s, 'hull2'), x * 0.1, -0.024, -0.005, Math.PI / 2); // missile body
+    addRot(grp, cone(0.007, 0.02, 6), C(s, 'accent'), x * 0.1, -0.024, 0.035, Math.PI / 2); // missile nose
+  }
+
+  // engraved panel lines on the top fuselage
+  panelZ(grp, s, 0, 0.031, -0.02, 0.14);
+  panelX(grp, s, 0, 0.031, 0.02, 0.05);
+  panelX(grp, s, 0, 0.031, -0.06, 0.05);
+
+  // twin engine nozzles + top verniers
+  for (const x of [-0.02, 0.02]) nozzle(grp, s, x, 0, -0.16, 0.02, 0.04);
+  for (const x of [-1, 1]) greeble(grp, s, 'dark', x * 0.03, 0.02, -0.14, 0.008, 0.008, 0.008);
+
+  runningLights(grp, s, 0.14, -0.006, -0.06);
   return grp;
 }
 
