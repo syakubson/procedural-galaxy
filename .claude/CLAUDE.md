@@ -87,10 +87,11 @@ first. `GENERATION.md` (repo root) documents the generation parameters in depth.
   2 draw calls (opaque + additive vertex-colour), unlit — the in-game path. `buildShipParts(role,
   faction)` returns the merged hull geometry (position+normal+colour, any material) plus the
   engine/nav EMITTERS pulled OUT of the bake, for lit/animated rendering. A faction MAY replace any
-  role or station with a BESPOKE builder via `style.roles[id]` / `style.stations[type]`; the Alliance
-  ships a full bespoke line (`faction_alliance.js` — 9 cosmo-style hulls + 3 stations, welded blocky
-  segments in a SW-Old-Republic / Halo-UNSC visual language). Factions without a bespoke line use the
-  shared role silhouettes (`roles.js`). Detail helpers (barrel/nozzle/dish/blister/nacelle/greeble/
+  role or station with a BESPOKE builder via `style.roles[id]` / `style.stations[type]`. The Alliance
+  (`faction_alliance.js` — welded blocky SW-Old-Republic / Halo-UNSC hulls) and the Empire
+  (`faction_imperial.js` — black angular ISD-style wedges) each ship a FULL bespoke line: 9 role hulls
+  + 3 stations apiece, including a richly detailed flagship. Factions without a bespoke line fall back
+  to the shared role silhouettes (`roles.js`). Detail helpers (barrel/nozzle/dish/blister/nacelle/greeble/
   radiatorPanel/rcsQuad/…) and an opt-in matcap path (`setShipMatcap`/`makeMatcap`, default OFF) live
   in `style.js`. Match the surrounding builder style and keep the 2-draw-call bake.
 - **Codex (`src/codex/`).** A PERMANENT cross-party discovery log (storage namespace `CODEX` —
