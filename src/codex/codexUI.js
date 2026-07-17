@@ -70,15 +70,19 @@ export class CodexUI {
    *   'system' progress can count only THIS galaxy's finds.
    * @param {(entry: object) => void} deps.onNavigate warp to a find in the live
    *   galaxy (closes the codex first). Given a codex Entry.
+   * @param {() => void} [deps.onOpen] fired once each time the panel opens —
+   *   main.js pauses its render loop under the panel (nothing of the world is
+   *   readable through the backdrop blur anyway).
    * @param {() => void} [deps.onClose] fired once each time the panel closes
    *   (any path: ×, backdrop, Escape, navigate) — the onboarding listens.
    */
-  constructor({ objectViewer, getOverlay, getSystemTotal, getPartyId, onNavigate, onClose }) {
+  constructor({ objectViewer, getOverlay, getSystemTotal, getPartyId, onNavigate, onOpen, onClose }) {
     this._objectViewer = objectViewer;
     this._getOverlay = getOverlay || (() => null);
     this._getSystemTotal = getSystemTotal || (() => 0);
     this._getPartyId = getPartyId || (() => null);
     this._onNavigate = onNavigate || (() => {});
+    this._onOpen = onOpen || (() => {});
     this._onClose = onClose || (() => {});
     this._activeCat = TABS[0].id;
     this._activeFaction = 'alliance'; // the faction sub-tab the «Фракции» shelf shows
@@ -105,10 +109,12 @@ export class CodexUI {
    *   default «Системы» tab would greet the graduate with an empty shelf). */
   open(tab) {
     if (tab) this._activeCat = tab;
+    const wasOpen = this._open;
     this._open = true;
     this.el.classList.add('open');
     this.el.setAttribute('aria-hidden', 'false');
     this._render();
+    if (!wasOpen) this._onOpen(); // once per open, mirroring onClose
   }
 
   /** Redraw the shelf if the codex is currently open — for callers that change

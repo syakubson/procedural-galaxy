@@ -783,6 +783,7 @@ class GalaxyApp {
    *  for the frame budget. */
   _initCodex() {
     this._objectViewerOpen = false;
+    this._codexOpen = false;
     this.objectViewer = new ObjectViewer({
       onOpen: () => {
         this._objectViewerOpen = true;
@@ -801,7 +802,15 @@ class GalaxyApp {
       getSystemTotal: () => this.systems.list.filter((s) => !s.special).length,
       getPartyId: () => currentPartyId(this.config), // scopes 'system' progress to this galaxy
       onNavigate: (entry) => this.navigateToEntry(entry), // «Перейти к объекту» → warp there
+      // the gallery fully covers the world behind a backdrop blur — rendering
+      // under it burns the frame budget for nothing on weak machines (#review)
+      onOpen: () => {
+        this._codexOpen = true;
+        this.pauseRender();
+      },
       onClose: () => {
+        this._codexOpen = false;
+        this.resumeRender();
         this.sfx.play('codexClose'); // a soft book close (#sfx)
         this.onboarding.notify('codexClose'); // tutorial: its codex step advances on CLOSE
       },
@@ -827,10 +836,11 @@ class GalaxyApp {
   }
 
   resumeRender() {
-    // A hidden tab stays paused — the visibilitychange handler will resume
-    // the loop when the tab comes back (and it, in turn, respects an open
-    // object viewer; the two pause owners never override each other).
-    this._running = !document.hidden;
+    // Three pause owners — hidden tab, object viewer, codex panel — and none
+    // may override another: closing the viewer while the codex is still open
+    // (its usual exit path) must leave the loop paused, so resume re-checks
+    // every owner instead of blindly flipping the flag.
+    this._running = !document.hidden && !this._objectViewerOpen && !this._codexOpen;
     this.clock.getDelta();
   }
 
@@ -860,9 +870,9 @@ class GalaxyApp {
     });
     document.addEventListener('visibilitychange', () => {
       // Pause the loop when the tab is hidden — saves battery/CPU. An open
-      // codex object viewer keeps the loop paused even on a visible tab
-      // (pauseRender() owns the pause for as long as the viewer is up).
-      this._running = !document.hidden && !this._objectViewerOpen;
+      // codex panel or object viewer keeps the loop paused even on a visible
+      // tab (pauseRender() owns the pause for as long as either is up).
+      this._running = !document.hidden && !this._objectViewerOpen && !this._codexOpen;
       if (this._running) this.clock.getDelta(); // drop the accumulated gap
     });
 
@@ -1719,9 +1729,14 @@ class GalaxyApp {
       if (this.mode === 'galaxy') this._applyKeyboard(dt); // arrows/WASD/±  (#2)
       if (this._galaxyDolly) {
         this._stepGalaxyDolly(dt); // #9: warp flight in/out — bypass controls
-      } else {
-        // resume auto-rotation after 7s of no camera interaction (#4), unless the
-        // user has hard-stopped the map with the rotate toggle.
+      } else if (this.mode === 'galaxy') {
+        // galaxy mode only: OrbitControls.update() applies autoRotate regardless
+        // of `enabled`, so running this branch during a transition (the window
+        // before _galaxyDolly is set, e.g. exitSystem's fade) would drift the
+        // camera — and the idle-resume below could even re-arm autoRotate
+        // mid-flight, shifting the dolly's captured fromPos.
+        // Resume auto-rotation after 7s of no camera interaction (#4), unless
+        // the user has hard-stopped the map with the rotate toggle.
         if (
           this.config.cameraAutoRotate &&
           !this._rotationLocked &&
