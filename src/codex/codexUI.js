@@ -461,10 +461,15 @@ export class CodexUI {
       if (hero) {
         const img = new Image();
         img.addEventListener('load', () => {
+          // re-check the generation IN the callback too — a re-render/close may
+          // have detached this tile while the image was still in flight
+          if (job.gen !== this._thumbGen) return;
           job.thumb.style.backgroundImage = `url("${hero}")`;
           job.thumb.classList.add('rendered');
         }, { once: true });
-        img.addEventListener('error', paint3D, { once: true });
+        img.addEventListener('error', () => {
+          if (job.gen === this._thumbGen) paint3D();
+        }, { once: true });
         img.src = hero;
       } else {
         paint3D();

@@ -180,12 +180,6 @@ export function catalogFor(category) {
   return CATALOGS[category] || null;
 }
 
-/** Curiosities/showcase were retired — the Особое tab now holds the noteworthy
- *  finds. Kept as a stable false so codex.js's record() needn't change. */
-export function isCuriosity() {
-  return false;
-}
-
 // --- recording helpers (main.js) -------------------------------------------
 
 /** The special-system codex key for a system seed, or null if it isn't one of

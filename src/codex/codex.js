@@ -10,7 +10,7 @@
 
 import { GEN_VERSION } from '../systems/genParams.js';
 import { NAMESPACES, read, write } from '../state/storage.js';
-import { catalogFor, isCuriosity } from './codexData.js';
+import { catalogFor } from './codexData.js';
 
 const SCOPE_KEY = 'entries';
 
@@ -40,11 +40,9 @@ function idFor(category, archetypeKey) {
  * which records the whole galaxy at once via `opts.defer` + flush() below.
  *
  * Idempotent: re-recording an archetype the codex already knows returns the
- * EXISTING entry (`isNew: false`) — `firstSeenAt` never moves. The ONE field a
- * re-record may change is `curiosity`, upward only: a planet KIND is usually
- * discovered on an ordinary world first, and a later rare find of the same
- * kind (say, a terraformed colony) would otherwise never reach the showcase
- * because its archetype is already logged.
+ * EXISTING entry (`isNew: false`) — `firstSeenAt` never moves. (Old saves may
+ * still carry a `curiosity` flag from the retired showcase; it is harmless
+ * persisted data nothing reads any more.)
  *
  * @param {string} category one of codexData.js's CATEGORIES ('ship',
  *   'station', 'planet', 'race', 'ruin', 'phenomenon'), or 'system' (which
@@ -58,8 +56,6 @@ function idFor(category, archetypeKey) {
  *   - `genVersion` — defaults to the current GEN_VERSION if omitted.
  *   - `label` — fallback display label, used only when `archetypeKey` isn't
  *     found in `category`'s catalog (always true for 'system').
- *   - anything else `isCuriosity()` needs for this category (e.g.
- *     `colonyKind`, `ruinType`, `biome` — see codexData.js).
  * @param {object} [opts]
  * @param {boolean} [opts.defer] skip the localStorage write and mutate only the
  *   in-memory map — for a bulk caller (reveal-all) that persists ONCE with
@@ -70,13 +66,7 @@ export function record(category, archetypeKey, meta = {}, opts = {}) {
   const entries = load();
   const id = idFor(category, archetypeKey);
   const existing = entries[id];
-  if (existing) {
-    if (!existing.curiosity && isCuriosity(category, { ...meta, archetypeKey })) {
-      existing.curiosity = true; // upgrade only — see the JSDoc above
-      if (!opts.defer) persist();
-    }
-    return { entry: existing, isNew: false };
-  }
+  if (existing) return { entry: existing, isNew: false };
 
   const catalog = catalogFor(category);
   const catalogEntry = catalog && catalog.find((c) => c.archetypeKey === archetypeKey);
@@ -90,7 +80,6 @@ export function record(category, archetypeKey, meta = {}, opts = {}) {
     firstSeenAt: Date.now(),
     batchId: meta.batchId ?? null,
     sourceRef: meta.sourceRef ?? null,
-    curiosity: isCuriosity(category, { ...meta, archetypeKey }),
     genVersion: meta.genVersion ?? GEN_VERSION,
   };
   entries[id] = entry;
@@ -123,14 +112,6 @@ export function hasAnyEntries() {
   return Object.keys(load()).length > 0;
 }
 
-/** Every entry ever flagged a curiosity, across all categories — the
- *  showcase list, oldest discovery first. */
-export function curiosities() {
-  return Object.values(load())
-    .filter((e) => e.curiosity)
-    .toSorted((a, b) => a.firstSeenAt - b.firstSeenAt);
-}
-
 /**
  * Discovery progress for `category`: distinct archetypes found over the
  * catalog total. Categories backed by a finite codexData.js catalog compute
@@ -145,18 +126,22 @@ export function curiosities() {
  */
 export function progress(category, total) {
   const catalog = catalogFor(category);
+  // `future: true` archetypes (announced-but-not-in-game races) are shown as
+  // locked teasers and can never be discovered — they must not count toward
+  // the denominator, or the category could never reach 100%.
+  const real = catalog ? catalog.filter((c) => !c.future) : null;
   // Count only entries whose archetypeKey is STILL in the catalog. The codex is
   // permanent and unversioned, so a returning player may hold entries under an
   // old key scheme (a pre-reorg `biome:type` ruin, a `type`-only station); those
   // orphans must not inflate the numerator past the catalog total. A category
   // with no catalog ('system') keeps its raw count.
   let found;
-  if (catalog) {
-    const keys = new Set(catalog.map((c) => c.archetypeKey));
+  if (real) {
+    const keys = new Set(real.map((c) => c.archetypeKey));
     found = list(category).filter((e) => keys.has(e.archetypeKey)).length;
   } else {
     found = list(category).length;
   }
   if (typeof total === 'number') return { found, total };
-  return { found, total: catalog ? catalog.length : 0 };
+  return { found, total: real ? real.length : 0 };
 }
