@@ -58,6 +58,14 @@ const MOVE_CODES = new Set([
 ]);
 const _ko = new THREE.Vector3(); // scratch: camera→target offset
 const _ksph = new THREE.Spherical(); // scratch: that offset in spherical coords
+// scratch for the per-frame reticle / hover-ring math — these ran 4 fresh
+// Vector3 allocations per frame each before (#review)
+const _rc = new THREE.Vector3(); // world centre of the focused/hovered object
+const _rp = new THREE.Vector3(); // its screen-space projection
+const _rr = new THREE.Vector3(); // camera-right basis column
+const _re = new THREE.Vector3(); // centre pushed one radius toward camera-right
+const _rbox = new THREE.Box3(); // bounds scratch for _objectRadius
+const _rsph = new THREE.Sphere();
 
 class GalaxyApp {
   constructor(canvas) {
@@ -170,6 +178,8 @@ class GalaxyApp {
       this._settingsOpen = !this._settingsOpen;
       if (this._settingsOpen) this.gui.show();
       else this.gui.hide();
+      // FPS/draw-call readouts poll via their own RAF — only while visible
+      if (this.gui.setReadoutsLive) this.gui.setReadoutsLive(this._settingsOpen);
       btn.classList.toggle('on', this._settingsOpen);
     });
   }
@@ -209,6 +219,7 @@ class GalaxyApp {
     const btn = document.createElement('button');
     btn.id = 'rotate-toggle';
     btn.type = 'button';
+    btn.setAttribute('aria-label', 'Вращение карты'); // title is synced dynamically
     btn.classList.add('visible'); // galaxy mode is shown from the start
     btn.innerHTML = this._rotIcon(true);
     btn.addEventListener('click', () => {
@@ -268,6 +279,7 @@ class GalaxyApp {
       ['Мышь', ''],
       ['Колесо', 'приблизиться к курсору'],
       ['Зажать ЛКМ', 'повернуть / облёт'],
+      ['Клик', 'войти в систему · выбрать объект (метки тоже кликаются)'],
       ['Клавиатура', ''],
       ['Стрелки / WASD', 'обзор'],
       ['Q / E · + / −', 'зум'],
@@ -276,6 +288,8 @@ class GalaxyApp {
       ['M', 'музыка'],
       ['Пробел', 'из планеты — к системе'],
       ['Esc', 'шаг назад'],
+      ['Ещё', ''],
+      ['Кодекс', 'коллекция находок — вкладка у левого края'],
     ];
     panel.innerHTML =
       '<h4>Управление</h4>' +
@@ -319,6 +333,7 @@ class GalaxyApp {
     btn.id = 'cine-toggle';
     btn.type = 'button';
     btn.title = 'Кинопоказ — авто-облёт миров';
+    btn.setAttribute('aria-label', 'Кинопоказ');
     btn.innerHTML =
       '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="7" width="12.5" height="10" rx="1.6"/><path d="M15.5 10.4 21 7.6v8.8l-5.5-2.8z"/></svg>';
     btn.classList.add('visible');
@@ -550,9 +565,8 @@ class GalaxyApp {
       return;
     }
     const cam = sv.camera;
-    const c = new THREE.Vector3();
-    f.obj.getWorldPosition(c);
-    const cp = c.clone().project(cam);
+    f.obj.getWorldPosition(_rc);
+    const cp = _rp.copy(_rc).project(cam);
     if (cp.z >= 1) {
       hide();
       return;
@@ -562,8 +576,8 @@ class GalaxyApp {
     const sx = (cp.x * 0.5 + 0.5) * w;
     const sy = (-cp.y * 0.5 + 0.5) * h;
     // project a point one radius to the camera-right → on-screen radius in px
-    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
-    const edge = c.clone().addScaledVector(right, f.reticleRadius || 1).project(cam);
+    const right = _rr.setFromMatrixColumn(cam.matrixWorld, 0);
+    const edge = _re.copy(_rc).addScaledVector(right, f.reticleRadius || 1).project(cam);
     const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
     const size = Math.max(44, pxR * 2 + 28);
     r.style.left = `${sx}px`;
@@ -575,8 +589,16 @@ class GalaxyApp {
     // park the side callout (label + description) beside the reticle, flipping
     // to the left when there isn't room on the right
     if (fc && this.infoPanel.focusActive) {
-      const fcw = fc.offsetWidth || 240;
-      const fch = fc.offsetHeight || 220;
+      // measure once per focused object (content only changes with the focus;
+      // _onResize invalidates too) — reading offsetWidth/Height right after
+      // the style writes above forced a synchronous layout flush every frame.
+      if (this._fcSizeFor !== f || !this._fcW) {
+        this._fcSizeFor = f;
+        this._fcW = fc.offsetWidth;
+        this._fcH = fc.offsetHeight;
+      }
+      const fcw = this._fcW || 240;
+      const fch = this._fcH || 220;
       let fx = sx + size / 2 + 18;
       if (fx + fcw > w - 16) fx = sx - size / 2 - 18 - fcw;
       // keep the callout clear of the bottom-left info dossier (big title + hero
@@ -731,6 +753,15 @@ class GalaxyApp {
     this.scene.add(this.background.group);
     this.scene.add(this.galaxy.points);
     this.scene.add(this.suns.points);
+    // None of these ever move — rotation/twinkle live entirely in shader
+    // uniforms (uRotTime/uTime). Bake their matrices once and opt out of the
+    // per-frame updateMatrixWorld() walk (r160 skips a subtree whose root has
+    // matrixWorldAutoUpdate === false). rebuild() re-runs this on new objects.
+    for (const obj of [this.background.group, this.galaxy.points, this.suns.points]) {
+      obj.updateMatrixWorld(true);
+      obj.matrixAutoUpdate = false;
+      obj.matrixWorldAutoUpdate = false;
+    }
   }
 
   _buildSystems() {
@@ -1089,10 +1120,18 @@ class GalaxyApp {
   /** World-space bounding-sphere radius of an object — the true size, so framing
    *  & brackets fit any model regardless of its scale. */
   _objectRadius(obj) {
-    const box = new THREE.Box3().setFromObject(obj);
-    if (box.isEmpty()) return 1;
-    const s = box.getBoundingSphere(new THREE.Sphere());
-    return s.radius || 1;
+    // Called every hover frame — Box3.setFromObject walks the whole subtree.
+    // Bounds are static per MODEL, but ships grow-in (uniform scale animates),
+    // so cache the UNIT-scale radius once and re-scale by the current scale.
+    let unit = obj.userData._unitBoundRadius;
+    if (unit == null) {
+      const box = _rbox.setFromObject(obj);
+      if (box.isEmpty()) return 1;
+      const r = box.getBoundingSphere(_rsph).radius || 1;
+      unit = r / (obj.scale.x || 1);
+      obj.userData._unitBoundRadius = unit;
+    }
+    return unit * (obj.scale.x || 1) || 1;
   }
 
   /** Focus `obj` with the camera distance + visor size for its `kind`, pulled
@@ -1124,9 +1163,8 @@ class GalaxyApp {
       ring.classList.remove('visible');
       return;
     }
-    const c = new THREE.Vector3();
-    obj.getWorldPosition(c);
-    const cp = c.clone().project(sv.camera);
+    obj.getWorldPosition(_rc);
+    const cp = _rp.copy(_rc).project(sv.camera);
     if (cp.z >= 1) {
       ring.classList.remove('visible');
       return;
@@ -1135,8 +1173,8 @@ class GalaxyApp {
     const h = window.innerHeight;
     const sx = (cp.x * 0.5 + 0.5) * w;
     const sy = (-cp.y * 0.5 + 0.5) * h;
-    const right = new THREE.Vector3().setFromMatrixColumn(sv.camera.matrixWorld, 0);
-    const edge = c.clone().addScaledVector(right, this._hoverR || 1).project(sv.camera);
+    const right = _rr.setFromMatrixColumn(sv.camera.matrixWorld, 0);
+    const edge = _re.copy(_rc).addScaledVector(right, this._hoverR || 1).project(sv.camera);
     const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
     const size = Math.max(32, pxR * 2 + 12); // brackets hug the object tightly
     ring.style.left = `${sx}px`;
@@ -1468,6 +1506,7 @@ class GalaxyApp {
     this.renderer.setSize(w, h);
     this.postfx.setSize(w, h);
     this.systemView.setSize(w, h);
+    this._fcSizeFor = null; // callout may reflow at the new width — re-measure
   }
 
   // ---- system enter / exit (cinematic warp) ---------------------------------

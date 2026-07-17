@@ -105,13 +105,20 @@ export function buildGUI(app) {
   fSound.close();
 
   // --- readout ---
-  gui.add(app.stats, 'fps').name('FPS').disable().listen();
+  const fpsCtrl = gui.add(app.stats, 'fps').name('FPS').disable();
 
   // --- perf budget (stage-0 surface; see config.js PERF_BUDGETS) ---
   const fBudget = gui.addFolder('Бюджет');
-  fBudget.add(app.stats, 'drawCalls').name('Вызовы отрисовки').disable().listen();
-  fBudget.add(app.stats, 'triangles').name('Треугольники').disable().listen();
+  const dcCtrl = fBudget.add(app.stats, 'drawCalls').name('Вызовы отрисовки').disable();
+  const triCtrl = fBudget.add(app.stats, 'triangles').name('Треугольники').disable();
   fBudget.close();
+
+  // .listen() self-schedules a RAF per controller even while the panel is
+  // hidden — main.js flips these with the ⚙ toggle so a closed panel costs
+  // nothing (lil-gui's listen(false) cancels the pending frame).
+  gui.setReadoutsLive = (on) => {
+    for (const ctrl of [fpsCtrl, dcCtrl, triCtrl]) ctrl.listen(on);
+  };
 
   return gui;
 }
