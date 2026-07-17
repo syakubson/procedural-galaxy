@@ -823,7 +823,16 @@ export class SystemView {
 
   clear() {
     if (this.ships) {
-      for (const s of this.ships) this.scene.remove(s.mesh);
+      for (const s of this.ships) {
+        this.scene.remove(s.mesh);
+        // buildShip() bakes a fresh merged geometry + material per ship (never
+        // the shared style.js caches — see codexViewer's disposeBaked note), so
+        // freeing them here can't touch any other ship's resources.
+        s.mesh.traverse((o) => {
+          if (o.geometry) o.geometry.dispose();
+          if (o.material) o.material.dispose();
+        });
+      }
       this.ships = [];
     }
     if (this.comets) {

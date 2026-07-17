@@ -412,7 +412,15 @@ export class Planet {
       moon.mesh.geometry.dispose();
       moon.mat.dispose();
     }
-    // station meshes reuse shared singletons (stations.js) — nothing per-instance
+    // createStation() bakes a fresh merged geometry + material per station
+    // (plus a separately-baked habitat-wheel child) — free them like any other
+    // baked group; the shared primitive caches it drew from stay untouched.
+    if (this.station) {
+      this.station.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+    }
     if (this._moonTrails) {
       for (const mt of this._moonTrails) {
         mt.geo.dispose();
