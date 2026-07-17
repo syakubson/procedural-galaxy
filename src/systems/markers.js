@@ -30,7 +30,7 @@ const SPECIAL_COLOR = '#d98ae8';
 const CAPITAL_COLOR = {
   alliance: '#5a8aff',
   imperial: '#ff4030',
-  swarm: '#9aff3a',
+  swarm: '#c060ff',
   syndicate: '#00d4ff',
   cartel: '#ff8a2a',
   precursor: '#ffd27a',

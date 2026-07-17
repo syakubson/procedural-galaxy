@@ -55,7 +55,22 @@ export const FACTION = {
   accent: 0xb14cff,
   glow: 0xc060ff,
   nav: { port: 0xff5aa0, star: 0x9a6bff, top: 0xe6c8ff },
-  lore: 'Живой рой выращенных кораблей-левиафанов: тёмная фиолетовая плоть и фиолетово-магентовое био-люминесцентное свечение из глубин пустоты вместо заводской стали.',
+  lore: 'Живой рой выращенных левиафанов: тёмная фиолетовая плоть и фиолетово-магентовое био-люминесцентное свечение из глубин пустоты вместо заводской стали.',
+
+  // Per-faction ship names (#hero): the Swarm's beasts aren't «Грузовик»/«Танкер»
+  // — each role is a grown creature with its own name. Consumed by the codex
+  // catalog + the in-world info panel; other factions fall back to ROLES names.
+  names: {
+    scout: 'Малёк',
+    fighter: 'Жало',
+    interceptor: 'Стрекало',
+    gunship: 'Таран',
+    corvette: 'Панцирник',
+    freighter: 'Носитель',
+    tanker: 'Нектарник',
+    liner: 'Ковчег',
+    flagship: 'Исполин',
+  },
 
   // Full bespoke line — every role is its own grown leviathan-beast (no shared
   // silhouette, so no `flourish`); each ship carries its own maw/flukes/organs.
