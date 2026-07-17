@@ -53,6 +53,18 @@ function tailTexture() {
   return _tailTex;
 }
 
+// nucleus geometry/material are identical for every comet (radius is applied
+// via mesh.scale) — module singletons like the textures above; dispose() must
+// leave them alone.
+let _nucGeo = null;
+let _nucMat = null;
+function nucleusGeo() {
+  return _nucGeo || (_nucGeo = new THREE.IcosahedronGeometry(1, 0));
+}
+function nucleusMat() {
+  return _nucMat || (_nucMat = new THREE.MeshBasicMaterial({ color: 0xdce9ff }));
+}
+
 export class Comet {
   /**
    * @param {object} o  { reach, scale, speed, rng }
@@ -66,10 +78,8 @@ export class Comet {
     const r = o.scale;
 
     this.group = new THREE.Group();
-    this.nucleus = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(r, 0),
-      new THREE.MeshBasicMaterial({ color: 0xdce9ff }),
-    );
+    this.nucleus = new THREE.Mesh(nucleusGeo(), nucleusMat());
+    this.nucleus.scale.setScalar(r); // radius via scale — geometry is shared
     this.group.add(this.nucleus);
 
     this.coma = new THREE.Sprite(
@@ -161,8 +171,7 @@ export class Comet {
   }
 
   dispose() {
-    this.nucleus.geometry.dispose();
-    this.nucleus.material.dispose();
+    // nucleus geometry/material are shared module singletons — not ours to free
     this.coma.material.dispose();
     this._tailGeo.dispose();
     this._tailMat.dispose();

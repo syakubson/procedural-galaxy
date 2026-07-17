@@ -11,6 +11,11 @@ import { planetLabel, planetKindLabel, planetMiniDesc, planetAccent, planetStatu
 // the source strings ('флагман', 'форпост', 'дом цивилизации', …) come in lower-case.
 const capFirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
+// per-frame de-overlap runs every system frame — hoist its comparator and reuse
+// one visible-list array instead of allocating both each call
+const _bySy = (a, b) => a.sy - b.sy;
+const _vis = [];
+
 export class PlanetLabels {
   constructor(onPick) {
     this.onPick = onPick; // (kind, ref) => void
@@ -128,7 +133,8 @@ export class PlanetLabels {
   update(camera, w, h, nearCutoff = 0, focusedBody = null) {
     if (!this.visible || !this.items.length) return;
     const overview = nearCutoff <= 0;
-    const vis = [];
+    const vis = _vis;
+    vis.length = 0;
     for (const it of this.items) {
       // the focused object carries its info in the side callout, so hide its
       // own in-world label to keep the reticle clean (#15)
@@ -166,7 +172,7 @@ export class PlanetLabels {
     // the pin: it extends RIGHT from sx and UP from sy. We resolve any pair that
     // overlaps in BOTH axes by pushing them apart vertically, a few relax passes.
     const PAD = 9; // breathing room between pills — 5 let borders visually kiss
-    vis.sort((a, b) => a.sy - b.sy);
+    vis.sort(_bySy);
     for (let pass = 0; pass < 8; pass++) {
       let moved = false;
       for (let i = 0; i < vis.length; i++) {

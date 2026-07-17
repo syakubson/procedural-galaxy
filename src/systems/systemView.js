@@ -27,6 +27,9 @@ const _FWD = new THREE.Vector3(0, 0, 1);
 const _fp = new THREE.Vector3(); // focus: planet world position (#6)
 const _fd = new THREE.Vector3(); // focus: view/approach direction
 const _ftmp = new THREE.Vector3();
+const _pkC = new THREE.Vector3(); // pick: pickable world centre (#9 hover path)
+const _pkR = new THREE.Vector3(); // pick: camera-right column
+const _pkE = new THREE.Vector3(); // pick: projected centre / radius edge
 
 export class SystemView {
   constructor(renderer, assetLoader) {
@@ -156,6 +159,10 @@ export class SystemView {
     // --- interplanetary ship traffic (spacefaring) ---
     // mostly transports, some fighters, and exactly one slow flagship (#11),
     // all painted in this civilisation's faction style.
+    // Math.random() here is a DOCUMENTED exception to the determinism rule:
+    // ambient traffic isn't part of a system's identity (never persisted, not
+    // in the codex), and its seeding is deferred to stage 9a when routes
+    // become trade lanes — see the wiki decision log, 2026-07-02.
     this._faction = data.faction;
     this.ships = [];
     if (data.ships > 0 && this.planets.length >= 2) {
@@ -433,15 +440,10 @@ export class SystemView {
 
   /** Raycast planets + ships + structures; returns {kind, ref, obj} or null. */
   pickObject(raycaster) {
-    const targets = [];
-    for (const p of this.planets) {
-      if (p.body) targets.push(p.body);
-      if (p.station) targets.push(p.station); // orbital structures are clickable too (#6)
-    }
-    for (const s of this.ships) if (s.mesh) targets.push(s.mesh);
-    if (this.deathStar) targets.push(this.deathStar.group); // the battle station (#10)
-    if (this.ishimura) targets.push(this.ishimura.group); // the Ishimura (#5)
-    if (this.dragon) targets.push(this.dragon.group); // the Crew Dragon (#8)
+    // the pickable set is fixed for the life of a loaded system — reuse the
+    // cached tuples' objects instead of rebuilding the array every hover frame
+    if (!this._pickTargets) this._pickTargets = this._pickables().map((t) => t[0]);
+    const targets = this._pickTargets;
     if (!targets.length) return null;
     const hits = raycaster.intersectObjects(targets, true);
     if (!hits.length) return null;
@@ -454,8 +456,10 @@ export class SystemView {
   }
 
   /** Every pickable object with the metadata needed for screen-space picking and
-   *  the hover ring: [obj, kind, ref, radius]. (#9) */
+   *  the hover ring: [obj, kind, ref, radius]. (#9) Cached per loaded system —
+   *  nothing pickable spawns or despawns mid-visit; clear() invalidates. */
   _pickables() {
+    if (this._pickCache) return this._pickCache;
     const out = [];
     for (const p of this.planets) {
       if (p.body) out.push([p.body, 'planet', p, p.data.radius]);
@@ -465,6 +469,7 @@ export class SystemView {
     if (this.ishimura) out.push([this.ishimura.group, 'ishimura', this.ishimura, 1.5]);
     if (this.deathStar) out.push([this.deathStar.group, 'deathstar', this.deathStar, this.deathStar.R || 5]);
     if (this.dragon) out.push([this.dragon.group, 'dragon', this.dragon, 0.6]);
+    this._pickCache = out;
     return out;
   }
 
@@ -474,20 +479,17 @@ export class SystemView {
    *  click target around every planet / ship / structure. */
   pickNearestScreen(px, py, w, h) {
     const cam = this.camera;
-    const c = new THREE.Vector3();
-    const right = new THREE.Vector3();
-    const edge = new THREE.Vector3();
+    const right = _pkR.setFromMatrixColumn(cam.matrixWorld, 0); // loop-invariant
     let best = null;
     let bestD = Infinity;
     for (const [obj, kind, ref, r] of this._pickables()) {
-      obj.getWorldPosition(c);
-      edge.copy(c).project(cam);
-      if (edge.z >= 1) continue;
-      const sx = (edge.x * 0.5 + 0.5) * w;
-      const sy = (-edge.y * 0.5 + 0.5) * h;
-      right.setFromMatrixColumn(cam.matrixWorld, 0);
-      edge.copy(c).addScaledVector(right, r).project(cam);
-      const pxR = Math.hypot((edge.x * 0.5 + 0.5) * w - sx, (-edge.y * 0.5 + 0.5) * h - sy);
+      obj.getWorldPosition(_pkC);
+      _pkE.copy(_pkC).project(cam);
+      if (_pkE.z >= 1) continue;
+      const sx = (_pkE.x * 0.5 + 0.5) * w;
+      const sy = (-_pkE.y * 0.5 + 0.5) * h;
+      _pkE.copy(_pkC).addScaledVector(right, r).project(cam);
+      const pxR = Math.hypot((_pkE.x * 0.5 + 0.5) * w - sx, (-_pkE.y * 0.5 + 0.5) * h - sy);
       const d = Math.hypot(sx - px, sy - py);
       const zone = Math.max(pxR + 26, 42); // generous, but never swallows the whole screen
       if (d <= zone && d < bestD) {
@@ -849,6 +851,8 @@ export class SystemView {
     this.planets = [];
     this._planetFocused = false; // fresh system → trails visible
     this._trailsHidden = false;
+    this._pickCache = null; // pickables die with the system (#9)
+    this._pickTargets = null;
 
     this.starGroup.clear();
     this.starGroup.rotation.set(0, 0, 0); // drop any binary-pair spin
