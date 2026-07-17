@@ -3,6 +3,8 @@
 // with a curiosity-gap teaser, a discovery Legend/counter, and a fade Overlay
 // for the warp transition. All plain DOM, styled via classes in styles.css.
 
+import { getShipStats } from '../systems/ships/shipStats.js';
+
 // vivid status palette — matches the brighter, higher-contrast galaxy markers
 const STATUS_COLOR = {
   inhabited: '#5fe0a0', // jade
@@ -518,10 +520,15 @@ export class InfoPanel {
     // transports keep their payload in `arm` (cargo, fuel, colonists) — label
     // the row honestly instead of calling 4 000 colonists an armament.
     const armLabel = role.cat === 'transport' ? 'Нагрузка' : 'Вооружение';
+    // speed on the shared 1–10 codex scale (shipStats.js — the single source);
+    // raw role.speed is an internal sim unit (2.6–14) that reads as nonsense
+    // next to «Длина: 120 м». Precursor instruments give no readings — no row.
+    const stats = getShipStats(role.id, faction && faction.id);
+    const speedVal = stats && !stats.unknown ? (stats.rows.find((row) => row[0] === 'Скорость') || [])[1] : null;
     const metaHtml =
       `<span><b>Класс:</b> ${roleName}</span>` +
       `<span><b>Длина:</b> ${role.lengthM} м</span>` +
-      `<span><b>Скорость:</b> ${role.speed}</span>` +
+      (speedVal ? `<span><b>Скорость:</b> ${speedVal} / 10</span>` : '') +
       `<span><b>Экипаж:</b> ${role.crew}</span>` +
       `<span><b>${armLabel}:</b> ${role.arm}</span>`;
     this._setDossier(heroPath); // hero portrait → left panel, beside the title
