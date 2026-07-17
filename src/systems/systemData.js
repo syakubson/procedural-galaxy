@@ -82,8 +82,8 @@ export const PLANET_KINDS = {
 // Habitable-world biomes (Star-Wars-style variety). Colours override the kind-1
 // surface; `biome` selects the sub-branch in the planet shader. Exported: this
 // IS the exhaustive reachable biome-key set for both living and ruined worlds
-// (see RUIN_BIOMES below, derived from these same keys) — the codex catalog and
-// lore.js's EXTINCT_WHO table must cover exactly this key set.
+// — lore.js's EXTINCT_WHO table must carry one entry per key here. (The codex,
+// since the stage-6 reorg, catalogs ruins by TYPE, not by biome.)
 export const BIOME_KEYS = {
   earthlike: { label: 'Земного типа', biome: 0, ocean: '#16406f', land: '#3f8a4a', land2: '#8a7a55' },
   ocean: { label: 'Океанический', biome: 1, ocean: '#0e3a66', land: '#3a8a72', land2: '#6f9a8a' },
@@ -92,13 +92,6 @@ export const BIOME_KEYS = {
   desert: { label: 'Пустынный мир', biome: 4, ocean: '#3a6a78', land: '#c9a36b', land2: '#8a6238' },
   city: { label: 'Планета-город', biome: 5, ocean: '#22324a', land: '#6f7588', land2: '#474c5e' },
 };
-
-// Reachable ruin-biome key set — a ruin rolls the SAME biome table a living
-// world would (see ruinWeights below) plus a flat "city" baseline, so it can
-// land on any of BIOME_KEYS' keys, never more/fewer. Derived, not duplicated,
-// so it can never silently drift out of sync with BIOME_KEYS (or with
-// lore.js's EXTINCT_WHO, which must carry one entry per key here).
-export const RUIN_BIOMES = Object.keys(BIOME_KEYS);
 
 // Ruin flavours a ruined homeworld can end up with, in roll order (see the
 // threshold chain a few lines below in generateSystem, which must keep
@@ -411,7 +404,7 @@ export function generateSystem(seed) {
 
     // R11: same insolation table a living world would use (this WAS a living
     // climate), plus a "was it a whole planet-city?" baseline that robotic
-    // ruins lean into hard. The reachable key set here is exactly RUIN_BIOMES.
+    // ruins lean into hard. The reachable key set is exactly BIOME_KEYS' keys.
     const tercile = tercileFromInsol(home.insol);
     const ruinWeights = { ...GEN.world.biomes[tercile][home.type], city: 1 };
     const ruinMul = GEN.world.ruinBiomeMul[ruinType];

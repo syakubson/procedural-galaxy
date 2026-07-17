@@ -9,6 +9,7 @@
 // trench separating the hemispheres, north-pole concave focusing dish.
 
 import * as THREE from 'three';
+import { createRng } from '../rng.js';
 
 const TAU = Math.PI * 2;
 
@@ -19,6 +20,9 @@ let _hullTex = null;
  *  a couple of darker sector bands and a hint of the equatorial trench. */
 function hullTexture() {
   if (_hullTex) return _hullTex;
+  // seeded — the panel pattern is part of the object's identity and must not
+  // reshuffle between page loads (determinism rule, .claude/CLAUDE.md)
+  const rng = createRng('deathstar::hull');
   const c = document.createElement('canvas');
   c.width = 1024;
   c.height = 512;
@@ -32,7 +36,7 @@ function hullTexture() {
   const ch = c.height / rows;
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
-      const v = 132 + Math.floor(Math.random() * 34); // 132..166 grey
+      const v = 132 + Math.floor(rng.next() * 34); // 132..166 grey
       x.fillStyle = `rgb(${v},${v + 3},${v + 8})`;
       x.fillRect(i * cw, j * ch, cw - 0.6, ch - 0.6); // thin gaps = grid lines
     }
@@ -44,9 +48,9 @@ function hullTexture() {
   // scattered greeble blocks (turbolaser emplacements / domes)
   x.fillStyle = 'rgba(30,33,38,0.6)';
   for (let k = 0; k < 240; k++) {
-    const px = Math.random() * c.width;
-    const py = Math.random() * c.height;
-    const s = 1.5 + Math.random() * 3.5;
+    const px = rng.next() * c.width;
+    const py = rng.next() * c.height;
+    const s = 1.5 + rng.next() * 3.5;
     x.fillRect(px, py, s, s);
   }
   const tex = new THREE.CanvasTexture(c);
