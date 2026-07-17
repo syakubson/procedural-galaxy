@@ -91,10 +91,9 @@ export const planetFragmentShader = /* glsl */ `
   void main() {
     vec3 dir = vDir;
     vec3 off = vec3(uSeed * 13.1, uSeed * 7.7, uSeed * 3.3);
-    float n = fbm(dir * 2.5 + off);
-    float n2 = fbm(dir * 6.0 + off * 1.7);
-    float n3 = fbm(dir * 15.0 + off * 2.3); // fine detail
-    float n4 = fbm(dir * 34.0 + off * 3.1); // crisp micro-detail (#8)
+    // the base fbm octaves (n..n4) live INSIDE the kind branches below — uKind
+    // is a uniform, so the branch is coherent for the whole draw call, and
+    // ice/lava/gas skip the 2-4 fbm evaluations they never read (#review)
     float lat = abs(dir.y);
 
     vec3 surf;
@@ -105,6 +104,10 @@ export const planetFragmentShader = /* glsl */ `
 
     if (uKind < 0.5) {
       // rocky / desert worlds: layered strata + impact pocks + fine grit (#8)
+      float n = fbm(dir * 2.5 + off);
+      float n2 = fbm(dir * 6.0 + off * 1.7);
+      float n3 = fbm(dir * 15.0 + off * 2.3); // fine detail
+      float n4 = fbm(dir * 34.0 + off * 3.1); // crisp micro-detail (#8)
       float h = n * 0.55 + n2 * 0.3 + n3 * 0.12 + n4 * 0.03;
       surf = mix(uColor3, uColor1, smoothstep(0.30, 0.58, h));
       surf = mix(surf, uColor2, smoothstep(0.58, 0.86, h));
@@ -115,6 +118,9 @@ export const planetFragmentShader = /* glsl */ `
       if (uColony > 0.5) cityMask = smoothstep(0.66, 0.86, fbm(dir * 26.0 + off * 2.3));
     } else if (uKind < 1.5) {
       // terran family — biome-driven sea level / land palette / clouds
+      float n = fbm(dir * 2.5 + off);
+      float n2 = fbm(dir * 6.0 + off * 1.7);
+      float n3 = fbm(dir * 15.0 + off * 2.3); // fine detail
       float h = n * 0.6 + n2 * 0.3 + n3 * 0.1;
       float sea = 0.5;
       float cloudAmt = 0.55;
@@ -157,6 +163,7 @@ export const planetFragmentShader = /* glsl */ `
       }
     } else if (uKind < 2.5) {
       // ice world
+      float n = fbm(dir * 2.5 + off);
       surf = mix(uColor3, uColor1, smoothstep(0.3, 0.7, n));
       float crack = 1.0 - smoothstep(0.49, 0.5, abs(fbm(dir * 4.0 + off) - 0.5) * 2.0);
       surf = mix(surf, vec3(0.95, 0.98, 1.0), crack * 0.4);
