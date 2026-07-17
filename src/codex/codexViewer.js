@@ -27,12 +27,13 @@ import {
   generateSolarSystem,
   generateDeadSpace,
   generateFilmWorlds,
+  generateFactionCapitals,
 } from '../systems/systemData.js';
 
 // Fixed hand-crafted seeds -> their own generate*() function, mirroring the
 // exact mapping systemCatalog.js uses to build the galaxy's system list. Any
-// seed NOT in this table (and not one of the film-world seeds below) is a
-// procedural seed (`<partyId>::sys<N>`) and goes through generateSystem().
+// seed NOT in this table (and not a film-world or faction-capital seed below)
+// is a procedural seed (`<partyId>::sys<N>`) and goes through generateSystem().
 const SPECIAL_BUILDERS = {
   'galactic-core': generateGalacticCore,
   interstellar: generateInterstellar,
@@ -50,6 +51,16 @@ function filmWorldBySeed(seed) {
   return _filmWorlds.find((d) => d.seed === seed) || null;
 }
 
+// Same deal for the six faction home systems (`capital-<id>`, appended to the
+// catalog by systemCatalog.js): fixed, input-free build, cached once. Without
+// this branch a capital seed would fall through to generateSystem() and rebuild
+// a random unrelated system — the wrong planet under a codex thumbnail.
+let _capitals = null;
+function capitalBySeed(seed) {
+  if (!_capitals) _capitals = generateFactionCapitals();
+  return _capitals.find((d) => d.seed === seed) || null;
+}
+
 /**
  * Resolve a stored seed back to its system data, through the SAME generator
  * the game used to produce it in the first place. `overlay`, if given, layers
@@ -62,7 +73,7 @@ function filmWorldBySeed(seed) {
  */
 export function resolveSystemData(seed, overlay) {
   const special = SPECIAL_BUILDERS[seed];
-  const base = special ? special() : filmWorldBySeed(seed) || generateSystem(seed);
+  const base = special ? special() : filmWorldBySeed(seed) || capitalBySeed(seed) || generateSystem(seed);
   return overlay ? overlay.effective(seed, base) : base;
 }
 
