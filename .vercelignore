@@ -4,7 +4,12 @@
 docs
 shots
 scripts
-media
+scratchpad
+# media/ is dev-only EXCEPT the hand-painted codex hero cards, which the app
+# fetches at runtime (media/hero/*.webp) and must ship in the deploy bundle.
+media/*
+!media/hero
+!media/hero/**
 .claude
 *.md
 *.py

@@ -15,7 +15,7 @@
 // Reads ONLY through codex.js's public API and codexData.js's catalogs/
 // describeEntry; it never touches storage.js directly.
 
-import { catalogFor, describeEntry, factionShelf, isRebuildable, racePlanetRef, specialGroup } from './codexData.js';
+import { catalogFor, describeEntry, factionShelf, heroPathFor, isRebuildable, racePlanetRef, specialGroup } from './codexData.js';
 import { has, list, progress } from './codex.js';
 import { categoryIcon } from './codexIcons.js';
 import { buildFor } from './codexViewer.js';
@@ -40,7 +40,7 @@ const TABS = [
 const FACTION_TINT = {
   alliance: '#5a8aff',
   imperial: '#ff4030',
-  swarm: '#9aff3a',
+  swarm: '#c060ff',
   syndicate: '#00d4ff',
   cartel: '#ff8a2a',
   precursor: '#ffd27a',
@@ -441,10 +441,27 @@ export class CodexUI {
     this._thumbRaf = 0;
     const job = this._thumbQueue.shift();
     if (job && job.gen === this._thumbGen) {
-      const url = thumbnailFor(job.entry, { overlay: this._getOverlay() });
-      if (url) {
-        job.thumb.style.backgroundImage = `url("${url}")`;
-        job.thumb.classList.add('rendered');
+      // Prefer the hand-painted hero card; fall back to the live 3D render on
+      // absence/error. Kicking the hero preload off async lets the queue keep
+      // its one-per-frame budget — hero entries skip the 3D render entirely.
+      const paint3D = () => {
+        const url = thumbnailFor(job.entry, { overlay: this._getOverlay() });
+        if (url) {
+          job.thumb.style.backgroundImage = `url("${url}")`;
+          job.thumb.classList.add('rendered');
+        }
+      };
+      const hero = heroPathFor(job.entry);
+      if (hero) {
+        const img = new Image();
+        img.addEventListener('load', () => {
+          job.thumb.style.backgroundImage = `url("${hero}")`;
+          job.thumb.classList.add('rendered');
+        }, { once: true });
+        img.addEventListener('error', paint3D, { once: true });
+        img.src = hero;
+      } else {
+        paint3D();
       }
     }
     if (this._thumbQueue.length) this._thumbRaf = requestAnimationFrame(() => this._drainThumbs());
@@ -493,16 +510,30 @@ export class CodexUI {
       this._r.detailFacts.append(dt, dd);
     }
 
-    // thumbnail: the same render the shelf uses, or the group glyph for a find
-    // with no standalone 3D object (a system, a race).
+    // Preview: the same 3D render the shelf uses (or the group glyph for a find
+    // with no standalone 3D object — a system, a race) shown IMMEDIATELY, then
+    // upgraded to the hand-painted hero card if one loads. A hero-capable find
+    // reserves the larger portrait 3:4 slot up front (`has-hero`) so the swap
+    // is seamless, no layout jump. The async swap is guarded against the dialog
+    // being retargeted to another entry meanwhile.
+    const hero = heroPathFor(entry);
     const url = isRebuildable(entry) ? thumbnailFor(entry, { overlay: this._getOverlay() }) : null;
-    this._r.detailThumb.className = `codex-detail-thumb cat-${entry.category}`;
+    this._r.detailThumb.className = `codex-detail-thumb cat-${entry.category}${hero ? ' has-hero' : ''}`;
     if (url) {
       this._r.detailThumb.style.backgroundImage = `url("${url}")`;
       this._r.detailThumb.innerHTML = '';
     } else {
       this._r.detailThumb.style.backgroundImage = '';
       this._r.detailThumb.innerHTML = `<span class="codex-thumb-icon">${categoryIcon(iconKeyFor(entry))}</span>`;
+    }
+    if (hero) {
+      const img = new Image();
+      img.addEventListener('load', () => {
+        if (this._detailEntry !== entry) return; // dialog moved on
+        this._r.detailThumb.style.backgroundImage = `url("${hero}")`;
+        this._r.detailThumb.innerHTML = '';
+      }, { once: true });
+      img.src = hero;
     }
 
     this._r.detailActions.innerHTML = '';

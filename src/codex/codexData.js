@@ -23,7 +23,8 @@ for (const faction of FACTIONS) {
   for (const role of ROLES) {
     SHIP_CATALOG.push({
       archetypeKey: `${faction.id}:${role.id}`,
-      label: role.name,
+      // a faction MAY name its ships itself (Swarm's grown beasts); else the shared role name
+      label: (faction.names && faction.names[role.id]) || role.name,
       group: faction.name,
       factionId: faction.id,
       roleId: role.id,
@@ -97,7 +98,7 @@ const RACE_CATALOG = [
   // the faction homeworld races (#stage6) — unlocked by visiting their capital
   { archetypeKey: 'aelari', label: 'Аэлары', group: 'Виды', planetRef: { seed: 'capital-alliance', label: 'Аэла' } },
   { archetypeKey: 'hesht', label: 'Хешты', group: 'Виды', planetRef: { seed: 'capital-imperial', label: 'Наковальня' } },
-  { archetypeKey: 'porosl', label: 'Поросль', group: 'Виды', planetRef: { seed: 'capital-swarm', label: 'Прародина' } },
+  { archetypeKey: 'porosl', label: 'Приплод', group: 'Виды', planetRef: { seed: 'capital-swarm', label: 'Прародина' } },
   { archetypeKey: 'precursors', label: 'Предтечи', group: 'Виды', planetRef: { seed: 'capital-precursor', label: 'Скрижаль' } },
   { archetypeKey: 'necromorphs', label: 'Некроморфы', group: 'Скоро', future: true },
   { archetypeKey: 'generative-1', label: 'Неизвестный вид', group: 'Скоро', future: true },
@@ -277,6 +278,28 @@ export function isRebuildable(entry) {
   }
 }
 
+// Signature specials (phenomena / named objects) that have a hand-painted card.
+// Other specials — planets, races, ordinary systems — have none and keep the
+// live 3D render / group glyph.
+const HERO_SPECIALS = new Set(['deathstar', 'ishimura', 'dragon', 'endurance', 'sys-sagittarius', 'sys-gargantua']);
+
+/** Optional hand-painted hero illustration for a find. Ships (54: 9 roles × 6
+ *  factions, incl. flagship) and stations (18) have a full painted set under
+ *  media/hero/<faction>_<role|type>.webp — keyed straight off archetypeKey with
+ *  ':' → '_'; the signature specials above live under media/hero/special/<key>.webp.
+ *  Everything else has no card and keeps the live 3D render. Returns null then. */
+export function heroPathFor(entry) {
+  if (!entry) return null;
+  const key = String(entry.archetypeKey || '');
+  if (entry.category === 'ship' || entry.category === 'station') {
+    return key.includes(':') ? `media/hero/${key.replace(':', '_')}.webp` : null;
+  }
+  if (entry.category === 'special' && HERO_SPECIALS.has(key)) {
+    return `media/hero/special/${key}.webp`;
+  }
+  return null;
+}
+
 /** The Особое sub-group ('Системы'|'Объекты'|'Планеты') for a special key, so a
  *  recorded entry (which stores no group) can pick the right placeholder glyph. */
 export function specialGroup(archetypeKey) {
@@ -366,7 +389,7 @@ const RACE_INFO = {
   signbuilders: 'Давно исчезнувшая раса зодчих, оставившая на промёрзшем мире загадочные Знаки.',
   aelari: 'Негромкий народ верфей — лучшие сварщики и навигаторы Альянса, одна из рас-основательниц Договора.',
   hesht: 'Народ расколотого мира, превративший траур в дисциплину, а клятву — в государство.',
-  porosl: 'Монораса-коллектив Роя; лес, научившийся расти между звёзд. Имя дали чужие картографы.',
+  porosl: 'Монораса-коллектив Роя; выводок исполинских выращенных тварей, кочующих между звёзд. Имя дали чужие картографы.',
   precursors: 'Высокие тихие силуэты старшей расы; их видят редко, издалека и всегда за работой.',
 };
 
@@ -376,7 +399,7 @@ const SPECIAL_INFO = {
   'sys-gargantua': { desc: 'Гигантская вращающаяся чёрная дыра с ярким тонким диском — та самая Гаргантюа из «Интерстеллара».', facts: [['Тип', 'вращающаяся ЧД'], ['Рядом', '«Эндюранс»']] },
   'sys-sol': { desc: 'Наша родная система: восемь планет вокруг жёлтого карлика, колыбель Человечества.', facts: [['Звезда', 'жёлтый карлик'], ['Планет', '8']] },
   'sys-quarantine': { desc: 'Мёртвая система под карантином: над Эгидой VII завис корабль-трещинник, команда мертва.', facts: [['Статус', 'карантин'], ['Угроза', 'некроморфы']] },
-  'sys-alderaan': { desc: 'Сектор, где боевая станция раскетолала целый мир одним залпом — на память осталось облако щебня.', facts: [['Событие', 'уничтожение Альдераана']] },
+  'sys-alderaan': { desc: 'Сектор, где боевая станция расколола целый мир одним залпом — на память осталось облако щебня.', facts: [['Событие', 'уничтожение Альдераана']] },
   'sys-twinsun': { desc: 'Мир двух солнц: под сдвоенным светом лежит пустынный Татуин.', facts: [['Звёзд', '2']] },
   'sys-spice': { desc: 'Пустынный предел, где добывают драгоценную пряность, а под песком ходят исполины.', facts: [['Ресурс', 'пряность']] },
   'sys-jungle': { desc: 'Спутник газового гиганта, заросший живыми джунглями, — дом народа На’ви.', facts: [['Тип', 'луна-джунгли']] },
@@ -397,14 +420,14 @@ const SPECIAL_INFO = {
   // --- столицы фракций (#stage6) ---
   'sys-cap-alliance': { desc: 'Первая общая верфь галактики над родным миром аэларов: здесь сваркой подписали Договор.', facts: [['Фракция', 'Альянс'], ['Флагман', '«Тихая Гавань»']] },
   'sys-cap-imperial': { desc: 'Поле обломков расколотого Хешта и тронная Наковальня — рана, вокруг которой построена Империя.', facts: [['Фракция', 'Империя Пепла'], ['Флагман', '«Тризна»']] },
-  'sys-cap-swarm': { desc: 'Прародина-сад, океан-питомник и пастбища полипов; все имена здесь дали чужие картографы.', facts: [['Фракция', 'Рой'], ['Флагман', '«Идущий лес»']] },
+  'sys-cap-swarm': { desc: 'Прародина-сад, океан-питомник и пастбища полипов; все имена здесь дали чужие картографы.', facts: [['Фракция', 'Рой'], ['Флагман', '«Исполин»']] },
   'sys-cap-syndicate': { desc: 'Нулевой меридиан всех маршрутов галактики: эталонные часы Прайма заверяют сделки половины флотов.', facts: [['Фракция', 'Синдикат'], ['Флагман', '«Контрольный пакет»']] },
   'sys-cap-cartel': { desc: 'Старейший вольный порт галактики: толчея бортов у Толстяка и доки, где плиты не гаснут.', facts: [['Фракция', 'Картель'], ['Флагман', '«Мамаша»']] },
   'sys-cap-precursor': { desc: 'Система, которую все карты помечают одинаково: не мешать. Города выметены, сад поливают — хозяев не видно.', facts: [['Фракция', 'Предтечи'], ['Флагман', '«Тот, Кто Остался»']] },
   'pl-aela': { desc: 'Родной мир аэларов: города вдоль побережий, кольцевой хаб-верфь над экватором и старые песни в ритме работы.', facts: [['Биом', 'земной'], ['Раса', 'Аэлары']] },
   'pl-hesht': { desc: 'Расколотый родной мир хештов — святыня и рана; сюда приходят молчать, заглушив двигатель.', facts: [['Статус', 'уничтожен'], ['Память', 'осколки в килях кораблей']] },
   'pl-anvil': { desc: 'Тронный мир Империи: чёрные города-арсеналы и небо, в котором всегда виден расколотый Хешт.', facts: [['Биом', 'скальный'], ['Раса', 'Хешты']] },
-  'pl-firstgarden': { desc: 'Мир-сад без единого огня городов: города здесь не строят, здесь растут.', facts: [['Биом', 'джунгли'], ['Раса', 'Поросль']] },
+  'pl-firstgarden': { desc: 'Мир-сад без единого огня городов: города здесь не строят, здесь растут.', facts: [['Биом', 'джунгли'], ['Раса', 'Приплод']] },
   'pl-prime': { desc: 'Мир-штаб под стеклом: от его нулевого меридиана отсчитываются маршруты и время половины галактики.', facts: [['Биом', 'город'], ['Владелец', 'Синдикат «Меридиан»']] },
   'pl-fatman': { desc: 'Полосатый гигант, кормящий половину Картеля: газосборщики, доки и очередь, которую уважают больше законов.', facts: [['Тип', 'газовый гигант'], ['Роль', 'главный порт']] },
   'pl-tablet': { desc: 'Древний мир, чьи города с орбиты читаются как строки текста; единственный сад поливают до сих пор.', facts: [['Биом', 'пустыня'], ['Раса', 'Предтечи']] },
@@ -435,7 +458,10 @@ export function describeEntry(entry) {
       const faction = FACTION_BY_ID[factionId];
       if (role) {
         desc = role.desc;
-        facts.push(['Назначение', role.purpose], ['Длина', `${role.lengthM} м`], ['Экипаж', String(role.crew)], ['Вооружение', role.arm]);
+        // transports keep their payload in `arm` (cargo, fuel, colonists) — an
+        // honest «Нагрузка» beats calling 4 000 colonists an armament.
+        const armLabel = role.cat === 'transport' ? 'Нагрузка' : 'Вооружение';
+        facts.push(['Назначение', role.purpose], ['Длина', `${role.lengthM} м`], ['Экипаж', String(role.crew)], [armLabel, role.arm]);
       }
       if (faction) {
         facts.push(['Флот', faction.name]);

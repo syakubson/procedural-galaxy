@@ -1073,6 +1073,34 @@ body.clean-view #fact-box {
 #fact-box p {
   margin: 0;
 }
+/* Selected-object portrait (ship / station): the hand-painted hero card parked
+   to the LEFT of the big title. Hidden for systems / planets, where .sp-head
+   collapses to the single titles column. */
+.sp-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+.sp-portrait {
+  display: none; /* JS reveals it for a selected ship / station */
+  flex: none;
+  width: 188px;
+}
+.sp-hero {
+  display: none; /* JS sets display:block once the image decodes */
+  width: 188px;
+  aspect-ratio: 3 / 4;
+  border-radius: 3px;
+  border: 1px solid var(--vellum);
+  background-color: rgba(10, 13, 26, 0.5);
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+}
+.sp-titles {
+  flex: 1;
+  min-width: 0;
+}
 .sp-status {
   display: inline-block;
   font-family: var(--font-mono);
@@ -2092,7 +2120,7 @@ body.clean-view #fact-box {
   z-index: 1;
   display: flex;
   gap: 22px;
-  width: min(640px, 88%);
+  width: min(760px, 92%);
   max-height: 88vh; /* a tall dialog on a short viewport scrolls instead of clipping */
   overflow-y: auto;
   padding: 22px;
@@ -2137,6 +2165,13 @@ body.clean-view #fact-box {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+/* A find with a hand-painted hero card shows it large and uncropped: the slot
+   takes the card's native 3:4 portrait so `background-size: cover` fills it with
+   no crop. Non-hero finds keep the compact 180² 3D-thumbnail slot above. */
+.codex-detail-thumb.has-hero {
+  width: 288px;
+  height: 384px;
 }
 .codex-detail-thumb .codex-thumb-icon {
   color: var(--cat, var(--parchment));
