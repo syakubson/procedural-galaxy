@@ -5,7 +5,7 @@
 // clicking one focuses + opens that object, exactly like clicking it in 3D.
 
 import * as THREE from 'three';
-import { planetLabel, planetMiniDesc, planetAccent, planetStatusIcon, structureCard } from './hud.js';
+import { planetLabel, planetKindLabel, planetMiniDesc, planetAccent, planetStatusIcon, structureCard } from './hud.js';
 
 // every label sub/mini reads as a caption, so it must start with a capital —
 // the source strings ('флагман', 'форпост', 'дом цивилизации', …) come in lower-case.
@@ -34,7 +34,11 @@ export class PlanetLabels {
     planets.forEach((pl, i) => {
       const pd = (data.planets && data.planets[i]) || {};
       const name = pd.label || `${data.name} ${String.fromCharCode(98 + i)}`;
-      this._add(pl.body, name, planetLabel(pd), planetMiniDesc(pd), planetAccent(pd), 'planet', pl, planetStatusIcon(pd));
+      // hand-named worlds: planetLabel() echoes the same label back — show the
+      // biome/type caption instead, so the pill never repeats its own name.
+      let sub = planetLabel(pd);
+      if (sub === name) sub = planetKindLabel(pd);
+      this._add(pl.body, name, sub, planetMiniDesc(pd), planetAccent(pd), 'planet', pl, planetStatusIcon(pd));
     });
     // flagships only (not every fighter/transport — that would be noise)
     for (const s of view.ships || []) {
@@ -161,7 +165,7 @@ export class PlanetLabels {
     // with a sub-line / mini-line separate fully. The text box sits anchored at
     // the pin: it extends RIGHT from sx and UP from sy. We resolve any pair that
     // overlaps in BOTH axes by pushing them apart vertically, a few relax passes.
-    const PAD = 5;
+    const PAD = 9; // breathing room between pills — 5 let borders visually kiss
     vis.sort((a, b) => a.sy - b.sy);
     for (let pass = 0; pass < 8; pass++) {
       let moved = false;
