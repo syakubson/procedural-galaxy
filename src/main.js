@@ -24,6 +24,7 @@ import { WorldOverlay } from './state/overlay.js';
 import { currentPartyId, ensureParty, hasLegacyCharted } from './state/party.js';
 import { record as codexRecord, flush as codexFlush } from './codex/codex.js';
 import { CodexUI } from './codex/codexUI.js';
+import { heroPathFor } from './codex/codexData.js';
 import { Onboarding } from './onboarding/onboarding.js';
 import { ObjectViewer } from './ui/objectViewer.js';
 import { ROLES } from './systems/ships.js';
@@ -575,10 +576,17 @@ class GalaxyApp {
     // to the left when there isn't room on the right
     if (fc && this.infoPanel.focusActive) {
       const fcw = fc.offsetWidth || 240;
+      const fch = fc.offsetHeight || 220;
       let fx = sx + size / 2 + 18;
       if (fx + fcw > w - 16) fx = sx - size / 2 - 18 - fcw;
+      // keep the callout clear of the bottom-left info dossier (big title + hero
+      // photo) it would otherwise overlap when the object is framed low-left;
+      // and always keep it fully on-screen.
+      let fy = sy;
+      if (fx < w * 0.42) fy = Math.min(fy, h - 300 - fch / 2);
+      fy = Math.max(fch / 2 + 16, Math.min(fy, h - fch / 2 - 16));
       fc.style.left = `${Math.max(16, fx)}px`;
-      fc.style.top = `${sy}px`;
+      fc.style.top = `${fy}px`;
       fc.classList.add('visible');
     } else if (fc) {
       fc.classList.remove('visible');
@@ -1325,7 +1333,8 @@ class GalaxyApp {
     } else if (kind === 'ship') {
       // #6: ships zoom in + follow, framed by their true bounds (focusConfig).
       this._frameObject(ref.mesh, 'ship');
-      this.infoPanel.showShip(ref.type, this.systemView._factionStyle, ref);
+      this.infoPanel.showShip(ref.type, this.systemView._factionStyle, ref,
+        heroPathFor({ category: 'ship', archetypeKey: `${this.systemView._faction}:${ref.type.id}` }));
       this.planetLabels.setVisible(false);
       this._codexRecord('ship', `${this.systemView._faction}:${ref.type.id}`, {
         batchId: codexBatch,
@@ -1336,7 +1345,8 @@ class GalaxyApp {
     } else if (kind === 'structure') {
       // #6: orbital structures zoom in + follow + their own info card.
       this._frameObject(ref.station, 'structure');
-      this.infoPanel.showStructure(structureCard(ref), this.systemView._factionStyle);
+      this.infoPanel.showStructure(structureCard(ref), this.systemView._factionStyle,
+        heroPathFor({ category: 'station', archetypeKey: `${this.systemView._faction}:${ref.stationKind}` }));
       this.planetLabels.setVisible(false);
       // station archetype is faction × kind now, so its faction is baked into
       // the key (grouped by faction on the Stations tab).
@@ -1361,6 +1371,7 @@ class GalaxyApp {
           ],
         },
         this.systemView._factionStyle,
+        heroPathFor({ category: 'special', archetypeKey: 'ishimura' }),
       );
       this.planetLabels.setVisible(false);
       this._codexRecord('special', 'ishimura', { batchId: codexBatch, sourceRef: { seed: this.systemView.data.seed } });
@@ -1381,6 +1392,7 @@ class GalaxyApp {
           ],
         },
         this.systemView._factionStyle,
+        heroPathFor({ category: 'special', archetypeKey: 'deathstar' }),
       );
       this.planetLabels.setVisible(false);
       this._codexRecord('special', 'deathstar', { batchId: codexBatch, sourceRef: { seed: this.systemView.data.seed } });
@@ -1401,6 +1413,7 @@ class GalaxyApp {
           ],
         },
         this.systemView._factionStyle,
+        heroPathFor({ category: 'special', archetypeKey: 'dragon' }),
       );
       this.planetLabels.setVisible(false);
       this._codexRecord('special', 'dragon', { batchId: codexBatch, sourceRef: { seed: this.systemView.data.seed } });

@@ -19,7 +19,7 @@ const SPECIAL_COLOR = '#d98ae8';
 const CAPITAL_COLOR = {
   alliance: '#5a8aff',
   imperial: '#ff4030',
-  swarm: '#9aff3a',
+  swarm: '#c060ff',
   syndicate: '#00d4ff',
   cartel: '#ff8a2a',
   precursor: '#ffd27a',
@@ -47,6 +47,12 @@ export function planetLabel(p) {
   if (p.label) return p.label; // hand-named special-system planets (#13/#19/#20)
   if (p.biomeLabel && (p.inhabited || p.ruined)) return p.biomeLabel;
   return TYPE_LABEL[p.type] || p.type;
+}
+
+/** Biome/type caption that is NEVER the planet's own name — the label pill's
+ *  sub-line for hand-named worlds, where planetLabel() would echo the name. */
+export function planetKindLabel(p) {
+  return p.biomeLabel || TYPE_LABEL[p.type] || '';
 }
 
 // Subtitle for the focused-planet card. Biome names must beat the generic
@@ -222,11 +228,18 @@ export class InfoPanel {
     const el = document.createElement('div');
     el.id = 'system-panel';
     el.innerHTML = `
-      <h1 class="sp-name"></h1>
-      <div class="sp-status"></div>
-      <div class="sp-star"></div>
-      <div class="sp-flourish">✦</div>
-      <p class="sp-desc"></p>
+      <div class="sp-head">
+        <div class="sp-portrait">
+          <div class="sp-hero"></div>
+        </div>
+        <div class="sp-titles">
+          <h1 class="sp-name"></h1>
+          <div class="sp-status"></div>
+          <div class="sp-star"></div>
+          <div class="sp-flourish">✦</div>
+          <p class="sp-desc"></p>
+        </div>
+      </div>
 
       <div class="sp-section sp-about">
         <div class="sp-about-title sp-sec-title">Об этой системе</div>
@@ -289,6 +302,8 @@ export class InfoPanel {
     this.focusActive = false;
 
     this._r = {
+      portrait: el.querySelector('.sp-portrait'),
+      hero: el.querySelector('.sp-hero'),
       status: el.querySelector('.sp-status'),
       aboutTitle: el.querySelector('.sp-about-title'),
       resTitle: el.querySelector('.sp-res-title'),
@@ -334,6 +349,39 @@ export class InfoPanel {
     }
   }
 
+  /** The hand-painted hero portrait for a selected ship / station, parked beside
+   *  the big title in the left panel (its name/type/story stay in place). Hidden
+   *  for systems / planets. Preloaded so a missing asset never flashes — on error
+   *  the photo just stays hidden. A token guards a fast re-selection. */
+  _setDossier(heroPath) {
+    const r = this._r;
+    r.portrait.style.display = heroPath ? 'block' : 'none'; // CSS default is display:none
+    const token = (this._dossierToken = (this._dossierToken || 0) + 1);
+    r.hero.style.display = 'none'; // CSS default; shown on successful decode
+    r.hero.style.backgroundImage = '';
+    if (!heroPath) return;
+    const img = new Image();
+    img.addEventListener('load', () => {
+      if (token !== this._dossierToken) return;
+      r.hero.style.backgroundImage = `url("${heroPath}")`;
+      r.hero.style.display = 'block';
+    }, { once: true });
+    img.src = heroPath; // on error: leave the photo hidden
+  }
+
+  /** Long capital / station / ship names tower at the 70px title size — they
+   *  wrap to four lines or clip at the panel edge. Scale the title font down for
+   *  longer names (relative to the CURRENT CSS base, so the responsive size is
+   *  respected), easing from full size to ~42% for very long names. */
+  _fitName() {
+    const el = this._r.name;
+    el.style.fontSize = ''; // read the CSS base (respects the mobile override)
+    const base = parseFloat(getComputedStyle(el).fontSize) || 70;
+    const len = (el.textContent || '').trim().length;
+    const size = Math.max(base * 0.42, base - Math.max(0, len - 11) * (base / 29));
+    el.style.fontSize = `${Math.round(size)}px`;
+  }
+
   /** Show/hide the top-right fact card (#10) — only the system view has one. */
   _setFact(fact) {
     if (fact) {
@@ -371,6 +419,7 @@ export class InfoPanel {
   show(data) {
     const r = this._r;
     this._mode = 'system';
+    this._setDossier(null); // systems carry no hero portrait
     this.backEl.textContent = '← Назад к галактике';
     this.backEl.classList.add('visible');
     r.aboutTitle.textContent = 'Об этой системе';
@@ -379,6 +428,7 @@ export class InfoPanel {
     r.status.style.color = color;
     r.status.style.borderColor = color;
     r.name.textContent = data.name;
+    this._fitName();
     // #18: a binary system must read as two suns, not one.
     r.star.textContent = data.binary
       ? `Двойная звезда · ${data.star.label} + ${data.binary.star2.label}`
@@ -409,6 +459,7 @@ export class InfoPanel {
   showPlanet(p, name) {
     const r = this._r;
     this._mode = 'planet';
+    this._setDossier(null); // planets keep their photo-less callout
     this.backEl.textContent = '← Назад к системе';
     this.backEl.classList.add('visible');
     r.aboutTitle.textContent = 'О планете';
@@ -417,6 +468,7 @@ export class InfoPanel {
     r.status.style.color = color;
     r.status.style.borderColor = color;
     r.name.textContent = name || planetLabel(p);
+    this._fitName();
     r.star.textContent = planetSubtitle(p);
     // label + description + characteristics + resources all live in the side
     // callout by the reticle now; the left panel keeps status/name + civilisation.
@@ -443,7 +495,7 @@ export class InfoPanel {
 
   /** Ship detail card (#6) — flagships & traffic. `ship` carries a flagship's
    *  own name + unique story (#H), if any. */
-  showShip(role, faction, ship) {
+  showShip(role, faction, ship, heroPath) {
     const r = this._r;
     this._mode = 'ship';
     this.backEl.textContent = '← Назад к системе';
@@ -454,17 +506,25 @@ export class InfoPanel {
     r.status.textContent = named ? 'Флагман флота' : `Корабль · ${role.size}`;
     r.status.style.color = color;
     r.status.style.borderColor = color;
-    r.name.textContent = named || role.name;
+    // a faction may name its ships itself (Swarm's grown beasts); flagship keeps its own legend name
+    const roleName = (faction && faction.names && faction.names[role.id]) || role.name;
+    r.name.textContent = named || roleName;
+    this._fitName();
     r.star.textContent = faction && faction.name ? `Флот: ${faction.name}` : 'Корабль';
-    // story + label + specs all move to the side callout by the reticle (#15)
+    // story + label + specs stay in the side callout by the reticle (#15); the
+    // hero portrait is the only thing added to the left panel, beside the title.
     r.desc.textContent = '';
     r.desc.style.display = 'none';
+    // transports keep their payload in `arm` (cargo, fuel, colonists) — label
+    // the row honestly instead of calling 4 000 colonists an armament.
+    const armLabel = role.cat === 'transport' ? 'Нагрузка' : 'Вооружение';
     const metaHtml =
-      `<span><b>Класс:</b> ${role.name}</span>` +
+      `<span><b>Класс:</b> ${roleName}</span>` +
       `<span><b>Длина:</b> ${role.lengthM} м</span>` +
       `<span><b>Скорость:</b> ${role.speed}</span>` +
       `<span><b>Экипаж:</b> ${role.crew}</span>` +
-      `<span><b>Вооружение:</b> ${role.arm}</span>`;
+      `<span><b>${armLabel}:</b> ${role.arm}</span>`;
+    this._setDossier(heroPath); // hero portrait → left panel, beside the title
     this._setFocusCallout(
       named || role.name,
       faction && faction.name ? `Флот: ${faction.name}` : 'Корабль',
@@ -481,7 +541,7 @@ export class InfoPanel {
   }
 
   /** Structure detail card (#6) — stations, gas collectors, orbital hubs. */
-  showStructure(info, faction) {
+  showStructure(info, faction, heroPath) {
     const r = this._r;
     this._mode = 'structure';
     this.backEl.textContent = '← Назад к системе';
@@ -492,10 +552,12 @@ export class InfoPanel {
     r.status.style.color = color;
     r.status.style.borderColor = color;
     r.name.textContent = info.name;
+    this._fitName();
     r.star.textContent = faction && faction.name ? `Постройка флота: ${faction.name}` : 'Орбитальная постройка';
     r.desc.textContent = '';
     r.desc.style.display = 'none';
     const metaHtml = (info.meta || []).map(([k, v]) => `<span><b>${k}:</b> ${v}</span>`).join('');
+    this._setDossier(heroPath); // hero portrait → left panel, beside the title
     this._setFocusCallout(info.name, info.kindLabel, stripUniverseTag(info.desc), metaHtml, '');
     r.history.textContent = '';
     r.about.style.display = 'none';
